@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GRS Duvet Calculator — Fabrics fixed, full bindings, no PDF</title>
+
+<!-- libs -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+  :root{
+    --brand:#424242;
+    --brand-2:#F6AA70;
+    --bg:#F7F6F4;
+    --card:#FFFFFF;
+    --muted:#61635f;
+    --border:#E4E3E0;
+    --ring:rgba(54,58,54,.35);
+    --danger:#a5282c;
+    --danger-bg:#fdecec;
+  }
+  html,body{height:100%}
+  body{
+    font-family:Inter, Segoe UI, Roboto, Arial, sans-serif;
+    margin:0;color:#202121;
+    background: radial-gradient(1200px 400px at 50% -200px, #fff0, #0000),
+               linear-gradient(180deg, var(--bg), #fff 260px);
+  }
+  *{box-sizing:border-box}
+  .wrap{max-width:1100px;margin:28px auto 80px;padding:0 18px}
+  .app-head{background:var(--brand);color:#fff;border-radius:18px;padding:22px 22px 18px;
+    box-shadow:0 10px 36px rgba(0,0,0,.10), inset 0 -1px 0 rgba(255,255,255,.08);
+    display:flex;align-items:center;gap:16px}
+  h1{font-size:24px;margin:0}
+  .logo-wrap{background:var(--brand-2);border-radius:999px;padding:8px 16px;min-width:220px;display:flex;align-items:center;justify-content:center}
+  .pill-logo{font-weight:800;font-size:16px;color:var(--brand);white-space:nowrap;letter-spacing:.2px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{appearance:none;border:1px solid transparent;background:var(--brand);color:#fff;font-weight:800;border-radius:12px;
+    padding:10px 14px;cursor:pointer;font-size:14px;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+  .btn.secondary{background:#fff;color:var(--brand)}
+  .menu{position:relative}
+  .menu-toggle{appearance:none;border:1px solid transparent;background:#fff;color:var(--brand);font-weight:800;border-radius:12px;padding:10px 14px;cursor:pointer;font-size:14px;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+  .menu-list{position:absolute;right:0;top:110%;min-width:220px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:6px;display:none;z-index:50}
+  .menu.open .menu-list{display:block}
+  .menu-item{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;padding:10px 10px;border-radius:10px;cursor:pointer;font-weight:700}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 16px 12px;box-shadow:0 1px 0 #fff inset, 0 1px 0 rgba(0,0,0,.02), 0 8px 28px rgba(0,0,0,.04);margin-top:16px}
+  .row{display:grid;grid-template-columns:240px 1fr;gap:12px;align-items:center;margin:.42rem 0}
+  label{font-weight:700}
+  input,select{width:100%;border:1px solid var(--border);border-radius:12px;padding:11px 12px;font-size:14px;background:#fff}
+  fieldset{border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin:.6rem 0;background:linear-gradient(180deg,#faf9f8,#fff)}
+  legend{font-weight:800;padding:0 8px}
+  .chip{display:inline-block;background:var(--brand-2);color:#1f1f1f;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800}
+  .chip-btn{border:none;background:var(--brand-2);cursor:pointer;border-radius:999px;padding:5px 10px;margin:0 6px 6px 0}
+  .hint{color:var(--muted);font-size:12px;margin:.25rem 0 .6rem}
+  .result{margin-top:18px;padding:16px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(180deg,#fafafa,#fff)}
+  .badge{display:inline-block;padding:.28rem .6rem;border-radius:9px;font-weight:800;font-size:.86rem;margin-right:.35rem}
+  .ok{background:#e9f6ee;color:#1a7f37;border:1px solid #d5eadc}
+  .warn{background:#fff7e6;color:#b8860b;border:1px solid #f3dfb3}
+  .no{background:#fdecec;color:#a5282c;border:1px solid #f5c3c7}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+  @media(max-width:680px){ .stats{grid-template-columns:1fr} }
+  .stat{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;box-shadow:0 1px 0 #fff inset}
+  .stat .k{font-size:12px;color:#666}
+  .stat .v{font-size:20px;font-weight:900;margin-top:4px;letter-spacing:.2px}
+  .stat .c{font-size:11px;color:#888;margin-top:2px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
+  thead th{background:#F7F6F4}
+  .right{text-align:right}
+  .inline-note{font-size:12px;color:#666}
+  .error-note{font-size:12px;color:var(--danger);margin-top:4px}
+  .danger{border-color:var(--danger)!important;background:var(--danger-bg)}
+  @media(max-width:900px){ .stickybar{ position: sticky; bottom: 0; background: #fff; padding: 12px; z-index: 10; border-top:1px solid var(--border); } }
+</style>
+
+<script>
+/* ===== expose simple GRS detector for binding codes ===== */
+(function(){ function isGrs(code){ try{return /GRS/i.test((code||'')+'');}catch(e){return false;} }
+  Object.defineProperty(window,'isGRSBindingCode',{value:isGrs,writable:false,configurable:false});
+})();
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="app-head">
+    <div class="logo-wrap"><span class="pill-logo">The Fine Bedding Company</span></div>
+    <div style="flex:1 1 auto"><h1>GRS Duvet Calculator</h1></div>
+    <div class="toolbar">
+      <button class="btn secondary" id="resetBtn" title="Clear inputs and results">Reset</button>
+      <div class="menu" id="exportMenu">
+        <button class="menu-toggle" onclick="toggleMenu(event)">Export ▾</button>
+        <div class="menu-list" role="menu" aria-label="Export options">
+          <button class="menu-item" onclick="exportCSV(); closeMenu()">CSV <span>↧</span></button>
+          <button class="menu-item" onclick="exportSkuHTML(); closeMenu()">SKU Sheet (HTML) <span>↧</span></button>
+          <button class="menu-item" onclick="exportSkuPNG(); closeMenu()">SKU PNG <span>↧</span></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="section">
+    <h3>📦 Product</h3>
+    <div class="row">
+      <label for="productName">SKU <span class="chip">required</span></label>
+      <div>
+        <input type="text" id="productName" placeholder="e.g. Smartdown 10.5 S" oninput="validateCanCalculate()">
+        <div class="inline-note" id="productNameNote">Enter a name to enable Calculate.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h3>🧵 Size & Fabrics</h3>
+    <div class="row">
+      <label for="duvetSize">Duvet Size</label>
+      <select id="duvetSize" onchange="onDuvetSizeChange();refreshDerivedDebounced();">
+        <option value="single">Single (135×200)</option>
+        <option value="double" selected>Double (200×200)</option>
+        <option value="king">King (230×220)</option>
+        <option value="superking">Super King (260×220)</option>
+        <option value="emperor">Emperor (290×235)</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div id="customSizeFields" style="display:none">
+      <div class="row"><label for="customLength">Custom length <span class="inline-note">cm</span></label><input inputmode="decimal" type="number" id="customLength" value="200" min="1" step="1" oninput="refreshDerivedDebounced()"></div>
+      <div class="row"><label for="customWidth">Custom width <span class="inline-note">cm</span></label><input inputmode="decimal" type="number" id="customWidth" value="200" min="1" step="1" oninput="refreshDerivedDebounced()"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="row">
+      <label for="numFabrics"># of Fabrics</label>
+      <select id="numFabrics" onchange="onNumFabricsChange();refreshDerivedDebounced();">
+        <option value="1" selected>1 Fabric (top &amp; bottom same)</option>
+        <option value="2">2 Fabrics (top Fabric 1, bottom Fabric 2)</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Fabric 1 -->
+  <section class="section">
+    <h3>🧶 Fabric 1</h3>
+    <div class="row">
+      <label for="fabric1Type">Fabric type</label>
+      <div>
+        <select id="fabric1Type" onchange="onFabricTypeChange(1)"></select>
+        <div id="fabric1Help" class="error-note" style="display:none">Choose Fabric 1 type.</div>
+      </div>
+    </div>
+    <div class="row fabric1-detail" style="display:none"><label for="fabric1GSM">GSM <span class="inline-note">g/m²</span></label><input inputmode="decimal" type="number" id="fabric1GSM" value="0" min="0" step="1" oninput="refreshDerivedDebounced()"></div>
+    <div class="row fabric1-detail" style="display:none"><label>Common GSMs</label><div id="fabric1GSMChips" class="hint"></div></div>
+    <div class="row fabric1-detail" style="display:none"><label for="fabric1IsGRS">Is GRS?</label><input type="checkbox" id="fabric1IsGRS" onchange="refreshDerivedDebounced()"></div>
+  </section>
+
+  <!-- Fabric 2 -->
+  <section class="section" id="fabric2Section" style="display:none">
+    <h3>🧶 Fabric 2</h3>
+    <div class="row">
+      <label for="fabric2Type">Fabric type</label>
+      <div>
+        <select id="fabric2Type" onchange="onFabricTypeChange(2)"></select>
+        <div id="fabric2Help" class="error-note" style="display:none">Choose Fabric 2 type.</div>
+      </div>
+    </div>
+    <div class="row fabric2-detail" style="display:none"><label for="fabric2GSM">GSM <span class="inline-note">g/m²</span></label><input inputmode="decimal" type="number" id="fabric2GSM" value="0" min="0" step="1" oninput="refreshDerivedDebounced()"></div>
+    <div class="row fabric2-detail" style="display:none"><label>Common GSMs</label><div id="fabric2GSMChips" class="hint"></div></div>
+    <div class="row fabric2-detail" style="display:none"><label for="fabric2IsGRS">Is GRS?</label><input type="checkbox" id="fabric2IsGRS" onchange="refreshDerivedDebounced()"></div>
+  </section>
+
+  <section class="section">
+    <h3>☁️ Filling</h3>
+    <div class="row">
+      <label for="finishType">Finish</label>
+      <select id="finishType" onchange="onFinishChange();refreshDerivedDebounced()">
+        <option selected>Sonic Seam</option>
+        <option>Bound Duvets</option>
+        <option>Nursery without corovin</option>
+        <option>Nursery with corovin</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="togExcel">TOG</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="togExcel" onchange="onTogChange();refreshDerivedDebounced()">
+          <option>4.5</option>
+          <option>7.5</option>
+          <option selected>10.5</option>
+          <option>13.5</option>
+          <option>15.0</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <input id="togCustom" type="number" inputmode="decimal" step="0.1" min="1" style="width:120px;display:none" placeholder="e.g. 11.2" oninput="refreshDerivedDebounced()" />
+      </div>
+    </div>
+    <div class="row">
+      <label for="fibreRecipe">Fibre recipe</label>
+      <select id="fibreRecipe" onchange="refreshDerivedDebounced()"></select>
+    </div>
+    <div class="hint">Total kg = m²(one side) × TOG × constant × factor ÷ 1000. Split into grams by recipe %.</div>
+    <fieldset>
+      <legend>Computed filling lines</legend>
+      <div class="inline-note" id="constInfo" style="margin-bottom:.4rem"></div>
+      <table>
+        <thead><tr><th>#</th><th>Code</th><th class="right">%</th><th class="right">g</th></tr></thead>
+        <tbody id="tbodyComponents"><tr><td colspan="4" class="inline-note">Pick recipe to see lines.</td></tr></tbody>
+        <tfoot><tr><th colspan="3" class="right">Total grams</th><th class="right" id="fillTotalGrams">0</th></tr></tfoot>
+      </table>
+    </fieldset>
+  </section>
+
+  <section class="section">
+    <h3>🧯 Lining</h3>
+    <div class="row"><label for="includeLiner">Include?</label><input type="checkbox" id="includeLiner" onchange="toggleLiningDetailed()"></div>
+    <div id="linerDetailedFields" style="display:none">
+      <div class="row"><label for="linerGSM" id="linerGSMLabel">Liner GSM</label><input type="number" id="linerGSM" value="0" min="0" step="1" oninput="onLinerGSMInput()"></div>
+      <div class="row" id="linerSideRow" style="display:none">
+        <label for="linerCoverage">Liner coverage</label>
+        <select id="linerCoverage">
+          <option value="both" selected>Both sides</option>
+          <option value="one">One side</option>
+        </select>
+      </div>
+      <div class="row"><label for="linerIsGRS">Liner is GRS?</label><input type="checkbox" id="linerIsGRS" onchange="refreshDerivedDebounced()"></div>
+    </div>
+  </section>
+
+  <section class="section" id="bindingSection">
+    <h3>📏 Binding</h3>
+    <div class="row"><label for="includeBinding">Include?</label><input type="checkbox" id="includeBinding" onchange="toggleBindingDetailed()"></div>
+    <div id="bindingDetailedFields" style="display:none">
+      <div class="row"><label for="bindingCode">Binding code</label>
+        <select id="bindingCode" onchange="onBindingCodeChange()"></select></div>
+      <div class="row"><label>G/m <span class="inline-note">auto</span></label><div><span id="bindingGPMView">0</span> <span class="inline-note">g/m</span></div></div>
+      <div class="row" id="bindingIsGRSRow"><label for="bindingIsGRS" id="bindingIsGRSLabel">Is GRS?</label><input type="checkbox" id="bindingIsGRS"></div>
+      <div class="hint">Perimeter = 2 × ((L + W) / 100).</div>
+    </div>
+    <div class="inline-note">Rule: when binding is OFF, finish switches to <strong>Sonic Seam</strong>. When binding is ON, finish becomes <strong>Bound Duvets</strong>.</div>
+  </section>
+
+  <section class="section">
+    <div class="toolbar stickybar">
+      <button id="calcBtn" class="btn" onclick="calculateAll()" disabled>Calculate</button>
+    </div>
+    <div id="inlineErrors" class="error-note" style="display:none"></div>
+    <div id="certDecision" class="result" style="margin-top:10px" hidden></div>
+    <div id="results" class="result" aria-live="polite"></div>
+  </section>
+
+  <section class="section">
+    <h3 style="margin-top:0">🗃️ Archive</h3>
+    <div class="hint">Saved locally on your device.</div>
+    <details id="archiveCollapse">
+      <summary>Show archive</summary>
+      <table id="archiveTable">
+        <thead><tr><th>Date/Time</th><th>Product Name</th><th class="right">Total Wt (g)</th><th class="right">GRS Wt (g)</th><th class="right">GRS %</th><th>Tier</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </section>
+</div>
+
+<script>
+/* ===== Data sets (from user) ===== */
+const BINDING_GPM = {
+  "A05MMSIMBAPIPING": 4.93,
+  "A042MMFPHBIAS": 3.25,
+  "A042MMPCBIAS": 4.55,
+  "A042MMTDAAGRSBIAS": 3.53,
+  "A042MMTDBGRSBIAS": 3.8,
+  "A042MM40CORBIAS": 1.91,
+  "A042MMNCGRYGRSBIAS": 3.8,
+  "A042MMMDWGRGRSBIAS": 3.63,
+  "A042MMPWHGRSBIAS": 3.7,
+  "A042MMSAVYSLGRSBIAS": 3.6,
+  "A042SIMBABIAS": 3.6,
+  "A042MMSIBLUEBIAS": 3.6,
+  "A042BLISSGRSBIAS": 3.55,
+  "A042MMCORBIAS": 0.6,
+  "A042MMNAVYBIAS": 4.4,
+  "A042MMMINTBIAS": 4.30,
+  "A042MMBLUEBIAS": 4.2,
+  "A042MMGRBIAS": 4.32,
+  "A042MMNWHBIAS": 4.37,
+  "A042MMBLUSHBIAS": 4.37,
+  "A042MMMORBIAS": 4.3,
+  "A042MMTURQBIAS": 3.7,
+  "A042MMPNKBIAS": 4.2
+};
+const FABRIC_GSM = {
+  "Cotton/Tencel": { mode_gsm:110, common_gsms:[110] },
+  "Cotton":        { mode_gsm:133, common_gsms:[100,115,133,230] },
+  "Poly/Cotton":   { mode_gsm:116, common_gsms:[98,111,116,158] },
+  "Modal/Cotton":  { mode_gsm:115, common_gsms:[109,115] },
+  "Polyester":     { mode_gsm:85,  common_gsms:[80,85,87,90] }
+};
+const FIBRE_TABLE = [
+  {"fibre_name":"Smartfil Eco","components":[{"code":"A6FIBRENO4YGRS","prcnt":0.65,"isGRS":true},{"code":"A6FIBRENO2CGRS","prcnt":0.35,"isGRS":true}],"constants":{"leq7_5":28.0,"tog9_10_5":31.0,"tog13_5":36.0,"tog15_0":36.0,"nursery_no_corovin":28.0,"nursery_corovin":25.0}},
+  {"fibre_name":"Smartfil Silk Touch","components":[{"code":"A6FIBRENO4YGRS","prcnt":0.65,"isGRS":true},{"code":"A6FIBRENO2CGRS","prcnt":0.30,"isGRS":true},{"code":"A6SILK9767","prcnt":0.05,"isGRS":false}],"constants":{"leq7_5":28.0,"tog9_10_5":31.0,"tog13_5":36.0,"tog15_0":36.0,"nursery_no_corovin":28.0,"nursery_corovin":25.0}},
+  {"fibre_name":"Smartfil Silk Touch 10","components":[{"code":"SMARTFIL_SILK_TOUCH_10","prcnt":1.0,"isGRS":false}],"constants":{"leq7_5":30.0,"tog9_10_5":31.0,"tog13_5":35.0,"tog15_0":35.0,"nursery_no_corovin":null,"nursery_corovin":null}},
+  {"fibre_name":"Smartfil Tech - Aegis (100%)","components":[{"code":"SMARTFIL_TECH_AEGIS_100","prcnt":1.0,"isGRS":false}],"constants":{"leq7_5":28.0,"tog9_10_5":30.0,"tog13_5":34.0,"tog15_0":34.0,"nursery_no_corovin":null,"nursery_corovin":null}},
+  {"fibre_name":"Smartfil Tech - Amicor","components":[{"code":"SMARTFIL_TECH_AMICOR","prcnt":1.0,"isGRS":false}],"constants":{"leq7_5":28.0,"tog9_10_5":30.0,"tog13_5":32.0,"tog15_0":32.0,"nursery_no_corovin":28.0,"nursery_corovin":25.0}}
+];
+
+/* ===== UI helpers ===== */
+function populateBindingCodes(){
+  const sel=document.getElementById('bindingCode'); if(!sel) return;
+  sel.innerHTML='<option value="">Select binding</option>';
+  Object.keys(BINDING_GPM).sort().forEach(code=>{
+    const o=document.createElement('option'); o.value=code; o.textContent=code; sel.appendChild(o);
+  });
+}
+function validateBindingSelect(){
+  const include = document.getElementById('includeBinding').checked;
+  const sel = document.getElementById('bindingCode');
+  if(!sel) return;
+  if(include && !sel.value){ sel.classList.add('danger'); }
+  else { sel.classList.remove('danger'); }
+}
+function onBindingCodeChange(){
+  const code=(document.getElementById('bindingCode')||{}).value||'';
+  const gpm=BINDING_GPM[code]||0;
+  document.getElementById('bindingGPMView').textContent=gpm.toString();
+
+  const chk=document.getElementById('bindingIsGRS');
+  const lbl=document.getElementById('bindingIsGRSLabel');
+  const row=document.getElementById('bindingIsGRSRow');
+  const hasGRS = window.isGRSBindingCode(code);
+
+  if (hasGRS){
+    if (chk){ chk.checked = true; chk.disabled = true; }
+    if (lbl){ lbl.classList.add('label-muted'); }
+    if (row){ row.style.display = ''; }
+  } else {
+    if (row){ row.style.display = 'none'; }
+    if (chk){ chk.checked = false; chk.disabled = false; }
+    if (lbl){ lbl.classList.remove('label-muted'); }
+  }
+  validateBindingSelect();
+}
+
+function populateFabricTypes(){
+  [1,2].forEach(i=>{
+    const sel=document.getElementById('fabric'+i+'Type'); if(!sel) return;
+    sel.innerHTML='<option value="">Select fabric type</option>';
+    const order = Object.keys(FABRIC_GSM);
+    const ordered = [];
+    if (FABRIC_GSM["Polyester"]) ordered.push("Polyester");
+    if (FABRIC_GSM["Cotton"]) ordered.push("Cotton");
+    order.forEach(k=>{ if(!ordered.includes(k)) ordered.push(k); });
+    ordered.forEach(tk=>{
+      const o=document.createElement('option'); o.value=tk; o.textContent=tk; sel.appendChild(o);
+    });
+  });
+}
+function setFabricDetailsVisibility(idx){
+  const type = (document.getElementById('fabric'+idx+'Type').value||'');
+  const show = !!type;
+  document.querySelectorAll('.fabric'+idx+'-detail').forEach(el=>{
+    el.style.display = show ? '' : 'none';
+  });
+}
+function onFabricTypeChange(idx){
+  const t=document.getElementById('fabric'+idx+'Type').value;
+  const gsm=document.getElementById('fabric'+idx+'GSM');
+  const chips=document.getElementById('fabric'+idx+'GSMChips');
+  if(FABRIC_GSM[t]){
+    gsm.value=FABRIC_GSM[t].mode_gsm||0;
+    chips.innerHTML=(FABRIC_GSM[t].common_gsms||[]).map(v=>
+      `<button type="button" class="chip chip-btn" role="button" tabindex="0" aria-label="Set GSM to ${v}" onclick="document.getElementById('fabric${idx}GSM').value=${v};refreshDerivedDebounced();">${v} GSM</button>`
+    ).join('');
+  } else {
+    chips.innerHTML='';
+  }
+  setFabricDetailsVisibility(idx);
+
+  if(idx===1){
+    const f1Sel=document.getElementById('fabric1Type');
+    const help1=document.getElementById('fabric1Help');
+    if(!t){ f1Sel.classList.add('danger'); help1.style.display='block'; }
+    else { f1Sel.classList.remove('danger'); help1.style.display='none'; }
+  }
+  if(idx===2){
+    const f2Sel=document.getElementById('fabric2Type');
+    const help2=document.getElementById('fabric2Help');
+    if(document.getElementById('numFabrics').value==='2' && !t){ f2Sel.classList.add('danger'); help2.style.display='block'; }
+    else { f2Sel.classList.remove('danger'); help2.style.display='none'; }
+  }
+  refreshDerivedDebounced();
+}
+
+/* ===== Archive (persist) ===== */
+let archive=[];
+const LS_KEY='grs_calc_archive_v6';
+function loadArchive(){ try{ const raw=localStorage.getItem(LS_KEY); if(raw){ archive=JSON.parse(raw)||[]; } }catch(e){ archive=[]; } }
+function saveArchive(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(archive)); }catch(e){} }
+function renderArchive(){
+  const tb=document.querySelector('#archiveTable tbody'); if(!tb) return; tb.innerHTML='';
+  archive.forEach(it=>{
+    const tr=document.createElement('tr');
+    [it.timestamp,it.productName,fmt0(it.totalW),fmt0(it.totalGRS),fmt2(it.grsPct)+'%', (it.decision?.tier||'—')]
+      .forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+    tb.appendChild(tr);
+  });
+}
+function addToArchive(name,w,g,decision){
+  const now=new Date(); const pct=w>0?(g/w)*100:0;
+  archive.push({timestamp:now.toLocaleString(),productName:name,totalW:w,totalGRS:g,grsPct:pct,decision});
+  saveArchive();
+  renderArchive();
+}
+
+/* ===== Layout toggles ===== */
+const duvetDims={ single:{length:200,width:135}, double:{length:200,width:200}, king:{length:220,width:230}, superking:{length:220,width:260}, emperor:{length:235,width:290} };
+function getRollWidth_cm(key){ if(key==='king'||key==='superking') return 240; if(key==='emperor') return 260; return 220; }
+function onDuvetSizeChange(){ const isCustom=document.getElementById('duvetSize').value==='custom'; document.getElementById('customSizeFields').style.display=isCustom?'block':'none'; }
+function onNumFabricsChange(){
+  const two = document.getElementById('numFabrics').value === '2';
+  document.getElementById('fabric2Section').style.display = two ? 'block' : 'none';
+  setFabricDetailsVisibility(2);
+  validateCanCalculate();
+}
+
+/* ===== Derived helpers ===== */
+function getDuvetArea_m2(){
+  const key=document.getElementById('duvetSize').value; let Lcm=0,Wcm=0;
+  if(key==='custom'){ Lcm=parseFloat(document.getElementById('customLength').value)||0; Wcm=parseFloat(document.getElementById('customWidth').value)||0; }
+  else { const d=duvetDims[key]; Lcm=d.length; Wcm=d.width; }
+  return (Lcm*Wcm)/10000; // 1-side m²
+}
+function refreshDerived(){
+  renderAutoFillingTable();
+}
+let _debT=null; function refreshDerivedDebounced(){ clearTimeout(_debT); _debT=setTimeout(refreshDerived, 80); }
+
+function onTogChange(){
+  const sel=document.getElementById('togExcel');
+  const custom=document.getElementById('togCustom');
+  if(!sel||!custom) return;
+  if(sel.value==='custom'){ custom.style.display='inline-block'; custom.focus(); }
+  else { custom.style.display='none'; }
+}
+function getSelectedTog(){
+  const sel=document.getElementById('togExcel');
+  if(!sel) return 10.5;
+  if(sel.value==='custom'){
+    const v=parseFloat(document.getElementById('togCustom').value);
+    return isNaN(v)?10.5:v;
+  }
+  return parseFloat(sel.value);
+}
+
+/* ===== Fabric calc ===== */
+function computeOneFabric(duvetArea_m2,isFirst,gsmVal,isGRS,sizeKey){
+  const rollW_cm=getRollWidth_cm(sizeKey);
+  const nf=document.getElementById('numFabrics').value;
+  const finalArea=isFirst?((nf==='1')?duvetArea_m2*2:duvetArea_m2):duvetArea_m2; // two sides if only one fabric
+  const finalLen=finalArea/(rollW_cm/100);
+  const weight_g=gsmVal*finalArea;
+  const grs_g=isGRS?weight_g:0;
+  return{area_m2:finalArea,length_m:finalLen,weight_g,grs_g};
+}
+
+/* ===== Filling (Excel logic) ===== */
+function initFibreDropdown(){
+  const sel=document.getElementById('fibreRecipe'); sel.innerHTML='';
+  FIBRE_TABLE.forEach(r=>{ const o=document.createElement('option'); o.value=r.fibre_name; o.textContent=r.fibre_name; sel.appendChild(o); });
+}
+function getConstantFor(recipe, tog, finishVal){
+  const c = recipe.constants||{}; const f = (finishVal||'').toLowerCase();
+  if (f.includes('nursery') && f.includes('without')) return c.nursery_no_corovin??0;
+  if (f.includes('nursery') && f.includes('with'))    return c.nursery_corovin??0;
+  if (tog <= 7.5) return c.leq7_5??0;
+  if (tog >= 9 && tog <= 10.5) return c.tog9_10_5??0;
+  if (tog === 13.5) return c.tog13_5??0;
+  if (tog === 15.0) return c.tog15_0??0;
+  return c.tog9_10_5??0;
+}
+function getFinishFactor(){
+  const finishSel=document.getElementById('finishType').value.toLowerCase();
+  return finishSel.includes('sonic') ? 1.028 : 1.0478;
+}
+function computeUsageKg(area1_m2, tog, constant, factor){
+  const kg=(area1_m2 * tog * constant * factor)/1000;
+  return Math.round(kg*100)/100; // 2dp
+}
+function splitToComponents(total_g, recipe){
+  return (recipe.components||[]).map((c,i)=>({
+    idx:i+1, code:c.code, prcnt:c.prcnt,
+    grams:+(total_g*(c.prcnt||0)).toFixed(3),
+    grs_grams:(c.isGRS?+(total_g*(c.prcnt||0)).toFixed(3):0)
+  }));
+}
+function calcFillingAuto(){
+  const tog=getSelectedTog();
+  const recipeName=document.getElementById('fibreRecipe').value;
+  const recipe=FIBRE_TABLE.find(r=>r.fibre_name===recipeName);
+  if(!recipe) return { total_g:0, grs_g:0, lines:[], meta:{} };
+
+  const area1=getDuvetArea_m2();
+  const constant=getConstantFor(recipe, tog, document.getElementById('finishType').value);
+  const factor=getFinishFactor();
+  const usageKg=computeUsageKg(area1, tog, constant, factor);
+  const total_g=Math.round(usageKg*1000);
+  const lines=splitToComponents(total_g, recipe);
+  const grs_g=lines.reduce((s,x)=>s+x.grs_grams,0);
+  const ci=document.getElementById('constInfo'); if(ci){ ci.textContent = `Constant: ${constant} • Factor: ${factor}`; }
+  return { total_g, grs_g, lines, meta:{area1,constant,factor,usageKg,tog} };
+}
+function renderAutoFillingTable(){
+  const t=calcFillingAuto();
+  const tb=document.getElementById('tbodyComponents'); tb.innerHTML="";
+  if(!t.lines.length){ tb.innerHTML=`<tr><td colspan="4" class="inline-note">Pick recipe to see lines.</td></tr>`; }
+  else{ t.lines.forEach(r=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.idx}</td><td>${r.code}</td><td class="right">${(r.prcnt*100).toFixed(1)}%</td><td class="right">${r.grams.toLocaleString()}</td>`; tb.appendChild(tr); }); }
+  document.getElementById('fillTotalGrams').textContent=(t.total_g||0).toLocaleString();
+  window._fibreComponentsForBOM=t;
+}
+
+/* ===== RCS/GRS decision ===== */
+function evaluateRcsGrs(opts){
+  const pct = Math.max(0, Math.min(100, Number(opts.recycledPct || 0)));
+  const hasCoC = true; // CoC kept implicit
+  const decision = { recycledPct:pct, hasCoC, standard:"None", tier:null, canUseLogo:false, canMarketAsCertified:false, allowedLogos:[], allowedClaims:[], notes:[] };
+  if (!hasCoC){ decision.notes.push("No Chain of Custody (CoC) → no certified claims or logos."); return decision; }
+  if (pct >= 50){ decision.standard="GRS"; decision.tier="GRS50"; decision.canUseLogo=true; decision.canMarketAsCertified=true; decision.allowedLogos.push("GRS"); decision.allowedClaims.push("On-product GRS logo and claims"); return decision; }
+  if (pct >= 20){ decision.standard="GRS"; decision.tier="GRS20"; decision.canUseLogo=false; decision.canMarketAsCertified=false; decision.allowedClaims.push("GRS claim (no on-product logo)"); decision.notes.push("GRS logo requires ≥50%."); return decision; }
+  if (pct >= 5){ decision.standard="RCS"; decision.tier="RCS"; decision.canUseLogo=true; decision.canMarketAsCertified=true; decision.allowedLogos.push("RCS"); decision.allowedClaims.push("On-product RCS logo and claims"); return decision; }
+  decision.notes.push("Recycled content below 5% → no RCS/GRS eligibility."); return decision;
+}
+function renderCertificationDecision(d, el){
+  if (!el) return; const fmt=(n)=>Number(n).toFixed(2).replace(/\.00$/,'');
+  const badges=[]; badges.push(`<span class="badge">${fmt(d.recycledPct)}% recycled</span>`);
+  let headline="", detail="", toneClass="warn";
+  if (d.tier === "GRS50"){ headline="GRS ✓ Logo allowed"; detail="GRS certification and on-product logo permitted."; toneClass="ok"; }
+  else if (d.tier === "GRS20"){ headline="GRS claim only (no logo)"; detail="Logo requires ≥50% recycled content."; toneClass="warn"; }
+  else if (d.tier === "RCS"){ headline="RCS ✓ Logo allowed"; detail="RCS certification with on-product logo permitted."; toneClass="ok"; }
+  else { headline="Not eligible"; detail="Recycled content below 5%."; toneClass="no"; }
+  el.innerHTML = `<h3 style="margin:0 0 6px">Certification & Logo Decision</h3><div class="badge ${toneClass}" style="margin-bottom:.4rem">${headline}</div><div class="muted tiny">${detail}</div><div style="margin-top:.5rem">${badges.join("")}</div>`;
+  el.hidden = false;
+}
+
+/* ===== Main calc ===== */
+const fmt0 = (n)=>Number(n||0).toFixed(0);
+const fmt2 = (n)=>Number(n||0).toFixed(2);
+
+function calcDetailed(){
+  const area1=getDuvetArea_m2();
+  const sizeKey=document.getElementById('duvetSize').value;
+
+  const f1=computeOneFabric(area1,true,
+    parseFloat(document.getElementById('fabric1GSM').value)||0,
+    document.getElementById('fabric1IsGRS').checked,sizeKey);
+
+  let f2={area_m2:0,length_m:0,weight_g:0,grs_g:0};
+  if(document.getElementById('numFabrics').value==='2'){
+    f2=computeOneFabric(area1,false,
+      parseFloat(document.getElementById('fabric2GSM').value)||0,
+      document.getElementById('fabric2IsGRS').checked,sizeKey);
+  }
+
+  // Filling
+  const fill=calcFillingAuto();
+
+  // Lining with coverage logic
+  let linerW = 0, linerG = 0;
+  if (document.getElementById('includeLiner').checked){
+    const gsm = parseFloat(document.getElementById('linerGSM').value) || 0;
+    const isg = document.getElementById('linerIsGRS').checked;
+    const two = document.getElementById('numFabrics').value === '2';
+    let coverage = 'both';
+    if (two){
+      const covSel = document.getElementById('linerCoverage');
+      coverage = covSel ? (covSel.value || 'both') : 'both';
+    }
+    const multiplier = (two && coverage === 'one') ? 1 : 2; // one side vs both
+    linerW = gsm * (area1 * multiplier);
+    linerG = isg ? linerW : 0;
+  }
+
+  // Binding
+  let bindW=0,bindG=0;
+  if(document.getElementById('includeBinding').checked){
+    const code=(document.getElementById('bindingCode')||{}).value||'';
+    const gpm=BINDING_GPM[code]||0;
+    let Lcm,Wcm; if(sizeKey==='custom'){Lcm=parseFloat(document.getElementById('customLength').value)||0; Wcm=parseFloat(document.getElementById('customWidth').value)||0;} else {const d=duvetDims[sizeKey]; Lcm=d.length; Wcm=d.width;}
+    const perimeter_m=2*((Lcm+Wcm)/100);
+    bindW=gpm*perimeter_m; bindG=(window.isGRSBindingCode(code)||document.getElementById('bindingIsGRS').checked)?bindW:0;
+  }
+
+  const totalWeight = f1.weight_g+f2.weight_g + fill.total_g + linerW + bindW;
+  const totalGRS    = f1.grs_g+f2.grs_g + fill.grs_g + linerG + bindG;
+
+  return { f1,f2,fill, linerW,linerG, bindW,bindG, totalWeight_g:totalWeight, totalGRS_g:totalGRS };
+}
+
+function showInlineError(msg, elToFocus){
+  const box = document.getElementById('inlineErrors'); if(!box) return;
+  box.textContent = msg || ''; box.style.display = msg ? 'block' : 'none';
+  if(elToFocus){ elToFocus.scrollIntoView({behavior:'smooth',block:'center'}); elToFocus.focus?.(); }
+}
+
+function calculateAll(){
+  showInlineError('');
+  const pNameEl = document.getElementById('productName');
+  const pName = pNameEl.value.trim();
+  if(!pName){ pNameEl.classList.add('danger'); showInlineError('Product Name is required to calculate.', pNameEl); return; }
+
+  // Require Fabric 1 always
+  const f1Sel = document.getElementById('fabric1Type');
+  if(!f1Sel.value){ document.getElementById('fabric1Help').style.display='block'; f1Sel.classList.add('danger'); showInlineError('Select Fabric 1 type.', f1Sel); validateCanCalculate(); return; }
+
+  if (document.getElementById('numFabrics').value === '2'){
+    const f2Sel = document.getElementById('fabric2Type');
+    if (!f2Sel || !f2Sel.value){
+      document.getElementById('fabric2Help').style.display='block';
+      f2Sel.classList.add('danger');
+      showInlineError('Select Fabric 2 type.', f2Sel); validateCanCalculate(); return;
+    }
+  }
+
+  const det=calcDetailed();
+  const totalW=det.totalWeight_g, totalGRS=det.totalGRS_g;
+  const pct=totalW>0?(totalGRS/totalW)*100:0;
+
+  // Decision above results
+  const decision = evaluateRcsGrs({ recycledPct: pct, hasCoC: true });
+  renderCertificationDecision(decision, document.getElementById('certDecision'));
+
+  // Results body
+  let html=`<h3 style="margin:0 0 6px">Results</h3><div class="inline-note">Product: <strong>${pName}</strong></div>`;
+  html+=`<div class="stats">
+    <div class="stat"><div class="k">Fabric 1 length</div><div class="v">${det.f1.length_m.toFixed(2)} m</div><div class="c">Fabric 1 length (m)</div></div>
+    <div class="stat"><div class="k">Fabric 2 length</div><div class="v">${(det.f2.length_m||0).toFixed(2)} m</div><div class="c">Fabric 2 length (m)</div></div>
+    <div class="stat"><div class="k">Filling total</div><div class="v">${(det.fill.total_g||0).toFixed(0)} g</div><div class="c">Filling total (g)</div></div>
+  </div>`;
+  html+=`<div class="stats">
+    <div class="stat"><div class="k">Fabric 1 weight</div><div class="v">${det.f1.weight_g.toFixed(0)} g</div><div class="c">Top (and bottom if 1 fabric)</div></div>
+    <div class="stat"><div class="k">Fabric 2 weight</div><div class="v">${(det.f2.weight_g||0).toFixed(0)} g</div><div class="c">Bottom</div></div>
+    <div class="stat"><div class="k">Lining weight</div><div class="v">${det.linerW.toFixed(0)} g</div><div class="c">Coverage applied</div></div>
+  </div>`;
+  html+=`<div class="stats">
+    <div class="stat"><div class="k">Binding weight</div><div class="v">${det.bindW.toFixed(0)} g</div><div class="c">From g/m × perimeter</div></div>
+    <div class="stat"><div class="k">Total weight</div><div class="v">${totalW.toFixed(0)} g</div><div class="c">All components</div></div>
+    <div class="stat"><div class="k">GRS weight</div><div class="v">${totalGRS.toFixed(0)} g</div><div class="c">Fabrics + filling + lining + binding</div></div>
+  </div>`;
+  html+=`<div class="stats">
+    <div class="stat"><div class="k">GRS %</div><div class="v">${pct.toFixed(2)}%</div><div class="c">Recycled content</div></div>
+  </div>`;
+
+  if(det.fill.lines?.length){
+    html+=`<div class="inline-note" style="margin-top:8px">Filling components:</div><table><thead><tr><th>#</th><th>Code</th><th class="right">%</th><th class="right">g</th></tr></thead><tbody>`;
+    det.fill.lines.forEach(r=>{ html+=`<tr><td>${r.idx}</td><td>${r.code}</td><td class="right">${(r.prcnt*100).toFixed(1)}%</td><td class="right">${r.grams.toFixed(3)}</td></tr>`; });
+    html+=`</tbody></table>`;
+  }
+
+  document.getElementById('results').innerHTML=html;
+  addToArchive(pName,totalW,totalGRS,decision);
+  // keep a snapshot for per-SKU export
+  window._lastCalc = {
+    name: pName,
+    sizeLabel: (document.getElementById('duvetSize').selectedOptions[0]||{}).text || document.getElementById('duvetSize').value,
+    finish: document.getElementById('finishType').value,
+    tog: getSelectedTog(),
+    recipeName: document.getElementById('fibreRecipe').value,
+    f1: det.f1, f2: det.f2, fill: det.fill,
+    linerW: det.linerW, bindW: det.bindW,
+    totalWeight_g: totalW, totalGRS_g: totalGRS,
+    grsPct: pct,
+    linerCoverageText: (function(){ 
+      const two = document.getElementById('numFabrics').value === '2';
+      if(!document.getElementById('includeLiner').checked) return '';
+      if(two){ const sel=document.getElementById('linerCoverage'); return (sel && sel.value==='one') ? 'One-side coverage' : 'Both sides'; }
+      return 'Coverage applied';
+    })(),
+    decision: decision
+  };
+}
+
+/* ===== Export dropdown ===== */
+function toggleMenu(ev){
+  ev?.stopPropagation?.();
+  const m=document.getElementById('exportMenu');
+  m.classList.toggle('open');
+}
+function closeMenu(){ const m=document.getElementById('exportMenu'); m&&m.classList.remove('open'); }
+document.addEventListener('click',function(e){
+  const m=document.getElementById('exportMenu'); if(!m) return;
+  if(!m.contains(e.target)) m.classList.remove('open');
+});
+
+/* ===== SKU EXPORT HELPERS (decision included) ===== */
+function getLastCalcSnapshot(){
+  if(!window._lastCalc) return null;
+  return JSON.parse(JSON.stringify(window._lastCalc));
+}
+function decisionBadgeHtml(d){
+  if(!d) return '';
+  const fmt=(n)=>Number(n).toFixed(2).replace(/\.00$/,'');
+  let cls='warn', text='Not eligible', detail=''; 
+  if (d.tier === "GRS50"){ cls="ok"; text="GRS ✓ Logo allowed"; detail="GRS certification and on-product logo permitted."; }
+  else if (d.tier === "GRS20"){ cls="warn"; text="GRS claim only (no logo)"; detail="Logo requires ≥50% recycled content."; }
+  else if (d.tier === "RCS"){ cls="ok"; text="RCS ✓ Logo allowed"; detail="RCS certification with on-product logo permitted."; }
+  else { cls="no"; text="Not eligible"; detail="Recycled content below 5%."; }
+  return `<div class="badge ${cls}">${text}</div><div class="small">${detail}</div><div class="small">${fmt(d.recycledPct)}% recycled</div>`;
+}
+function buildSkuHTML(calc){
+  const name = (calc?.name||'SKU');
+  const fillLines = (calc?.fill?.lines||[]).map(r=>`<tr><td>${r.idx}</td><td>${r.code}</td><td style="text-align:right">${(r.prcnt*100).toFixed(1)}%</td><td style="text-align:right">${r.grams.toFixed(3)}</td></tr>`).join('') || '<tr><td colspan="4" class="small">No filling lines.</td></tr>';
+  const decision = calc?.decision ? decisionBadgeHtml(calc.decision) : '';
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>SKU Sheet - ${name}</title>
+<style>
+body{font-family:Inter, Segoe UI, Roboto, Arial, sans-serif;margin:0;background:#fff;color:#202121}
+.wrap{max-width:960px;margin:24px auto;padding:0 16px}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.logo{font-weight:800;background:#D7D2CB;color:#363A36;border-radius:999px;padding:6px 12px;white-space:nowrap}
+h1{font-size:18px;margin:0}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:720px){ .grid{grid-template-columns:1fr} }
+.card{border:1px solid #E4E3E0;border-radius:14px;padding:12px;background:#fff}
+.k{font-size:12px;color:#666}
+.v{font-size:20px;font-weight:900;margin-top:4px}
+.c{font-size:11px;color:#888;margin-top:2px}
+.badge{display:inline-block;padding:.24rem .5rem;border-radius:9px;font-weight:800;font-size:.86rem;margin-right:.35rem}
+.ok{background:#e9f6ee;color:#1a7f37;border:1px solid #d5eadc}
+.warn{background:#fff7e6;color:#b8860b;border:1px solid #f3dfb3}
+.no{background:#fdecec;color:#a5282c;border:1px solid #f5c3c7}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:8px 10px;border-bottom:1px solid #E4E3E0;text-align:left;font-size:13px}
+thead th{background:#F7F6F4}
+.small{font-size:12px;color:#61635f;margin:6px 0 10px}
+.footer{margin-top:12px;font-size:11px;color:#888}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="header"><div class="logo">The Fine Bedding Company</div><h1>GRS Duvet — ${name}</h1></div>
+  <div class="small">Size: ${calc.sizeLabel||'-'} • Finish: ${calc.finish||'-'} • TOG: ${calc.tog||'-'} • Recipe: ${calc.recipeName||'-'}</div>
+  ${decision}
+  <div class="grid" id="sku-cards">
+    <div class="card"><div class="k">Fabric 1 length</div><div class="v">${(calc.f1.length_m||0).toFixed(2)} m</div><div class="c">Fabric 1 length (m)</div></div>
+    <div class="card"><div class="k">Fabric 2 length</div><div class="v">${(calc.f2.length_m||0).toFixed(2)} m</div><div class="c">Fabric 2 length (m)</div></div>
+    <div class="card"><div class="k">Filling total</div><div class="v">${(calc.fill.total_g||0).toFixed(0)} g</div><div class="c">Filling total (g)</div></div>
+
+    <div class="card"><div class="k">Fabric 1 weight</div><div class="v">${(calc.f1.weight_g||0).toFixed(0)} g</div><div class="c">Top (and bottom if 1 fabric)</div></div>
+    <div class="card"><div class="k">Fabric 2 weight</div><div class="v">${(calc.f2.weight_g||0).toFixed(0)} g</div><div class="c">Bottom</div></div>
+    <div class="card"><div class="k">Lining weight</div><div class="v">${(calc.linerW||0).toFixed(0)} g</div><div class="c">${calc.linerCoverageText||'Coverage applied'}</div></div>
+
+    <div class="card"><div class="k">Binding weight</div><div class="v">${(calc.bindW||0).toFixed(0)} g</div><div class="c">From g/m × perimeter</div></div>
+    <div class="card"><div class="k">Total weight</div><div class="v">${(calc.totalWeight_g||0).toFixed(0)} g</div><div class="c">All components</div></div>
+    <div class="card"><div class="k">GRS weight</div><div class="v">${(calc.totalGRS_g||0).toFixed(0)} g</div><div class="c">Fabrics + filling + lining + binding</div></div>
+
+    <div class="card"><div class="k">GRS %</div><div class="v">${(calc.grsPct||0).toFixed(2)}%</div><div class="c">Recycled content</div></div>
+    <div class="card" style="grid-column:span 2"><div class="k">Filling components</div>
+      <table><thead><tr><th>#</th><th>Code</th><th style="text-align:right">%</th><th style="text-align:right">g</th></tr></thead>
+      <tbody>${fillLines}</tbody></table>
+    </div>
+  </div>
+  <div class="footer">Auto-generated SKU sheet • ${new Date().toLocaleString()}</div>
+</div>
+</body></html>`;
+}
+function exportSkuHTML(){
+  const calc = getLastCalcSnapshot();
+  if(!calc){ showInlineError('No calculation available. Click Calculate first.'); return; }
+  const html = buildSkuHTML(calc);
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=(calc.name||'sku')+'.html'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function exportSkuPNG(){
+  const calc = getLastCalcSnapshot();
+  if(!calc){ showInlineError('No calculation available to export SKU PNG.'); return; }
+  const html = buildSkuHTML(calc);  // includes decision
+  const tmp = document.createElement('div');
+  tmp.style.position = 'fixed';
+  tmp.style.left = '-9999px';
+  tmp.innerHTML = html;
+  document.body.appendChild(tmp);
+  const target = tmp.querySelector('.wrap');
+  html2canvas(target, { scale: 2 }).then(canvas=>{
+    const a=document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = (calc.name||'sku') + '.png';
+    a.click();
+    tmp.remove();
+  }).catch(err=>{
+    tmp.remove();
+    showInlineError('Failed to export PNG: '+err);
+  });
+}
+function exportCSV(){
+  if(archive.length===0){ showInlineError('No archive entries to export.'); return; }
+  let csv='data:text/csv;charset=utf-8,Date/Time,Product Name,Total Wt (g),GRS Wt (g),GRS %,Tier\r\n';
+  archive.forEach(it=>{ csv+=[`"${it.timestamp}"`,`"${it.productName}"`,Number(it.totalW).toFixed(0),Number(it.totalGRS).toFixed(0),Number(it.grsPct).toFixed(2)+'%', (it.decision?.tier||'')].join(',')+'\r\n'; });
+  const a=document.createElement('a'); a.href=encodeURI(csv); a.download='duvet_archive.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ===== Validation helpers ===== */
+function validateCanCalculate(){
+  const calcBtn = document.getElementById('calcBtn');
+  const nameEl = document.getElementById('productName');
+  const nameOk = (nameEl.value || '').trim().length > 0;
+  if(nameOk){ nameEl.classList.remove('danger'); } else { nameEl.classList.add('danger'); }
+  const note = document.getElementById('productNameNote'); if (note) note.style.display = nameOk ? 'none' : 'block';
+
+  const f1Sel = document.getElementById('fabric1Type');
+  const f1Ok = !!(f1Sel && f1Sel.value);
+  const help1 = document.getElementById('fabric1Help');
+  if(!f1Ok){ f1Sel.classList.add('danger'); if(help1) help1.style.display='block'; } else { f1Sel.classList.remove('danger'); if(help1) help1.style.display='none'; }
+  setFabricDetailsVisibility(1);
+
+  const numFabs = document.getElementById('numFabrics').value;
+  let f2Ok = true; const f2Sel = document.getElementById('fabric2Type');
+  if (numFabs === '2'){ f2Ok = !!(f2Sel && f2Sel.value); }
+  const f2Help = document.getElementById('fabric2Help');
+  if (f2Sel){ if (numFabs === '2' && !f2Ok){ f2Sel.classList.add('danger'); if(f2Help) f2Help.style.display='block'; } else { f2Sel.classList.remove('danger'); if(f2Help) f2Help.style.display='none'; } }
+  setFabricDetailsVisibility(2);
+
+  validateBindingSelect();
+  const ok = nameOk && f1Ok && f2Ok; if (calcBtn) calcBtn.disabled = !ok;
+}
+
+/* ===== Reset & init ===== */
+function resetAll(){
+  document.getElementById('productName').value='';
+  document.getElementById('duvetSize').value='double';
+  document.getElementById('customLength').value='200';
+  document.getElementById('customWidth').value='200';
+  document.getElementById('numFabrics').value='1';
+  document.getElementById('fabric1Type').value='';
+  document.getElementById('fabric1GSM').value='0';
+  document.getElementById('fabric1IsGRS').checked=false;
+  document.getElementById('fabric2Section').style.display='none';
+  document.getElementById('fabric2Type').value='';
+  document.getElementById('fabric2GSM').value='0';
+  document.getElementById('fabric2IsGRS').checked=false;
+  document.getElementById('finishType').value='Sonic Seam';
+  document.getElementById('togExcel').value='10.5';
+  document.getElementById('togCustom').value='';
+  initFibreDropdown(); renderAutoFillingTable();
+  document.getElementById('includeBinding').checked=false; document.getElementById('bindingDetailedFields').style.display='none';
+  document.getElementById('bindingCode').value=''; document.getElementById('bindingGPMView').textContent='0'; document.getElementById('bindingIsGRS').checked=false; document.getElementById('bindingCode').classList.remove('danger');
+  document.getElementById('includeLiner').checked=false; document.getElementById('linerDetailedFields').style.display='none'; document.getElementById('linerGSM').value='0'; document.getElementById('linerIsGRS').checked=false; document.getElementById('linerGSM').classList.remove('danger');
+  document.getElementById('results').innerHTML=''; document.getElementById('certDecision').hidden=true; document.getElementById('inlineErrors').style.display='none';
+  refreshDerived(); validateCanCalculate();
+}
+function _populateAllOnce(){ try{populateBindingCodes();onBindingCodeChange();}catch(e){} try{populateFabricTypes();}catch(e){} try{initFibreDropdown();}catch(e){} try{renderAutoFillingTable();}catch(e){} }
+document.addEventListener('DOMContentLoaded',_populateAllOnce);
+window.addEventListener('load',function(){
+  loadArchive(); _populateAllOnce(); validateCanCalculate(); onTogChange(); refreshDerived(); renderArchive();
+  var f1 = document.getElementById('fabric1Type'); if (f1){ ['change','input'].forEach(ev=>f1.addEventListener(ev, validateCanCalculate)); }
+  var f2 = document.getElementById('fabric2Type'); if (f2){ ['change','input'].forEach(ev=>f2.addEventListener(ev, validateCanCalculate)); }
+  var nf = document.getElementById('numFabrics'); if (nf){ ['change','input'].forEach(ev=>nf.addEventListener(ev, validateCanCalculate)); }
+  var bindSel = document.getElementById('bindingCode'); if (bindSel){ ['change','input'].forEach(ev=>bindSel.addEventListener(ev, validateBindingSelect)); }
+  document.getElementById('resetBtn').addEventListener('click', resetAll);
+});
+</script>
+</body>
+</html>
