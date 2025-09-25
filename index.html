@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Timer</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f5f5;
+        --text: #222;
+        --accent: #3b82f6;
+        --surface: #ffffff;
+        --shadow: rgba(15, 23, 42, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f172a;
+          --text: #e2e8f0;
+          --surface: #1e293b;
+          --shadow: rgba(15, 23, 42, 0.6);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+
+      .app-shell {
+        width: min(520px, 100%);
+        background: var(--surface);
+        box-shadow: 0 20px 40px var(--shadow);
+        border-radius: 1.5rem;
+        padding: 2.5rem 2rem;
+        display: grid;
+        gap: 1.75rem;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: clamp(1.9rem, 3vw + 1rem, 2.4rem);
+        letter-spacing: -0.03em;
+      }
+
+      header p {
+        margin: 0.4rem 0 0;
+        opacity: 0.8;
+        line-height: 1.6;
+      }
+
+      .timer-display {
+        display: flex;
+        justify-content: center;
+        align-items: baseline;
+        font-size: clamp(3.5rem, 8vw + 1rem, 5rem);
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.08));
+        padding: 1.5rem 1rem;
+      }
+
+      .controls {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .controls button {
+        border: none;
+        padding: 0.9rem 1rem;
+        font-size: 1.05rem;
+        border-radius: 0.85rem;
+        cursor: pointer;
+        transition: transform 150ms ease, box-shadow 150ms ease;
+        font-weight: 600;
+      }
+
+      .controls button.primary {
+        background: var(--accent);
+        color: white;
+        box-shadow: 0 14px 30px rgba(59, 130, 246, 0.25);
+      }
+
+      .controls button.secondary {
+        background: transparent;
+        color: var(--accent);
+        border: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+      }
+
+      .controls button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+        box-shadow: none;
+      }
+
+      .controls button:not(:disabled):hover {
+        transform: translateY(-2px);
+      }
+
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .preset {
+        padding: 0.9rem 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 0.9rem;
+        text-align: left;
+        transition: border-color 150ms ease, transform 150ms ease;
+        background: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(6px);
+        cursor: pointer;
+      }
+
+      .preset strong {
+        display: block;
+        font-size: 1.05rem;
+        margin-bottom: 0.3rem;
+      }
+
+      .preset:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+      }
+
+      footer {
+        font-size: 0.85rem;
+        opacity: 0.7;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell" aria-labelledby="app-title">
+      <header>
+        <h1 id="app-title">Focus Timer</h1>
+        <p>
+          Alternate between focused work and mindful breaks. Choose a preset or set
+          a custom duration to stay on track.
+        </p>
+      </header>
+
+      <div class="timer-display" aria-live="polite">
+        <span id="minutes">25</span><span>:</span><span id="seconds">00</span>
+      </div>
+
+      <section class="controls" aria-label="Timer controls">
+        <div class="preset-grid" role="list">
+          <button class="preset" data-minutes="25" role="listitem">
+            <strong>Pomodoro</strong>
+            <span>25 min focus</span>
+          </button>
+          <button class="preset" data-minutes="5" role="listitem">
+            <strong>Short Break</strong>
+            <span>5 min recharge</span>
+          </button>
+          <button class="preset" data-minutes="15" role="listitem">
+            <strong>Long Break</strong>
+            <span>15 min rest</span>
+          </button>
+        </div>
+        <div class="button-row" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button id="start" class="primary">Start</button>
+          <button id="pause" class="secondary" disabled>Pause</button>
+          <button id="reset" class="secondary">Reset</button>
+        </div>
+      </section>
+
+      <footer>
+        Pro tip: pair each focus session with a specific intention to make every
+        minute count.
+      </footer>
+    </main>
+
+    <script>
+      const minutesNode = document.getElementById("minutes");
+      const secondsNode = document.getElementById("seconds");
+      const startButton = document.getElementById("start");
+      const pauseButton = document.getElementById("pause");
+      const resetButton = document.getElementById("reset");
+      const presets = document.querySelectorAll(".preset");
+
+      let remainingSeconds = 25 * 60;
+      let timerId = null;
+
+      function renderTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        minutesNode.textContent = String(minutes).padStart(2, "0");
+        secondsNode.textContent = String(seconds).padStart(2, "0");
+        document.title = `⏱️ ${minutesNode.textContent}:${secondsNode.textContent} · Focus Timer`;
+      }
+
+      function tick() {
+        if (remainingSeconds <= 0) {
+          clearInterval(timerId);
+          timerId = null;
+          pauseButton.disabled = true;
+          startButton.disabled = false;
+          startButton.textContent = "Start";
+          notify();
+          return;
+        }
+        remainingSeconds -= 1;
+        renderTime(remainingSeconds);
+      }
+
+      function startTimer() {
+        if (timerId) {
+          return;
+        }
+        timerId = setInterval(tick, 1000);
+        startButton.disabled = true;
+        pauseButton.disabled = false;
+        startButton.textContent = "Running";
+      }
+
+      function pauseTimer() {
+        if (!timerId) {
+          return;
+        }
+        clearInterval(timerId);
+        timerId = null;
+        startButton.disabled = false;
+        startButton.textContent = "Resume";
+        pauseButton.disabled = true;
+      }
+
+      function resetTimer() {
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        remainingSeconds = 25 * 60;
+        renderTime(remainingSeconds);
+        startButton.disabled = false;
+        pauseButton.disabled = true;
+        startButton.textContent = "Start";
+      }
+
+      function notify() {
+        if ("Notification" in window) {
+          if (Notification.permission === "granted") {
+            new Notification("Focus session complete!", {
+              body: "Time for a new intention or a well-earned break.",
+            });
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((permission) => {
+              if (permission === "granted") {
+                notify();
+              }
+            });
+          }
+        }
+      }
+
+      startButton.addEventListener("click", startTimer);
+      pauseButton.addEventListener("click", pauseTimer);
+      resetButton.addEventListener("click", resetTimer);
+
+      presets.forEach((preset) => {
+        preset.addEventListener("click", () => {
+          const minutes = Number(preset.dataset.minutes) || 25;
+          remainingSeconds = minutes * 60;
+          renderTime(remainingSeconds);
+          startButton.disabled = false;
+          pauseButton.disabled = true;
+          startButton.textContent = "Start";
+        });
+      });
+
+      renderTime(remainingSeconds);
+    </script>
+  </body>
+</html>
