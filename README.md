@@ -1,6 +1,7 @@
 # testing
 
-Welcome to the **testing** repository! This repository is intended for experiments, demonstrations, and general testing of code, workflows, and GitHub features.
+Welcome to the **testing** repository! This repository is intended for experiments, demonstrations, and general testing of code,
+workflows, and GitHub features.
 
 ## Table of Contents
 
@@ -26,8 +27,7 @@ To get started:
 
 ## Usage
 
-Open the `index.html` file in your favorite browser to launch the Focus Timer web app. The timer offers Pomodoro-style presets
-and simple controls to start, pause, and reset your sessions.
+Open the `index.html` file in your favorite browser to launch the Chromatic Goo web app. A swirling fluid simulation pours across the screen and reacts dramatically to your pointer. Drag, click, or touch to inject color, stir the currents, and watch the goo chase your cursor in eerie technicolor fashion.
 
 ## Contributing
 
@@ -35,8 +35,7 @@ Contributions are welcome! Feel free to open issues or submit pull requests for 
 
 ## License
 
-This repository is provided for testing and experimentation. Unless otherwise noted, assume examples are available for personal
-and educational use.
+This repository is provided for testing and experimentation. Unless otherwise noted, assume examples are available for personal and educational use.
 
 ## Contact
 
