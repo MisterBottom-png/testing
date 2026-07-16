@@ -80,7 +80,19 @@ jobs:
 
       - name: Build installable APK
         working-directory: antimatter-mobile
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee gradle-build.log
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antimatter-Mobile-Build-Diagnostics
+          path: antimatter-mobile/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Prepare APK artifact
         shell: bash
