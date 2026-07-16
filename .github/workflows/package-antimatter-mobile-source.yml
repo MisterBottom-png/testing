@@ -42,9 +42,11 @@ jobs:
           cp .github/workflows/build-antimatter-mobile.yml source-package/.github/workflows/
           cp .github/workflows/package-antimatter-mobile-source.yml source-package/.github/workflows/
           cat > source-package/SOURCE-MANIFEST.txt <<'EOF'
-          Antimatter Dimensions Mobile v0.2.0 complete source package
+          Antimatter Dimensions Mobile v0.3.0 complete source package
 
           Android/mobile wrapper source: antimatter-mobile/
+          Secrets and Cheats source overlay: antimatter-mobile/game-source-overrides/
+          Upstream patch script: antimatter-mobile/patch-upstream-source.mjs
           Full pinned upstream game source: upstream-game-source/
           CI build workflows: .github/workflows/
           Upstream repository: https://github.com/IvarK/AntimatterDimensionsSourceCode
@@ -55,12 +57,12 @@ jobs:
           EOF
           find source-package -type d \( -name build -o -name .gradle -o -name node_modules -o -name output -o -name dist -o -name .git \) -prune -exec rm -rf {} +
           cd source-package
-          zip -r ../Antimatter-Dimensions-Mobile-Complete-Source-v0.2.0.zip .
+          zip -r ../Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0.zip .
 
       - name: Upload complete source ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: Antimatter-Dimensions-Mobile-Complete-Source-v0.2.0
-          path: Antimatter-Dimensions-Mobile-Complete-Source-v0.2.0.zip
+          name: Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0
+          path: Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0.zip
           if-no-files-found: error
           retention-days: 14
