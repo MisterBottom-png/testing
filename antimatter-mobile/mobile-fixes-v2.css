@@ -1,0 +1,202 @@
+/* Second-pass mobile corrections based on physical Android testing. */
+@media (max-width: 900px), (pointer: coarse) {
+  /* The game itself owns scrolling. Hide the desktop-sized scrollbar and keep
+     enough scroll clearance for the fixed navigation. */
+  .c-game-ui {
+    scrollbar-width: none !important;
+    scroll-padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-subnav-height) + env(safe-area-inset-bottom) + 2rem);
+  }
+
+  .c-game-ui::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Upstream hides the locked Tickspeed row with visibility, which preserves
+     its desktop button height and creates a large blank hole on mobile. */
+  .l-tickspeed-container--hidden {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Dimension cards must size to both the information and purchase controls.
+     The upstream row has an explicit 3.5rem height, causing every purchase
+     button to overflow into the following row. */
+  .l-dimension-single-row,
+  .c-dimension-row.l-dimension-single-row,
+  .c-antimatter-dim-row.l-dimension-single-row {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    align-content: stretch !important;
+    align-items: stretch !important;
+    gap: 0.8rem !important;
+    overflow: hidden !important;
+    isolation: isolate;
+  }
+
+  .l-dimension-text-container {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 2;
+  }
+
+  .l-dim-row-multi-button-container,
+  .c-modern-dim-tooltip-container,
+  .l-dim-row-multi-button-container.c-modern-dim-tooltip-container {
+    display: flex !important;
+    flex: 0 0 5.6rem !important;
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 5.6rem !important;
+    min-height: 5.6rem !important;
+    position: relative !important;
+    inset: auto !important;
+    justify-content: stretch !important;
+    align-items: stretch !important;
+    z-index: 1;
+  }
+
+  .l-dim-row-multi-button-container > .o-primary-btn--new,
+  .c-modern-dim-tooltip-container > .o-primary-btn--new {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 5.6rem !important;
+    min-height: 5.6rem !important;
+    position: relative !important;
+    inset: auto !important;
+    margin: 0 !important;
+  }
+
+  .o-primary-btn--new .button-content {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 2 !important;
+    padding: 0.5rem 0.8rem;
+    pointer-events: none;
+  }
+
+  .o-primary-btn--new .fill {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 1 !important;
+    pointer-events: none;
+  }
+
+  /* Desktop reset geometry uses two fixed-height columns. Convert each reset
+     into an independent content-sized card. */
+  .resets-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 1rem !important;
+    overflow: visible !important;
+    padding: 0.8rem 0 1.2rem !important;
+  }
+
+  .resets-container > .reset-container,
+  .reset-container.dimboost,
+  .reset-container.galaxy {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 0.6rem !important;
+    overflow: hidden !important;
+    text-align: center;
+    background: color-mix(in srgb, var(--color-base) 90%, transparent);
+    border: 0.1rem solid color-mix(in srgb, var(--color-text) 18%, transparent);
+    border-radius: 0.9rem;
+    margin: 0 !important;
+    padding: 1rem !important;
+  }
+
+  .reset-container h4 {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+  }
+
+  .reset-container > span {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .reset-container .o-primary-btn--dimension-reset {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 7rem !important;
+    position: relative !important;
+    inset: auto !important;
+    justify-content: center !important;
+    align-items: center !important;
+    line-height: 1.25 !important;
+    margin: 0.4rem 0 0 !important;
+    padding: 1rem !important;
+  }
+
+  /* Keep help actions reachable without occupying the scrollbar lane or
+     covering the resource header. The tutorial speech bubble is too wide for
+     a phone and is replaced by the highlighted question-mark button itself. */
+  #ui-fixed .l-help-me {
+    width: 4rem !important;
+    height: 4rem !important;
+    position: fixed !important;
+    right: 1rem !important;
+    left: auto !important;
+    z-index: 1300 !important;
+    font-size: 2rem !important;
+    line-height: 3.8rem !important;
+    background: color-mix(in srgb, var(--color-base) 92%, transparent);
+    border-radius: 50% !important;
+    margin: 0 !important;
+    backdrop-filter: blur(0.8rem);
+  }
+
+  #ui-fixed .l-help-me:not(.l-information) {
+    top: calc(env(safe-area-inset-top) + 1rem) !important;
+  }
+
+  #ui-fixed .l-information.l-help-me {
+    top: calc(env(safe-area-inset-top) + 5.5rem) !important;
+  }
+
+  #ui-fixed .h2p-tooltip,
+  #ui-fixed .h2p-tutorial--glow {
+    display: none !important;
+  }
+
+  .information-header {
+    padding-right: 5.8rem !important;
+    padding-left: 1rem !important;
+  }
+
+  /* Prevent the fixed navigation from covering the final actionable card. */
+  .l-antimatter-dim-tab {
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 2rem) !important;
+  }
+}
