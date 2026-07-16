@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           cp antimatter-mobile/mobile-overrides.css "$GAME_DIR/dist/stylesheets/mobile-overrides.css"
+          cat antimatter-mobile/mobile-fixes-v2.css >> "$GAME_DIR/dist/stylesheets/mobile-overrides.css"
           node antimatter-mobile/patch-build.mjs "$GAME_DIR/dist"
           rm -rf antimatter-mobile/app/src/main/assets/game
           mkdir -p antimatter-mobile/app/src/main/assets/game
