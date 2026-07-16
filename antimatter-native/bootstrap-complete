@@ -1,8 +1,9 @@
 Antimatter Dimensions native alpha source bootstrap
 Files reconstructed: 42
-Bootstrap scripts: 20
+Bootstrap scripts: 21
 Pinned upstream commit: 8ae221fcb07db667b3d04114c2b977175966611d
 Local bootstrap replay: passed
 Project contract test: passed
 JavaScript bridge behavior test: passed
-Triggered: 2026-07-16
+Fix: first Antimatter Dimension uses single cost 10 AM and buyOneDimension
+Triggered: 2026-07-16T23:35+03:00
