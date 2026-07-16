@@ -1,0 +1,50 @@
+name: Package Antimatter Mobile Source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/package-antimatter-mobile-source.yml"
+      - ".github/workflows/build-antimatter-mobile.yml"
+      - "antimatter-mobile/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source branch
+        uses: actions/checkout@v4
+
+      - name: Create source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source-package/.github/workflows
+          cp -R antimatter-mobile source-package/
+          cp .github/workflows/build-antimatter-mobile.yml source-package/.github/workflows/
+          cat > source-package/SOURCE-MANIFEST.txt <<'EOF'
+          Antimatter Dimensions Mobile v0.2.0 source package
+
+          Android/mobile wrapper source: included in antimatter-mobile/
+          CI build workflow: included in .github/workflows/
+          Upstream game repository: https://github.com/IvarK/AntimatterDimensionsSourceCode
+          Pinned upstream commit: 8ae221fcb07db667b3d04114c2b977175966611d
+
+          The upstream game source is fetched at build time and remains under its MIT license.
+          Generated build folders and APK binaries are intentionally excluded.
+          EOF
+          find source-package -type d \( -name build -o -name .gradle -o -name output \) -prune -exec rm -rf {} +
+          cd source-package
+          zip -r ../Antimatter-Dimensions-Mobile-Source-v0.2.0.zip .
+
+      - name: Upload source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antimatter-Dimensions-Mobile-Source-v0.2.0
+          path: Antimatter-Dimensions-Mobile-Source-v0.2.0.zip
+          if-no-files-found: error
+          retention-days: 14
