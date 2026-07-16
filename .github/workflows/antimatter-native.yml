@@ -5,13 +5,13 @@ on:
     branches:
       - agent/antimatter-native-apk
     paths:
-      - antimatter-native/**
+      - antimatter-native/bootstrap-complete
       - .github/workflows/antimatter-native.yml
   pull_request:
     branches:
       - main
     paths:
-      - antimatter-native/**
+      - antimatter-native/bootstrap-complete
       - .github/workflows/antimatter-native.yml
   workflow_dispatch:
 
@@ -31,8 +31,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode antimatter-native/source.tar.gz.b64 | tar -xz
+          rm -rf project
+          mkdir -p project
+          for script in antimatter-native/bootstrap/*.sh; do
+            bash "$script" project
+          done
           test -f project/settings.gradle.kts
+          test -f project/app/src/main/java/com/vitautas/antimatter/nativegame/MainActivity.kt
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
