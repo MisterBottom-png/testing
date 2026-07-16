@@ -79,12 +79,39 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build installable APK
+      - name: Build unsigned release APK
         working-directory: antimatter-mobile
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee gradle-build.log
+          gradle --no-daemon --stacktrace :app:assembleRelease 2>&1 | tee gradle-build.log
+
+      - name: Sign stable installable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_DIR="$RUNNER_TEMP/aosp-test-key"
+          mkdir -p "$KEY_DIR" antimatter-mobile/output
+
+          curl -fsSL \
+            "https://android.googlesource.com/platform/build/+/android-8.0.0_r17/target/product/security/testkey.pk8?format=TEXT" \
+            | base64 --decode > "$KEY_DIR/testkey.pk8"
+          curl -fsSL \
+            "https://android.googlesource.com/platform/build/+/android-8.0.0_r17/target/product/security/testkey.x509.pem?format=TEXT" \
+            | base64 --decode > "$KEY_DIR/testkey.x509.pem"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --key "$KEY_DIR/testkey.pk8" \
+            --cert "$KEY_DIR/testkey.x509.pem" \
+            --out antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk \
+            antimatter-mobile/app/build/outputs/apk/release/app-release-unsigned.apk
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --verbose --print-certs \
+            antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk
+
+          sha256sum antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk \
+            > antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk.sha256
 
       - name: Upload build diagnostics
         if: always()
@@ -95,19 +122,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Prepare APK artifact
-        shell: bash
-        run: |
-          mkdir -p antimatter-mobile/output
-          cp antimatter-mobile/app/build/outputs/apk/debug/app-debug.apk \
-            antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk
-          sha256sum antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk \
-            > antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk.sha256
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Antimatter-Dimensions-Mobile-APK
+          name: Antimatter-Dimensions-Mobile-v0.2.0
           path: antimatter-mobile/output/*
           if-no-files-found: error
           retention-days: 14
