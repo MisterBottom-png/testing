@@ -37,6 +37,14 @@ jobs:
           git -C "$GAME_DIR" checkout --detach FETCH_HEAD
           echo "GAME_DIR=$GAME_DIR" >> "$GITHUB_ENV"
 
+      - name: Add Secrets and Cheats options tab
+        shell: bash
+        run: |
+          set -euo pipefail
+          node antimatter-mobile/patch-upstream-source.mjs \
+            "$GAME_DIR" \
+            antimatter-mobile/game-source-overrides/OptionsSecretsCheatsTab.vue
+
       - name: Install game dependencies
         working-directory: ${{ env.GAME_DIR }}
         env:
@@ -103,15 +111,15 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
             --key "$KEY_DIR/testkey.pk8" \
             --cert "$KEY_DIR/testkey.x509.pem" \
-            --out antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk \
+            --out antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.3.0.apk \
             antimatter-mobile/app/build/outputs/apk/release/app-release-unsigned.apk
 
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
             --verbose --print-certs \
-            antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk
+            antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.3.0.apk
 
-          sha256sum antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk \
-            > antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.2.0.apk.sha256
+          sha256sum antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.3.0.apk \
+            > antimatter-mobile/output/Antimatter-Dimensions-Mobile-v0.3.0.apk.sha256
 
       - name: Upload build diagnostics
         if: always()
@@ -125,7 +133,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Antimatter-Dimensions-Mobile-v0.2.0
+          name: Antimatter-Dimensions-Mobile-v0.3.0
           path: antimatter-mobile/output/*
           if-no-files-found: error
           retention-days: 14
