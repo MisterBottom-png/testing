@@ -1,0 +1,97 @@
+name: Build Antimatter Native APK
+
+on:
+  push:
+    branches:
+      - agent/antimatter-native-apk
+    paths:
+      - antimatter-native/**
+      - .github/workflows/antimatter-native.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode antimatter-native/source.tar.gz.b64 | tar -xz
+          test -f project/settings.gradle.kts
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: project/upstream-placeholder-package-lock.json
+        continue-on-error: true
+
+      - name: Rebuild pinned upstream game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/IvarK/AntimatterDimensionsSourceCode.git upstream-game-source
+          git -C upstream-game-source checkout 8ae221fcb07db667b3d04114c2b977175966611d
+          mkdir -p upstream-game-source/build
+          cp project/tools/upstream-build/pre-build.js upstream-game-source/build/pre-build.js
+          cp project/tools/upstream-build/post-build.js upstream-game-source/build/post-build.js
+          npm --prefix upstream-game-source ci --no-audit --no-fund
+          AD_FAST_BUILD=true AD_UPSTREAM_COMMIT=8ae221fcb07db667b3d04114c2b977175966611d npm --prefix upstream-game-source run build:release
+          rm -rf project/app/src/main/assets/game
+          mkdir -p project/app/src/main/assets/game
+          cp -a upstream-game-source/dist/. project/app/src/main/assets/game/
+
+      - name: Generate placeholder native audio
+        run: python3 project/tools/generate_audio.py
+
+      - name: Verify bridge contract
+        working-directory: project
+        run: |
+          node tools/verify-project.mjs
+          node tools/bridge-mock-test.mjs
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 35 SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compile debug APK
+        working-directory: project
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Run JVM tests
+        working-directory: project
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: antimatter-dimensions-native-debug-apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
