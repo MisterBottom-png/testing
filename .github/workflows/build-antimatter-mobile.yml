@@ -1,0 +1,100 @@
+name: Build Antimatter Mobile APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "antimatter-mobile/**"
+      - ".github/workflows/build-antimatter-mobile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out Android packaging project
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch pinned upstream game source
+        shell: bash
+        run: |
+          set -euo pipefail
+          GAME_DIR="$RUNNER_TEMP/antimatter-source"
+          mkdir -p "$GAME_DIR"
+          git -C "$GAME_DIR" init
+          git -C "$GAME_DIR" remote add origin https://github.com/IvarK/AntimatterDimensionsSourceCode.git
+          git -C "$GAME_DIR" fetch --depth 1 origin 8ae221fcb07db667b3d04114c2b977175966611d
+          git -C "$GAME_DIR" checkout --detach FETCH_HEAD
+          echo "GAME_DIR=$GAME_DIR" >> "$GITHUB_ENV"
+
+      - name: Install game dependencies
+        working-directory: ${{ env.GAME_DIR }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm ci
+
+      - name: Build upstream release
+        working-directory: ${{ env.GAME_DIR }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run build:release
+
+      - name: Apply mobile layout and bundle game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp antimatter-mobile/mobile-overrides.css "$GAME_DIR/dist/stylesheets/mobile-overrides.css"
+          node antimatter-mobile/patch-build.mjs "$GAME_DIR/dist"
+          rm -rf antimatter-mobile/app/src/main/assets/game
+          mkdir -p antimatter-mobile/app/src/main/assets/game
+          cp -R "$GAME_DIR/dist/." antimatter-mobile/app/src/main/assets/game/
+          cp "$GAME_DIR/LICENSE" antimatter-mobile/app/src/main/assets/UPSTREAM_LICENSE.txt
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        shell: bash
+        run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build installable APK
+        working-directory: antimatter-mobile
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Prepare APK artifact
+        shell: bash
+        run: |
+          mkdir -p antimatter-mobile/output
+          cp antimatter-mobile/app/build/outputs/apk/debug/app-debug.apk \
+            antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk
+          sha256sum antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk \
+            > antimatter-mobile/output/Antimatter-Dimensions-Mobile.apk.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antimatter-Dimensions-Mobile-APK
+          path: antimatter-mobile/output/*
+          if-no-files-found: error
+          retention-days: 14
