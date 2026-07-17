@@ -45,9 +45,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.vitautas.drumkit.input.DrumSurfaceView
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.CircleHitRegion
@@ -69,6 +66,7 @@ fun DrumKitScreen(
     onMasterVolumeChanged: (Float) -> Unit,
     onRoomMixChanged: (Float) -> Unit,
     diagnosticsProvider: () -> AudioDiagnostics,
+    sessionController: DrumKitSessionController,
     modifier: Modifier = Modifier,
     audioAvailable: Boolean = true,
     showDiagnostics: Boolean = false,
@@ -84,7 +82,6 @@ fun DrumKitScreen(
     var showHitRegions by remember { mutableStateOf(false) }
     var lastDebugStrike by remember { mutableStateOf<DrumStrike?>(null) }
     val recorder = remember { PerformanceRecorder() }
-    val lifecycleOwner = LocalLifecycleOwner.current
     val strikeDispatcher = remember(onStrike, recorder, showHitRegions) {
         { strike: DrumStrike ->
             onStrike(strike)
@@ -92,29 +89,24 @@ fun DrumKitScreen(
             if (showHitRegions) lastDebugStrike = strike
         }
     }
-
-    DisposableEffect(lifecycleOwner, recorder) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                recorder.stopIfRecording()?.let { take ->
-                    lastTake = take
-                    isRecording = false
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    LaunchedEffect(audioAvailable, recorder) {
-        if (!audioAvailable) {
+    val stopRecordingHandler: () -> Unit = remember(recorder) {
+        {
             recorder.stopIfRecording()?.let { take ->
                 lastTake = take
                 isRecording = false
             }
         }
+    }
+
+    DisposableEffect(sessionController, stopRecordingHandler) {
+        sessionController.bindStopRecordingHandler(stopRecordingHandler)
+        onDispose {
+            sessionController.unbindStopRecordingHandler(stopRecordingHandler)
+        }
+    }
+
+    LaunchedEffect(audioAvailable, stopRecordingHandler) {
+        if (!audioAvailable) stopRecordingHandler()
     }
 
     LaunchedEffect(showDiagnostics, diagnosticsProvider) {
