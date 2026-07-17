@@ -14,11 +14,20 @@ object StudioKitCamera {
     const val DRUM_HEAD_ELLIPSE_COMPRESSION = 0.27f
     const val CYMBAL_ELLIPSE_COMPRESSION = 0.18f
 
+    const val DRUM_HEAD_HEIGHT_FRACTION_OF_DRAW_BOUNDS = 0.42f
+    const val CYMBAL_HEIGHT_FRACTION_OF_DRAW_BOUNDS = 0.54f
+
     fun projectedDrumHeadHeight(normalizedWidth: Float): Float =
         projectedEllipseHeight(normalizedWidth, DRUM_HEAD_ELLIPSE_COMPRESSION)
 
     fun projectedCymbalHeight(normalizedWidth: Float): Float =
         projectedEllipseHeight(normalizedWidth, CYMBAL_ELLIPSE_COMPRESSION)
+
+    fun drumDrawBoundsHeight(normalizedWidth: Float): Float =
+        projectedDrumHeadHeight(normalizedWidth) / DRUM_HEAD_HEIGHT_FRACTION_OF_DRAW_BOUNDS
+
+    fun cymbalDrawBoundsHeight(normalizedWidth: Float): Float =
+        projectedCymbalHeight(normalizedWidth) / CYMBAL_HEIGHT_FRACTION_OF_DRAW_BOUNDS
 
     private fun projectedEllipseHeight(normalizedWidth: Float, compression: Float): Float {
         require(normalizedWidth.isFinite() && normalizedWidth in 0f..1f) {
