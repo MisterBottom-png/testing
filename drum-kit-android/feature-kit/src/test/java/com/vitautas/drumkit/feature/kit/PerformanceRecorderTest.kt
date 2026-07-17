@@ -4,6 +4,7 @@ import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,17 +45,59 @@ class PerformanceRecorderTest {
         assertTrue(take.truncated)
     }
 
+    @Test
+    fun stopIfRecordingFinalizesOnlyAnActiveTake() {
+        var nowNanos = 100L
+        val recorder = PerformanceRecorder(capacity = 2, clockNanos = { nowNanos })
+
+        assertNull(recorder.stopIfRecording())
+        recorder.start()
+        nowNanos = 350L
+        val take = recorder.stopIfRecording()
+
+        assertEquals(250L, take?.durationNanos)
+        assertFalse(recorder.isRecording)
+        assertNull(recorder.stopIfRecording())
+    }
+
+    @Test
+    fun capturedValuesAreFiniteAndClamped() {
+        val recorder = PerformanceRecorder(capacity = 1, clockNanos = { 0L })
+        recorder.start()
+        recorder.record(
+            strike(
+                instrument = InstrumentId.RIDE,
+                velocity = Float.NaN,
+                normalizedX = Float.POSITIVE_INFINITY,
+                normalizedY = -3f,
+                pressure = Float.NaN,
+                contactSize = Float.NEGATIVE_INFINITY,
+            ),
+        )
+
+        val recorded = recorder.stop().strikes.single()
+        assertEquals(0.8f, recorded.velocity, 0f)
+        assertEquals(0.5f, recorded.normalizedX, 0f)
+        assertEquals(0f, recorded.normalizedY, 0f)
+        assertEquals(0f, recorded.pressure, 0f)
+        assertEquals(0f, recorded.contactSize, 0f)
+    }
+
     private fun strike(
         instrument: InstrumentId,
         velocity: Float,
+        normalizedX: Float = 0.35f,
+        normalizedY: Float = 0.64f,
+        pressure: Float = 0.73f,
+        contactSize: Float = 0.18f,
     ): DrumStrike = DrumStrike(
         pointerId = 7,
         instrument = instrument,
         velocity = velocity,
-        normalizedX = 0.35f,
-        normalizedY = 0.64f,
-        pressure = 0.73f,
-        contactSize = 0.18f,
+        normalizedX = normalizedX,
+        normalizedY = normalizedY,
+        pressure = pressure,
+        contactSize = contactSize,
         eventTimeNanos = 123L,
     )
 }
