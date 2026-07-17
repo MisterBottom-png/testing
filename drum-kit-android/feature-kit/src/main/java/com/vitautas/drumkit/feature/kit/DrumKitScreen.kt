@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -44,6 +45,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.vitautas.drumkit.input.DrumSurfaceView
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.CircleHitRegion
@@ -66,6 +70,7 @@ fun DrumKitScreen(
     onRoomMixChanged: (Float) -> Unit,
     diagnosticsProvider: () -> AudioDiagnostics,
     modifier: Modifier = Modifier,
+    audioAvailable: Boolean = true,
     showDiagnostics: Boolean = false,
 ) {
     var volume by remember { mutableFloatStateOf(0.76f) }
@@ -79,11 +84,36 @@ fun DrumKitScreen(
     var showHitRegions by remember { mutableStateOf(false) }
     var lastDebugStrike by remember { mutableStateOf<DrumStrike?>(null) }
     val recorder = remember { PerformanceRecorder() }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val strikeDispatcher = remember(onStrike, recorder, showHitRegions) {
         { strike: DrumStrike ->
             onStrike(strike)
             recorder.record(strike)
             if (showHitRegions) lastDebugStrike = strike
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, recorder) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                recorder.stopIfRecording()?.let { take ->
+                    lastTake = take
+                    isRecording = false
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(audioAvailable, recorder) {
+        if (!audioAvailable) {
+            recorder.stopIfRecording()?.let { take ->
+                lastTake = take
+                isRecording = false
+            }
         }
     }
 
@@ -157,6 +187,7 @@ fun DrumKitScreen(
                         isRecording = true
                     }
                 },
+                enabled = audioAvailable,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = if (isRecording) Color(0xffa93232) else Color(0xff292d32),
                     contentColor = Color(0xfff7f4ee),
@@ -264,7 +295,17 @@ fun DrumKitScreen(
             }
         }
 
-        if (showDiagnostics) {
+        if (!audioAvailable) {
+            Text(
+                text = "Audio unavailable · retrying",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xffffa08d),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(Color(0xcc000000), MaterialTheme.shapes.small)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+        } else if (showDiagnostics) {
             Text(
                 text = diagnostics.toDisplayText(),
                 style = MaterialTheme.typography.labelSmall,
