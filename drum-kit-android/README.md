@@ -1,63 +1,79 @@
 # Native Android Drum Kit
 
-A native Android foundation derived from the supplied single-file HTML drum kit and implementation plan.
+A native, offline Android instrument derived from the supplied single-file HTML prototype, implementation plan, and drum-acoustics research.
 
-The source prototype is treated as a layout, instrument-mapping, and interaction reference only. The application does not use a WebView. The extracted mapping and foundation scope are documented in `docs/source-mapping.md`.
+The browser prototype remains a reference for layout, mapping, and interaction ideas. It is not embedded in a `WebView` and is not a runtime dependency.
 
-## Included foundation
+## Current implementation
 
 - Kotlin and Jetpack Compose application shell
 - Landscape-only immersive activity
-- Modular project structure
-- Raw Android multi-touch input through a custom `View`
-- Position and pressure-aware strike events
-- Native C++ audio engine using Oboe
-- Lock-free fixed-capacity event queue between UI and audio callback
-- Preallocated synthesized voice pool for kick, snare, three toms, hi-hat, crash, and ride
-- Master volume, simple room mix, haptics, and basic diagnostics
-- GitHub Actions build and lint workflow
+- Raw multi-touch input through a custom Android `View`
+- Position, pressure, and contact-size strike capture
+- Native C++20 audio engine using Oboe
+- Lock-free fixed-capacity event queue and preallocated voice pool
+- Sample-first acoustic snare with five articulations
+- Six velocity layers and four round robins per snare articulation
+- Equal-power interpolation between adjacent velocity layers
+- Small pitch, gain, and filter variation between repetitions
+- Complete 48 kHz PCM snare bank loaded before playback
+- Dry-first output with low-level parallel room processing
+- Synthesized placeholders retained for the other seven instruments
+- Master volume, room mix, haptics, and audio diagnostics
+- GitHub Actions tests, assembly, lint, PCM-bank verification, and APK artifact publishing
+
+## Snare model
+
+The snare no longer uses the oscillator-and-noise placeholder from the HTML reference. Acoustic recordings supply the attack and body for centre, off-centre, edge expression, rimshot, and cross-stick playback. The initial production bank contains 120 stereo samples: five articulations, six velocity layers, and four round robins.
+
+The deterministic preprocessing pipeline:
+
+1. Selects source hits by recorded power.
+2. Builds a controlled stereo mix from close and overhead microphones.
+3. Removes DC offset and aligns attacks to a common onset frame.
+4. Applies one duration and fade policy across the bank.
+5. Applies one global normalization gain rather than normalizing files independently.
+6. Resamples the cross-stick sources to 48 kHz.
+7. Quantizes once to interleaved PCM with deterministic dither.
+8. Writes a source manifest and SHA-256 bank digest.
+
+See `docs/snare-sampling.md` and `THIRD_PARTY_NOTICES.md` for the technical and licensing details.
 
 ## Modules
 
 - `app`: activity, lifecycle, immersive mode, and dependency wiring
-- `core-model`: instrument IDs, normalized layout, and diagnostics models
+- `core-model`: instrument IDs, normalized layout, articulation selection, and diagnostics models
 - `engine-input`: multi-touch surface and strike extraction
-- `engine-audio`: JNI bridge and Oboe real-time audio callback
+- `engine-audio`: JNI bridge, PCM bank loading, and Oboe real-time audio callback
 - `feature-kit`: Compose play screen and controls
 
 ## Build requirements
 
-- Android Studio compatible with Android Gradle Plugin 8.13.x
 - JDK 17
 - Android SDK 36
+- Android Gradle Plugin 8.13.x
+- Gradle 8.13
 - NDK 27.0.12077973
-- CMake 3.22.1 or newer
-- Gradle 8.13 when building outside Android Studio
+- CMake 3.22.1
 
 From this directory:
 
 ```bash
-gradle :app:assembleDebug
+gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-The GitHub Actions workflow installs the required SDK, NDK, CMake, and Gradle versions explicitly.
+The snare bank is generated before the Android build:
 
-## Validation status
+```bash
+python tools/build_snare_bank.py \
+  --output engine-audio/src/main/assets/snare/snare-bank.pcm \
+  --manifest build/snare-bank-manifest.json
+```
 
-The native engine has been checked locally with C++20, `-Wall`, `-Wextra`, and `-Werror`. A full Android build requires the Android SDK/NDK toolchain and is run by the repository workflow when the pull request is opened.
+The GitHub Actions workflow installs the required toolchains, creates and verifies the bank, runs tests and lint, builds the debug APK, and publishes the APK and bank manifest as workflow artifacts.
 
-## Current scope
+## Remaining validation and scope
 
-This is a production-oriented foundation, not the finished instrument. The current native engine synthesizes placeholder percussion so the complete touch-to-audio path can be tested before sample production, articulation layers, continuous hi-hat behavior, cymbal choking, recording, and detailed rendering are added.
+The other seven instruments intentionally remain synthesized placeholders until the snare passes repeated fast-stroke listening tests on physical Android devices. Device validation must cover double strokes, flams, rapid centre-to-edge movement, rimshot versus cross-stick distinction, clipping, voice stealing, underruns, and audio-route changes.
 
-## Next milestone
-
-Implement the expressive snare spike described in the plan:
-
-1. Five snare zones
-2. Velocity layers and round robins
-3. Hold-to-damp
-4. Drag-to-bend
-5. Rimshot and cross-stick prototypes
-6. Local head deformation
-7. Multi-touch validation and latency diagnostics
+Continuous hold-to-damp, drag-to-bend, hi-hat openness, cymbal choking, recording, MIDI, calibration, and production rendering remain later milestones.
