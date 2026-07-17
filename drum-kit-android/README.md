@@ -17,11 +17,12 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Independent normalized draw bounds and typed hit regions
 - Separate render z-index and hit-test priority
 - Compact kit, recording, and mixer controls with an expandable settings panel
+- Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
 - Cached Canvas geometry and shaders created during size changes
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
 - System-respecting, restrained instrument haptics
-- GitHub Actions build and lint workflow
+- GitHub Actions tests, build, lint, and downloadable debug APK artifact
 
 ## Modules
 
@@ -29,7 +30,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - `core-model`: instrument IDs, normalized draw geometry, typed hit regions, render metadata, strike data, and diagnostics models
 - `engine-input`: raw multi-touch, priority hit testing, strike extraction, haptics, animation state, and Canvas rendering
 - `engine-audio`: JNI bridge and Oboe real-time audio callback
-- `feature-kit`: Compose play screen, compact controls, settings overlays, and playable-surface embedding
+- `feature-kit`: Compose play screen, compact controls, fixed-capacity performance capture, settings overlays, and playable-surface embedding
 
 ## Build requirements
 
@@ -43,22 +44,22 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 From this directory:
 
 ```bash
-gradle :app:assembleDebug
+gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-The GitHub Actions workflow installs the required SDK, NDK, CMake, and Gradle versions explicitly.
+The GitHub Actions workflow installs the required SDK, NDK, CMake, and Gradle versions explicitly. Successful runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
 
 ## Validation status
 
-The native engine has been checked locally with C++20, `-Wall`, `-Wextra`, and `-Werror`. Geometry and renderer Kotlin sources are syntax-checked during development, while the repository workflow performs the authoritative Android build, unit tests, and lint checks.
+The native engine has been checked locally with C++20, `-Wall`, `-Wextra`, and `-Werror`. Geometry and renderer Kotlin sources are syntax-checked during development, while the repository workflow performs the authoritative Android build, unit tests, lint checks, and APK packaging.
 
 ## Current scope
 
-This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion, and the renderer still uses procedural Canvas layers rather than final pre-rendered or RenderNode-cached instrument artwork.
+This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion, and the renderer still uses procedural Canvas layers rather than final pre-rendered or fully RenderNode-cached instrument artwork.
 
-The first redesign implementation slice is complete: drawing and touch geometry are independent, overlap resolution is explicit, the permanent HUD is gone, diagnostics are restricted to debuggable builds, labels fade away, renderer objects are cached outside steady-state drawing, and strikes drive instrument-specific local feedback rather than lifting the whole instrument.
+The current redesign implementation separates drawing from touch geometry, resolves overlaps explicitly, removes the permanent HUD, restricts diagnostics to debuggable builds, fades labels, caches renderer objects outside steady-state drawing, and drives local instrument-specific feedback rather than lifting the whole instrument.
 
-The compact recording control is intentionally disabled until a real recording contract exists. It is not wired to a decorative Boolean that lies to the user, a remarkably common interface tradition.
+The recording control now captures an expressive strike-event take using fixed-capacity primitive buffers. Audio dispatch remains first; recording copies timing, instrument, velocity, normalized position, pressure, and contact size afterward. The take is materialized only when recording stops. PCM/WAV export remains deferred.
 
 ## Next milestone
 
@@ -67,7 +68,7 @@ The compact recording control is intentionally disabled until a real recording c
 3. Profile rapid multi-touch rendering on representative phones and tablets.
 4. Tune hit regions and overlap priority using physical-device play tests.
 5. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.
-6. Add a functional recording engine before enabling the recording control.
+6. Add strike-take playback and later PCM/WAV recording export.
 7. Consider AGSL or OpenGL only after profiling proves the Canvas/RenderNode path insufficient.
 
 The raw `MotionEvent` input path, custom playable `View`, normalized strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.
