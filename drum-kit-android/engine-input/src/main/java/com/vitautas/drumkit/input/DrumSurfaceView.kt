@@ -75,10 +75,10 @@ class DrumSurfaceView @JvmOverloads constructor(
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         textSize = TypedValue.applyDimension(
-    TypedValue.COMPLEX_UNIT_SP,
-    11f,
-    resources.displayMetrics,
-)
+            TypedValue.COMPLEX_UNIT_SP,
+            11f,
+            resources.displayMetrics,
+        )
         isFakeBoldText = true
         setShadowLayer(density * 3f, 0f, density, Color.BLACK)
     }
