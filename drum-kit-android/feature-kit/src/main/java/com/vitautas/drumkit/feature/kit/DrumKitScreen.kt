@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.weight
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -45,8 +46,6 @@ fun DrumKitScreen(
     diagnosticsProvider: () -> AudioDiagnostics,
     modifier: Modifier = Modifier,
     showDiagnostics: Boolean = false,
-    isRecording: Boolean = false,
-    onRecordingToggle: (() -> Unit)? = null,
 ) {
     var volume by remember { mutableFloatStateOf(0.76f) }
     var room by remember { mutableFloatStateOf(0.32f) }
@@ -54,6 +53,15 @@ fun DrumKitScreen(
     var settingsExpanded by remember { mutableStateOf(false) }
     var kitSelectorExpanded by remember { mutableStateOf(false) }
     var diagnostics by remember { mutableStateOf(AudioDiagnostics()) }
+    var isRecording by remember { mutableStateOf(false) }
+    var lastTake by remember { mutableStateOf<RecordedPerformance?>(null) }
+    val recorder = remember { PerformanceRecorder() }
+    val strikeDispatcher = remember(onStrike, recorder) {
+        { strike: DrumStrike ->
+            onStrike(strike)
+            recorder.record(strike)
+        }
+    }
 
     LaunchedEffect(showDiagnostics, diagnosticsProvider) {
         if (!showDiagnostics) return@LaunchedEffect
@@ -71,12 +79,12 @@ fun DrumKitScreen(
         AndroidView(
             factory = { context ->
                 DrumSurfaceView(context).apply {
-                    this.onStrike = onStrike
+                    onStrike = strikeDispatcher
                     hapticsEnabled = haptics
                 }
             },
             update = { surface ->
-                surface.onStrike = onStrike
+                surface.onStrike = strikeDispatcher
                 surface.hapticsEnabled = haptics
             },
             modifier = Modifier.fillMaxSize(),
@@ -112,8 +120,19 @@ fun DrumKitScreen(
                 .padding(end = 12.dp, top = 10.dp),
         ) {
             FilledTonalButton(
-                onClick = { onRecordingToggle?.invoke() },
-                enabled = onRecordingToggle != null,
+                onClick = {
+                    if (isRecording) {
+                        lastTake = recorder.stop()
+                        isRecording = false
+                    } else {
+                        recorder.start()
+                        isRecording = true
+                    }
+                },
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = if (isRecording) Color(0xffa93232) else Color(0xff292d32),
+                    contentColor = Color(0xfff7f4ee),
+                ),
                 modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp),
             ) {
                 Text(if (isRecording) "STOP" else "REC")
@@ -171,6 +190,23 @@ fun DrumKitScreen(
                             onCheckedChange = { haptics = it },
                         )
                     }
+                    Surface(
+                        color = Color(0xff1a1d22),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            Text("Performance capture", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = recordingStatus(isRecording, lastTake),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isRecording) Color(0xffffa08d) else Color(0xffaab2bf),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -215,6 +251,19 @@ private fun CompactSlider(
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+private fun recordingStatus(
+    isRecording: Boolean,
+    lastTake: RecordedPerformance?,
+): String = when {
+    isRecording -> "Capturing strike timing and expression"
+    lastTake == null -> "No take captured"
+    lastTake.truncated -> "${lastTake.strikes.size} hits · buffer limit reached"
+    else -> {
+        val seconds = lastTake.durationMillis / 1_000f
+        "${lastTake.strikes.size} hits · ${"%.1f".format(seconds)} s"
     }
 }
 
