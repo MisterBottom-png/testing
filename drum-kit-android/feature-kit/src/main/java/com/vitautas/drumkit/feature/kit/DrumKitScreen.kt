@@ -79,7 +79,7 @@ fun DrumKitScreen(
         AndroidView(
             factory = { context ->
                 DrumSurfaceView(context).apply {
-                    onStrike = strikeDispatcher
+                    this.onStrike = strikeDispatcher
                     hapticsEnabled = haptics
                 }
             },
