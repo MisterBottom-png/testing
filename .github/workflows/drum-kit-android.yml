@@ -26,7 +26,7 @@ jobs:
           sha256sum /tmp/snare-position.zip | tee /tmp/snare-metadata/archive-sha256.txt
           unzip -q /tmp/snare-position.zip -d /tmp/snare-source
           cp /tmp/snare-source/snare-position/snare-position.xml /tmp/snare-metadata/
-          cp /tmp/snare-source/snare-position/artstar-positional.xml /tmp/snare-metadata/
+          cp /tmp/snare-source/artstar-positional.xml /tmp/snare-metadata/
           find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%p\n' \
             | sort | sed -n '1,8p' > /tmp/snare-metadata/probe-files.txt
           while IFS= read -r sample; do
