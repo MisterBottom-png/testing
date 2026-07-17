@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
@@ -50,10 +51,11 @@ import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.EllipseHitRegion
 import com.vitautas.drumkit.model.HitRegion
 import com.vitautas.drumkit.model.InstrumentId
-import com.vitautas.drumkit.model.NormalizedPoint
+import com.vitautas.drumkit.model.InstrumentLayout
 import com.vitautas.drumkit.model.PolygonHitRegion
 import com.vitautas.drumkit.model.RectangleHitRegion
 import com.vitautas.drumkit.model.StudioKitDefinition
+import com.vitautas.drumkit.model.StudioKitGeometry
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -294,16 +296,22 @@ private fun HitRegionOverlay(lastStrike: DrumStrike?) {
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
+        val aspectRatio = size.width / size.height
         for (definition in definitions) {
             val selected = definition.id == lastStrike?.instrument
             val color = debugColor(definition.id)
             drawDebugHitRegion(
-                region = definition.layout.hitRegion,
+                layout = definition.layout,
                 color = color,
                 strokeWidth = if (selected) selectedStrokeWidth else strokeWidth,
                 selected = selected,
             )
-            val center = regionCenter(definition.layout.hitRegion)
+            val center = StudioKitGeometry.screenPoint(
+                layout = definition.layout,
+                normalizedX = 0.5f,
+                normalizedY = 0.5f,
+                aspectRatio = aspectRatio,
+            )
             textPaint.color = color.toArgb()
             drawContext.canvas.nativeCanvas.drawText(
                 "${definition.id.label.uppercase()} P${definition.layout.hitTestPriority}",
@@ -315,12 +323,19 @@ private fun HitRegionOverlay(lastStrike: DrumStrike?) {
 
         val strike = lastStrike ?: return@Canvas
         val definition = StudioKitDefinition.instruments.firstOrNull { it.id == strike.instrument } ?: return@Canvas
-        val bounds = definition.layout.drawBounds
-        val screenX = bounds.left + strike.normalizedX * bounds.width
-        val screenY = bounds.top + strike.normalizedY * bounds.height
-        val marker = Offset(screenX * size.width, screenY * size.height)
+        val screenPoint = StudioKitGeometry.screenPoint(
+            layout = definition.layout,
+            normalizedX = strike.normalizedX,
+            normalizedY = strike.normalizedY,
+            aspectRatio = aspectRatio,
+        )
+        val marker = Offset(screenPoint.x * size.width, screenPoint.y * size.height)
         val color = debugColor(strike.instrument)
-        val overlapCount = StudioKitDefinition.matchingInstrumentCount(screenX, screenY)
+        val overlapCount = StudioKitGeometry.matchingInstrumentCount(
+            screenX = screenPoint.x,
+            screenY = screenPoint.y,
+            aspectRatio = aspectRatio,
+        )
 
         drawCircle(Color.Black.copy(alpha = 0.55f), markerRadius * 1.45f, marker)
         drawCircle(color, markerRadius, marker, style = Stroke(width = selectedStrokeWidth))
@@ -347,14 +362,36 @@ private fun HitRegionOverlay(lastStrike: DrumStrike?) {
 }
 
 private fun DrawScope.drawDebugHitRegion(
-    region: HitRegion,
+    layout: InstrumentLayout,
     color: Color,
     strokeWidth: Float,
     selected: Boolean,
 ) {
     val fillColor = color.copy(alpha = if (selected) 0.30f else 0.12f)
     val strokeColor = color.copy(alpha = if (selected) 1f else 0.78f)
+    val pivot = Offset(
+        layout.drawBounds.centerX * size.width,
+        layout.drawBounds.centerY * size.height,
+    )
 
+    withTransform({
+        rotate(degrees = layout.rotationDegrees, pivot = pivot)
+    }) {
+        drawUnrotatedHitRegion(
+            region = layout.hitRegion,
+            fillColor = fillColor,
+            strokeColor = strokeColor,
+            strokeWidth = strokeWidth,
+        )
+    }
+}
+
+private fun DrawScope.drawUnrotatedHitRegion(
+    region: HitRegion,
+    fillColor: Color,
+    strokeColor: Color,
+    strokeWidth: Float,
+) {
     when (region) {
         is RectangleHitRegion -> {
             val bounds = region.bounds
@@ -373,13 +410,10 @@ private fun DrawScope.drawDebugHitRegion(
         }
 
         is CircleHitRegion -> {
-            val topLeft = Offset(
-                (region.center.x - region.radius) * size.width,
-                (region.center.y - region.radius) * size.height,
-            )
-            val regionSize = Size(region.radius * 2f * size.width, region.radius * 2f * size.height)
-            drawOval(fillColor, topLeft, regionSize)
-            drawOval(strokeColor, topLeft, regionSize, style = Stroke(width = strokeWidth))
+            val center = Offset(region.center.x * size.width, region.center.y * size.height)
+            val radius = region.radius * size.height
+            drawCircle(fillColor, radius, center)
+            drawCircle(strokeColor, radius, center, style = Stroke(width = strokeWidth))
         }
 
         is PolygonHitRegion -> {
@@ -394,21 +428,6 @@ private fun DrawScope.drawDebugHitRegion(
             drawPath(path, fillColor)
             drawPath(path, strokeColor, style = Stroke(width = strokeWidth))
         }
-    }
-}
-
-private fun regionCenter(region: HitRegion): NormalizedPoint = when (region) {
-    is RectangleHitRegion -> NormalizedPoint(region.bounds.centerX, region.bounds.centerY)
-    is EllipseHitRegion -> NormalizedPoint(region.bounds.centerX, region.bounds.centerY)
-    is CircleHitRegion -> region.center
-    is PolygonHitRegion -> {
-        var x = 0f
-        var y = 0f
-        for (point in region.points) {
-            x += point.x
-            y += point.y
-        }
-        NormalizedPoint(x / region.points.size, y / region.points.size)
     }
 }
 
