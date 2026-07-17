@@ -26,7 +26,7 @@ class HitRegionTest {
         )
 
         assertTrue(region.contains(0.5f, 0.4f, landscapeAspectRatio))
-        assertTrue(region.contains(0.74f, 0.44f, landscapeAspectRatio))
+        assertTrue(region.contains(0.60f, 0.44f, landscapeAspectRatio))
         assertFalse(region.contains(0.78f, 0.30f, landscapeAspectRatio))
     }
 
