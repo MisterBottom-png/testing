@@ -19,6 +19,7 @@ import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentId
 import com.vitautas.drumkit.model.InstrumentRendererKey
 import com.vitautas.drumkit.model.StudioKitDefinition
+import com.vitautas.drumkit.model.StudioKitGeometry
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -198,11 +199,10 @@ class DrumSurfaceView @JvmOverloads constructor(
         val y = event.getY(pointerIndex)
         val screenX = x / width.toFloat()
         val screenY = y / height.toFloat()
-        val definition = hitTest(screenX, screenY) ?: return
+        val aspectRatio = width.toFloat() / height.toFloat()
+        val hit = StudioKitGeometry.hitTest(screenX, screenY, aspectRatio) ?: return
+        val definition = hit.definition
         val pointerId = event.getPointerId(pointerIndex)
-        val drawBounds = definition.layout.drawBounds
-        val normalizedX = ((screenX - drawBounds.left) / drawBounds.width).coerceIn(0f, 1f)
-        val normalizedY = ((screenY - drawBounds.top) / drawBounds.height).coerceIn(0f, 1f)
         val pressure = event.getPressure(pointerIndex).coerceAtLeast(0f)
         val contactSize = event.getSize(pointerIndex).coerceAtLeast(0f)
         val velocity = estimateVelocity(pressure, contactSize, event.eventTime)
@@ -213,8 +213,8 @@ class DrumSurfaceView @JvmOverloads constructor(
                 pointerId = pointerId,
                 instrument = definition.id,
                 velocity = velocity,
-                normalizedX = normalizedX,
-                normalizedY = normalizedY,
+                normalizedX = hit.normalizedX,
+                normalizedY = hit.normalizedY,
                 pressure = pressure,
                 contactSize = contactSize,
                 eventTimeNanos = eventTimeNanos,
@@ -223,8 +223,8 @@ class DrumSurfaceView @JvmOverloads constructor(
 
         activePointers.put(pointerId, definition.id)
         animationStates[definition.id.ordinal].apply {
-            strikeX = normalizedX
-            strikeY = normalizedY
+            strikeX = hit.normalizedX
+            strikeY = hit.normalizedY
             this.velocity = velocity
             startTimeNanos = System.nanoTime()
             activePointerCount += 1
@@ -260,21 +260,24 @@ class DrumSurfaceView @JvmOverloads constructor(
         return (pressureVelocity + contactSize.coerceIn(0f, 1f) * 0.12f).coerceIn(0.22f, 1f)
     }
 
-    private fun hitTest(screenX: Float, screenY: Float): InstrumentDefinition? {
-        for (definition in StudioKitDefinition.hitTestOrder) {
-            if (definition.layout.hitRegion.contains(screenX, screenY)) return definition
-        }
-        return null
-    }
-
     private fun configureRenderState(state: InstrumentRenderState, viewWidth: Float, viewHeight: Float) {
         val normalized = state.definition.layout.drawBounds
+        val playable = StudioKitGeometry.playableBounds(
+            layout = state.definition.layout,
+            aspectRatio = viewWidth / viewHeight,
+        )
         val bounds = state.drawBounds
         bounds.set(
             normalized.left * viewWidth,
             normalized.top * viewHeight,
             normalized.right * viewWidth,
             normalized.bottom * viewHeight,
+        )
+        state.playableRect.set(
+            playable.left * viewWidth,
+            playable.top * viewHeight,
+            playable.right * viewWidth,
+            playable.bottom * viewHeight,
         )
         state.labelX = state.definition.layout.labelPosition.x * viewWidth
         state.labelY = state.definition.layout.labelPosition.y * viewHeight
@@ -283,12 +286,7 @@ class DrumSurfaceView @JvmOverloads constructor(
             InstrumentRendererKey.CYMBAL,
             InstrumentRendererKey.HI_HAT,
             -> {
-                state.primaryRect.set(
-                    bounds.left,
-                    bounds.top + bounds.height() * 0.18f,
-                    bounds.right,
-                    bounds.bottom - bounds.height() * 0.28f,
-                )
+                state.primaryRect.set(state.playableRect)
                 state.shadowRect.set(
                     state.primaryRect.left + state.primaryRect.width() * 0.10f,
                     state.primaryRect.bottom - bounds.height() * 0.02f,
@@ -314,12 +312,7 @@ class DrumSurfaceView @JvmOverloads constructor(
                     bounds.right - bounds.width() * 0.10f,
                     bounds.bottom - bounds.height() * 0.10f,
                 )
-                state.secondaryRect.set(
-                    bounds.left,
-                    bounds.top,
-                    bounds.right,
-                    bounds.top + bounds.height() * 0.42f,
-                )
+                state.secondaryRect.set(state.playableRect)
                 state.shadowRect.set(
                     state.primaryRect.left + state.primaryRect.width() * 0.05f,
                     state.primaryRect.bottom - bounds.height() * 0.02f,
@@ -351,13 +344,12 @@ class DrumSurfaceView @JvmOverloads constructor(
 
             InstrumentRendererKey.KICK -> {
                 state.primaryRect.set(
-                    bounds.left + bounds.width() * 0.04f,
-                    bounds.top + bounds.height() * 0.12f,
-                    bounds.right - bounds.width() * 0.04f,
-                    bounds.bottom - bounds.height() * 0.10f,
+                    bounds.left,
+                    bounds.top + bounds.height() * 0.06f,
+                    bounds.right,
+                    bounds.bottom - bounds.height() * 0.04f,
                 )
-                state.secondaryRect.set(state.primaryRect)
-                state.secondaryRect.inset(state.primaryRect.width() * 0.10f, state.primaryRect.height() * 0.10f)
+                state.secondaryRect.set(state.playableRect)
                 state.shadowRect.set(
                     state.primaryRect.left + state.primaryRect.width() * 0.04f,
                     state.primaryRect.bottom - bounds.height() * 0.03f,
@@ -432,8 +424,8 @@ class DrumSurfaceView @JvmOverloads constructor(
         canvas.drawLine(shell.right - shell.width() * 0.38f, lugTop, shell.right - shell.width() * 0.38f, lugBottom, hardwarePaint)
         canvas.drawLine(shell.right - shell.width() * 0.15f, lugTop, shell.right - shell.width() * 0.15f, lugBottom, hardwarePaint)
 
-        val impactX = bounds.left + animation.strikeX * bounds.width()
-        val impactY = bounds.top + animation.strikeY * bounds.height()
+        val impactX = head.left + animation.strikeX * head.width()
+        val impactY = head.top + animation.strikeY * head.height()
         val headSaveCount = canvas.save()
         if (animation.currentDeformation > 0f) {
             canvas.scale(
@@ -478,10 +470,12 @@ class DrumSurfaceView @JvmOverloads constructor(
         rimPaint.alpha = 255
         canvas.drawOval(shell, rimPaint)
 
+        val impactX = head.left + animation.strikeX * head.width()
+        val impactY = head.top + animation.strikeY * head.height()
         val headSaveCount = canvas.save()
         if (animation.currentDeformation > 0f) {
             val scale = 1f - animation.currentDeformation * 0.045f
-            canvas.scale(scale, scale, head.centerX(), head.centerY())
+            canvas.scale(scale, scale, impactX, impactY)
         }
         headPaint.shader = state.secondaryShader
         canvas.drawOval(head, headPaint)
@@ -499,6 +493,8 @@ class DrumSurfaceView @JvmOverloads constructor(
         val bounds = state.drawBounds
         val centerX = disc.centerX()
         val centerY = disc.centerY()
+        val impactX = disc.left + animation.strikeX * disc.width()
+        val impactY = disc.top + animation.strikeY * disc.height()
 
         canvas.drawLine(centerX, centerY, centerX, bounds.bottom, standPaint)
         canvas.drawLine(centerX, bounds.bottom - bounds.height() * 0.05f, bounds.left + bounds.width() * 0.28f, bounds.bottom, standPaint)
@@ -511,7 +507,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         }
 
         val discSaveCount = canvas.save()
-        canvas.rotate(animation.currentRotation, centerX, centerY)
+        canvas.rotate(animation.currentRotation, impactX, impactY)
         if (hiHat) {
             canvas.translate(0f, -animation.currentDeformation * bounds.height() * 0.07f)
         }
@@ -646,6 +642,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         val definition: InstrumentDefinition,
     ) {
         val drawBounds = RectF()
+        val playableRect = RectF()
         val primaryRect = RectF()
         val secondaryRect = RectF()
         val shadowRect = RectF()
