@@ -30,6 +30,10 @@ android {
         }
     }
 
+    androidResources {
+        noCompress += "pcm"
+    }
+
     buildFeatures {
         compose = true
     }
