@@ -98,11 +98,12 @@ Required versions:
 
 - JDK 17
 - Android SDK 36
-- Android Gradle Plugin 8.13.x
-- Gradle 8.13
-- NDK 27.0.12077973
+- Android SDK Build Tools 36.0.0
+- Android Gradle Plugin 9.3.x
+- Gradle 9.5.0
+- NDK 28.2.13676358
 - CMake 3.22.1
-- Kotlin 2.3.x
+- Kotlin 2.4.x through Android Gradle Plugin built-in Kotlin support
 - C++20
 - Oboe 1.10.x
 
@@ -111,19 +112,19 @@ The repository currently uses the system `gradle` command rather than a committe
 Minimum validation:
 
 ```bash
-gradle --no-daemon :app:assembleDebug :app:lintDebug
+gradle --no-daemon --warning-mode=fail :app:assembleDebug :app:lintDebug
 ```
 
 Release-sensitive validation:
 
 ```bash
-gradle --no-daemon :app:assembleRelease :app:lintRelease
+gradle --no-daemon --warning-mode=fail :app:assembleRelease :app:lintRelease
 ```
 
 When tests or a device are available:
 
 ```bash
-gradle --no-daemon testDebugUnitTest
+gradle --no-daemon --warning-mode=fail testDebugUnitTest
 gradle --no-daemon connectedDebugAndroidTest
 ```
 
