@@ -18,7 +18,7 @@ jobs:
 
       - name: Download and inspect positional snare archive
         run: |
-          set -euo pipefail
+          set -eu
           mkdir -p /tmp/snare-metadata
           curl --fail --location --retry 3 \
             https://drumgizmo.org/kits/snare-position.zip \
@@ -27,12 +27,14 @@ jobs:
           unzip -q /tmp/snare-position.zip -d /tmp/snare-source
           cp /tmp/snare-source/snare-position/snare-position.xml /tmp/snare-metadata/
           cp /tmp/snare-source/snare-position/artstar-positional.xml /tmp/snare-metadata/
-          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -print0 \
-            | sort -z \
-            | head -z -n 8 \
-            | xargs -0 -I{} ffprobe -v error -show_entries \
+          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%p\n' \
+            | sort | sed -n '1,8p' > /tmp/snare-metadata/probe-files.txt
+          while IFS= read -r sample; do
+            printf '\nFILE=%s\n' "${sample##*/}"
+            ffprobe -v error -show_entries \
               stream=codec_name,sample_fmt,sample_rate,channels,bits_per_raw_sample,duration \
-              -of default=noprint_wrappers=0 "{}" \
+              -of default=noprint_wrappers=0 "$sample"
+          done < /tmp/snare-metadata/probe-files.txt \
             > /tmp/snare-metadata/sample-formats.txt
           find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%f\n' \
             | sort > /tmp/snare-metadata/sample-files.txt
