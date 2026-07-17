@@ -2,7 +2,7 @@
 
 A native Android foundation derived from the supplied single-file HTML drum kit and implementation plan.
 
-The HTML prototype is retained under `reference/` for layout, instrument mapping, and interaction reference only. The application does not use a WebView.
+The source prototype is treated as a layout, instrument-mapping, and interaction reference only. The application does not use a WebView. The extracted mapping and foundation scope are documented in `docs/source-mapping.md`.
 
 ## Included foundation
 
@@ -41,6 +41,10 @@ gradle :app:assembleDebug
 ```
 
 The GitHub Actions workflow installs the required SDK, NDK, CMake, and Gradle versions explicitly.
+
+## Validation status
+
+The native engine has been checked locally with C++20, `-Wall`, `-Wextra`, and `-Werror`. A full Android build requires the Android SDK/NDK toolchain and is run by the repository workflow when the pull request is opened.
 
 ## Current scope
 
