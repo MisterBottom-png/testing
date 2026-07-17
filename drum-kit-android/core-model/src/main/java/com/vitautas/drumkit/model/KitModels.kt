@@ -1,6 +1,8 @@
 package com.vitautas.drumkit.model
 
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 private const val MinimumPolygonPoints = 3
 private const val GeometryEpsilon = 0.000001f
@@ -63,6 +65,8 @@ data class NormalizedRect(
 
 sealed interface HitRegion {
     fun contains(x: Float, y: Float): Boolean
+
+    fun contains(x: Float, y: Float, aspectRatio: Float): Boolean = contains(x, y)
 }
 
 data class RectangleHitRegion(
@@ -73,12 +77,31 @@ data class RectangleHitRegion(
 
 data class EllipseHitRegion(
     val bounds: NormalizedRect,
+    val rotationDegrees: Float = 0f,
+    val rotationCenter: NormalizedPoint = NormalizedPoint(bounds.centerX, bounds.centerY),
 ) : HitRegion {
-    override fun contains(x: Float, y: Float): Boolean {
-        val radiusX = bounds.width * 0.5f
+    init {
+        require(rotationDegrees.isFinite()) { "rotation must be finite" }
+    }
+
+    override fun contains(x: Float, y: Float): Boolean = contains(x, y, 1f)
+
+    override fun contains(x: Float, y: Float, aspectRatio: Float): Boolean {
+        require(aspectRatio.isFinite() && aspectRatio > 0f) { "aspect ratio must be positive and finite" }
+
+        val scaledCenterX = rotationCenter.x * aspectRatio
+        val deltaX = x * aspectRatio - scaledCenterX
+        val deltaY = y - rotationCenter.y
+        val radians = Math.toRadians(-rotationDegrees.toDouble())
+        val cosine = cos(radians).toFloat()
+        val sine = sin(radians).toFloat()
+        val localX = deltaX * cosine - deltaY * sine + scaledCenterX
+        val localY = deltaX * sine + deltaY * cosine + rotationCenter.y
+
+        val radiusX = bounds.width * aspectRatio * 0.5f
         val radiusY = bounds.height * 0.5f
-        val normalizedX = (x - bounds.centerX) / radiusX
-        val normalizedY = (y - bounds.centerY) / radiusY
+        val normalizedX = (localX - bounds.centerX * aspectRatio) / radiusX
+        val normalizedY = (localY - bounds.centerY) / radiusY
         return normalizedX * normalizedX + normalizedY * normalizedY <= 1f
     }
 }
@@ -175,7 +198,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.CRASH,
             drawBounds = NormalizedRect(0.03f, 0.10f, 0.30f, 0.37f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.055f, 0.145f, 0.275f, 0.285f)),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = -7f,
@@ -186,7 +208,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.RIDE,
             drawBounds = NormalizedRect(0.70f, 0.10f, 0.97f, 0.37f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.725f, 0.145f, 0.945f, 0.285f)),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = 6f,
@@ -197,7 +218,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.HI_HAT,
             drawBounds = NormalizedRect(0.02f, 0.31f, 0.25f, 0.58f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.04f, 0.36f, 0.23f, 0.50f)),
             renderZIndex = 45,
             hitTestPriority = 60,
             rotationDegrees = -4f,
@@ -208,7 +228,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_HIGH,
             drawBounds = NormalizedRect(0.26f, 0.18f, 0.49f, 0.49f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.275f, 0.185f, 0.475f, 0.325f)),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = -4f,
@@ -219,7 +238,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_MID,
             drawBounds = NormalizedRect(0.48f, 0.17f, 0.72f, 0.49f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.495f, 0.175f, 0.705f, 0.315f)),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = 3f,
@@ -230,7 +248,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.KICK,
             drawBounds = NormalizedRect(0.37f, 0.43f, 0.72f, 0.94f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.405f, 0.50f, 0.685f, 0.86f)),
             renderZIndex = 35,
             hitTestPriority = 70,
             rotationDegrees = 0f,
@@ -241,7 +258,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.FLOOR_TOM,
             drawBounds = NormalizedRect(0.70f, 0.46f, 0.97f, 0.84f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.72f, 0.46f, 0.95f, 0.63f)),
             renderZIndex = 40,
             hitTestPriority = 90,
             rotationDegrees = 4f,
@@ -252,7 +268,6 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.SNARE,
             drawBounds = NormalizedRect(0.18f, 0.47f, 0.48f, 0.82f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.20f, 0.47f, 0.46f, 0.63f)),
             renderZIndex = 50,
             hitTestPriority = 100,
             rotationDegrees = -3f,
@@ -269,25 +284,64 @@ object StudioKitDefinition {
             .thenByDescending { it.layout.renderZIndex },
     )
 
-    fun hitTest(screenX: Float, screenY: Float): InstrumentDefinition? {
+    fun hitTest(screenX: Float, screenY: Float, aspectRatio: Float = 1f): InstrumentDefinition? {
         for (definition in hitTestOrder) {
-            if (definition.layout.hitRegion.contains(screenX, screenY)) return definition
+            if (definition.layout.hitRegion.contains(screenX, screenY, aspectRatio)) return definition
         }
         return null
     }
 
-    fun matchingInstrumentCount(screenX: Float, screenY: Float): Int {
+    fun matchingInstrumentCount(screenX: Float, screenY: Float, aspectRatio: Float = 1f): Int {
         var count = 0
         for (definition in instruments) {
-            if (definition.layout.hitRegion.contains(screenX, screenY)) count += 1
+            if (definition.layout.hitRegion.contains(screenX, screenY, aspectRatio)) count += 1
         }
         return count
+    }
+
+    private fun playableHitRegion(
+        drawBounds: NormalizedRect,
+        rendererKey: InstrumentRendererKey,
+        rotationDegrees: Float,
+    ): HitRegion {
+        val width = drawBounds.width
+        val height = drawBounds.height
+        val playableBounds = when (rendererKey) {
+            InstrumentRendererKey.CYMBAL,
+            InstrumentRendererKey.HI_HAT,
+            -> NormalizedRect(
+                left = drawBounds.left,
+                top = drawBounds.top + height * 0.18f,
+                right = drawBounds.right,
+                bottom = drawBounds.bottom - height * 0.28f,
+            )
+
+            InstrumentRendererKey.DRUM,
+            InstrumentRendererKey.SNARE,
+            -> NormalizedRect(
+                left = drawBounds.left,
+                top = drawBounds.top,
+                right = drawBounds.right,
+                bottom = drawBounds.top + height * 0.42f,
+            )
+
+            InstrumentRendererKey.KICK -> NormalizedRect(
+                left = drawBounds.left + width * 0.04f,
+                top = drawBounds.top + height * 0.12f,
+                right = drawBounds.right - width * 0.04f,
+                bottom = drawBounds.bottom - height * 0.10f,
+            )
+        }
+        return EllipseHitRegion(
+            bounds = playableBounds,
+            rotationDegrees = rotationDegrees,
+            rotationCenter = NormalizedPoint(drawBounds.centerX, drawBounds.centerY),
+        )
     }
 
     private fun instrument(
         id: InstrumentId,
         drawBounds: NormalizedRect,
-        hitRegion: HitRegion,
         renderZIndex: Int,
         hitTestPriority: Int,
         rotationDegrees: Float,
@@ -298,7 +352,7 @@ object StudioKitDefinition {
         layout = InstrumentLayout(
             instrumentId = id,
             drawBounds = drawBounds,
-            hitRegion = hitRegion,
+            hitRegion = playableHitRegion(drawBounds, rendererKey, rotationDegrees),
             renderZIndex = renderZIndex,
             hitTestPriority = hitTestPriority,
             rotationDegrees = rotationDegrees,
