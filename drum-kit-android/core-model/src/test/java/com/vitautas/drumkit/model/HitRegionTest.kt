@@ -97,9 +97,9 @@ class HitRegionTest {
             Triple(0.83f, 0.1912f, InstrumentId.RIDE),
             Triple(0.15f, 0.4252f, InstrumentId.HI_HAT),
             Triple(0.415f, 0.2699f, InstrumentId.TOM_HIGH),
-            Triple(0.585f, 0.2657f, InstrumentId.TOM_MID),
+            Triple(0.605f, 0.2657f, InstrumentId.TOM_MID),
             Triple(0.315f, 0.5792f, InstrumentId.SNARE),
-            Triple(0.54f, 0.6852f, InstrumentId.KICK),
+            Triple(0.51f, 0.6852f, InstrumentId.KICK),
             Triple(0.82f, 0.5504f, InstrumentId.FLOOR_TOM),
         )
 
