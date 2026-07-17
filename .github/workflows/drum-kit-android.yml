@@ -42,7 +42,17 @@ jobs:
           gradle-version: "8.13"
 
       - name: Build and lint
-        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:lintDebug 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-build-log
+          path: drum-kit-android/build.log
+          if-no-files-found: error
 
       - name: Upload debug APK
         if: success()
