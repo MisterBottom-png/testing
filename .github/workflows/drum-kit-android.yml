@@ -16,28 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download and inspect positional snare archive
+      - name: Download positional snare metadata
         run: |
           set -eu
           mkdir -p /tmp/snare-metadata
           curl --fail --location --retry 3 \
             https://drumgizmo.org/kits/snare-position.zip \
             --output /tmp/snare-position.zip
-          sha256sum /tmp/snare-position.zip | tee /tmp/snare-metadata/archive-sha256.txt
-          unzip -q /tmp/snare-position.zip -d /tmp/snare-source
-          cp /tmp/snare-source/snare-position/snare-position.xml /tmp/snare-metadata/
-          cp /tmp/snare-source/artstar-positional.xml /tmp/snare-metadata/
-          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%p\n' \
-            | sort | sed -n '1,8p' > /tmp/snare-metadata/probe-files.txt
-          while IFS= read -r sample; do
-            printf '\nFILE=%s\n' "${sample##*/}"
-            ffprobe -v error -show_entries \
-              stream=codec_name,sample_fmt,sample_rate,channels,bits_per_raw_sample,duration \
-              -of default=noprint_wrappers=0 "$sample"
-          done < /tmp/snare-metadata/probe-files.txt \
-            > /tmp/snare-metadata/sample-formats.txt
-          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%f\n' \
-            | sort > /tmp/snare-metadata/sample-files.txt
+          sha256sum /tmp/snare-position.zip > /tmp/snare-metadata/archive-sha256.txt
+          unzip -p /tmp/snare-position.zip snare-position/snare-position.xml \
+            > /tmp/snare-metadata/snare-position.xml
+          unzip -p /tmp/snare-position.zip artstar-positional.xml \
+            > /tmp/snare-metadata/artstar-positional.xml
+          unzip -Z1 /tmp/snare-position.zip \
+            | grep '/samples/.*\.wav$' \
+            > /tmp/snare-metadata/sample-files.txt
 
       - name: Upload snare metadata
         uses: actions/upload-artifact@v4
