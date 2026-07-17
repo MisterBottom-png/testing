@@ -61,7 +61,11 @@ Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument 
 - Compact recording and mixer controls in the upper-right corner
 - Expandable Room, Volume, and Haptics controls
 - Fixed-capacity strike-performance recording with relative timing and expressive input values
+- Recording finalization when the activity stops or audio becomes unavailable
 - Debug-only audio diagnostics and diagnostics polling
+- Android audio-focus acquisition, loss handling, delayed focus support, and startup retry
+- Automatic Oboe stream recovery after unexpected closure, with shared-mode fallback when exclusive opening fails
+- Closed-stream-safe diagnostics access and finite-value validation at Kotlin and native audio boundaries
 - Independent draw bounds and playable hit regions
 - Shared viewport-aware rotation for rendering, hit testing, strike positions, and debug overlays
 - Playable-surface-local strike coordinates for audio and animation input
@@ -78,7 +82,7 @@ Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument 
 - Camera-aligned instrument positions, scale relationships, and control-safe placement
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
-The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP, keeping the touch-to-audio path ahead of recording work.
+The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP or lifecycle finalization, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
@@ -116,4 +120,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, and shared viewport-aware input geometry.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
