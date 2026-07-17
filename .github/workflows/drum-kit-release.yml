@@ -1,0 +1,80 @@
+name: Drum Kit Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "drum-kit-v*"
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-release.yml"
+
+concurrency:
+  group: drum-kit-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-36" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Test, lint, and build release artifacts
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain \
+            testDebugUnitTest \
+            :app:lintRelease \
+            :app:assembleRelease \
+            :app:bundleRelease 2>&1 | tee release-build.log
+
+      - name: Upload release build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-release-build-log
+          path: drum-kit-android/release-build.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unsigned release artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-unsigned-release
+          path: |
+            drum-kit-android/app/build/outputs/apk/release/*.apk
+            drum-kit-android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
