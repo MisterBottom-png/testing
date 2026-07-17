@@ -29,7 +29,20 @@ Phase 2 Step 2.1 defines one shared elevated drummer-view camera in `StudioKitCa
 - Drum-head ellipse compression: 0.27 minor axis to major axis
 - Cymbal ellipse compression: 0.18 minor axis to major axis
 
-The elevation and horizon retain the prototype's slightly elevated viewpoint and floor transition. The compression ratios normalize the representative drum and cymbal profiles from the prototype into explicit screen-space targets. Instrument positions, scale by depth, and occlusion remain separate work for Steps 2.2 through 2.4.
+The elevation and horizon retain the prototype's slightly elevated viewpoint and floor transition. The compression ratios normalize representative drum and cymbal profiles from the prototype into explicit screen-space targets.
+
+## Camera-aligned kit placement
+
+Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument layout:
+
+- Rack tom centers flank the kick center symmetrically.
+- The snare sits lower and to the player's left.
+- The floor tom sits to the player's right, behind the snare line, and is larger than either rack tom.
+- The hi-hat sits left of the snare in a player-side position.
+- The crash and ride are rebalanced around the rack toms, with the ride remaining larger.
+- Cymbal and drum draw-bound heights are derived from the shared camera compression targets.
+- The top 12 percent of the playable surface remains reserved as a control-safe area.
+- Existing render order and hit-test priority remain unchanged pending the dedicated depth and occlusion steps.
 
 ## Prototype behavior represented in the base
 
@@ -60,14 +73,15 @@ The elevation and horizon retain the prototype's slightly elevated viewpoint and
 - System-respecting haptic feedback with restrained velocity thresholds
 - Audio dispatch before recording, haptic, and visual state updates
 - Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
+- Camera-aligned instrument positions, scale relationships, and control-safe placement
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
 The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
-- Apply the fixed camera contract while repositioning and scaling the complete kit
-- Correct depth relationships, hardware occlusion, and the shared floor plane
+- Correct depth relationships and establish one shared floor plane
+- Correct hardware occlusion and clipping
 - Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
@@ -100,4 +114,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, and the fixed camera contract for the next layout batch.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, and the camera-aligned Phase 2 kit placement.
