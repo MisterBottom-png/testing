@@ -15,9 +15,11 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.vitautas.drumkit.audio.AudioEngine
 import com.vitautas.drumkit.feature.kit.DrumKitScreen
+import com.vitautas.drumkit.feature.kit.DrumKitSessionController
 
 class MainActivity : ComponentActivity() {
     private val audioAvailableState = mutableStateOf(true)
+    private val kitSessionController = DrumKitSessionController()
     private lateinit var audioSessionController: AudioSessionController
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     onMasterVolumeChanged = AudioEngine::setMasterVolume,
                     onRoomMixChanged = AudioEngine::setRoomMix,
                     diagnosticsProvider = AudioEngine::diagnostics,
+                    sessionController = kitSessionController,
                     audioAvailable = audioAvailableState.value,
                     showDiagnostics = showDiagnostics,
                 )
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        kitSessionController.onAppStopping()
         audioSessionController.stop()
         super.onStop()
     }
