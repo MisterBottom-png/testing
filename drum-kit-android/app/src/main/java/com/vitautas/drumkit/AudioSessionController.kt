@@ -19,7 +19,12 @@ internal class AudioSessionController(
     private val retryRunnable = Runnable {
         if (!started) return@Runnable
         if (focusGranted) {
-            startEngineOrRetry()
+            if (AudioEngine.diagnostics().running) {
+                onAvailabilityChanged(true)
+                scheduleRetry()
+            } else {
+                startEngineOrRetry()
+            }
         } else if (!focusRequested) {
             requestFocus()
         }
@@ -102,7 +107,7 @@ internal class AudioSessionController(
         mainHandler.removeCallbacks(retryRunnable)
         val available = AudioEngine.start()
         onAvailabilityChanged(available)
-        if (!available) scheduleRetry()
+        scheduleRetry()
     }
 
     private fun pauseForFocusLoss(permanent: Boolean) {
