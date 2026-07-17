@@ -35,6 +35,7 @@ Normalized strike coordinates remain in the existing `[0, 1]` instrument-local d
 - Compact kit selector in the upper-left corner
 - Compact recording and mixer controls in the upper-right corner
 - Expandable Room, Volume, and Haptics controls
+- Fixed-capacity strike-performance recording with relative timing and expressive input values
 - Debug-only audio diagnostics and diagnostics polling
 - Independent draw bounds and playable hit regions
 - Independent render z-index and hit-test priority
@@ -45,7 +46,10 @@ Normalized strike coordinates remain in the existing `[0, 1]` instrument-local d
 - Cached static rectangles, gradients, labels, and shaders created in `onSizeChanged()`
 - Animation-only redraw through `postInvalidateOnAnimation()`
 - System-respecting haptic feedback with restrained velocity thresholds
-- Audio dispatch before haptic and visual state updates
+- Audio dispatch before recording, haptic, and visual state updates
+- CI unit tests, Android build, lint, and downloadable debug APK artifact
+
+The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
@@ -53,7 +57,7 @@ Normalized strike coordinates remain in the existing `[0, 1]` instrument-local d
 - Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
-- Functional recording rather than the disabled control slot
+- Strike-take playback and PCM/WAV export
 - Optional AGSL effects after profiling
 
 ## Deliberately deferred
@@ -66,7 +70,7 @@ The following behaviors require later expressive-engine phases and are not faked
 - Continuous hi-hat openness and pedal events
 - Cymbal edge, bow, bell, choke, and mute behavior
 - Snare throw-off, rimshot, cross-stick, and press roll
-- Recording export, MIDI, and calibration
+- PCM/WAV export, MIDI, and calibration
 - OpenGL rendering unless profiling proves Canvas/RenderNode insufficient
 
 ## Architectural decisions
@@ -75,11 +79,11 @@ The following behaviors require later expressive-engine phases and are not faked
 - Compose for application shell, selectors, settings, sheets, and overlays
 - Custom Android `View` for raw `MotionEvent` access, hit testing, animation state, and rendering
 - C++/Oboe for the audio callback
-- Fixed-capacity event queue and voice pool
+- Fixed-capacity event queue, voice pool, and performance-recording buffers
 - No allocation or Kotlin calls from the real-time callback
 - Source-independent instrument definitions to support future kits
 - Render technology remains independent from input and audio contracts
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, and the first structural slice of the 2.5D UI redesign.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, and fixed-capacity expressive strike-performance capture.
