@@ -1,5 +1,6 @@
 package com.vitautas.drumkit
 
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
 
+        val showDiagnostics = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         setContent {
             NativeDrumKitTheme {
                 DrumKitScreen(
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
                     onMasterVolumeChanged = AudioEngine::setMasterVolume,
                     onRoomMixChanged = AudioEngine::setRoomMix,
                     diagnosticsProvider = AudioEngine::diagnostics,
+                    showDiagnostics = showDiagnostics,
                 )
             }
         }
@@ -60,11 +63,11 @@ class MainActivity : ComponentActivity() {
 private fun NativeDrumKitTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xffffb44a),
-            background = Color(0xff05070a),
-            surface = Color(0xff0d1016),
-            onBackground = Color(0xfff3f5f8),
-            onSurface = Color(0xfff3f5f8),
+            primary = Color(0xffffa13a),
+            background = Color(0xff08090b),
+            surface = Color(0xff111318),
+            onBackground = Color(0xfff2f0eb),
+            onSurface = Color(0xfff2f0eb),
         ),
         content = content,
     )
