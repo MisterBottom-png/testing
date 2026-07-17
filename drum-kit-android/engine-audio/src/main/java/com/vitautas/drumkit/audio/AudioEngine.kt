@@ -17,18 +17,18 @@ object AudioEngine {
     fun trigger(strike: DrumStrike) {
         nativeTrigger(
             instrument = strike.instrument.nativeCode,
-            velocity = strike.velocity,
-            normalizedX = strike.normalizedX,
-            normalizedY = strike.normalizedY,
+            velocity = AudioInputSanitizer.velocity(strike.velocity),
+            normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX),
+            normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY),
         )
     }
 
     fun setMasterVolume(value: Float) {
-        nativeSetMasterVolume(value.coerceIn(0f, 1f))
+        AudioInputSanitizer.level(value)?.let(::nativeSetMasterVolume)
     }
 
     fun setRoomMix(value: Float) {
-        nativeSetRoomMix(value.coerceIn(0f, 1f))
+        AudioInputSanitizer.level(value)?.let(::nativeSetRoomMix)
     }
 
     fun diagnostics(): AudioDiagnostics = AudioDiagnostics(
