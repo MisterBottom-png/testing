@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        AudioEngine.start()
+        AudioEngine.start(this)
     }
 
     override fun onStop() {
