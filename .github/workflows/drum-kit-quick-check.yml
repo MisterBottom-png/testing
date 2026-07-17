@@ -46,15 +46,17 @@ jobs:
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36"
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.13"
+          gradle-version: "9.5.0"
 
       - name: Compile Kotlin and run unit tests
         run: >-
-          gradle --no-daemon --console=plain
+          gradle --no-daemon --console=plain --warning-mode=fail
           :core-model:testDebugUnitTest
           :engine-input:compileDebugKotlin
           :engine-audio:compileDebugKotlin

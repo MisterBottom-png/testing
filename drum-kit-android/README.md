@@ -34,20 +34,22 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 
 ## Build requirements
 
-- Android Studio compatible with Android Gradle Plugin 8.13.x
+- Android Studio compatible with Android Gradle Plugin 9.3.x
 - JDK 17
 - Android SDK 36
-- NDK 27.0.12077973
+- Android SDK Build Tools 36.0.0
+- NDK 28.2.13676358
 - CMake 3.22.1 or newer
-- Gradle 8.13 when building outside Android Studio
+- Gradle 9.5.0 when building outside Android Studio
+- Kotlin 2.4.0 through Android Gradle Plugin built-in Kotlin support
 
 From this directory:
 
 ```bash
-gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug
+gradle --no-daemon --warning-mode=fail testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-The GitHub Actions workflow installs the required SDK, NDK, CMake, and Gradle versions explicitly. Successful runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
+The GitHub Actions workflows install the required SDK, Build Tools, NDK, CMake, and Gradle versions explicitly. Builds fail on Gradle deprecation warnings. Successful APK runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
 
 ## Validation status
 

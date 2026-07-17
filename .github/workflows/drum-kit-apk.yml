@@ -39,18 +39,19 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager \
             "platforms;android-36" \
-            "ndk;27.0.12077973" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
             "cmake;3.22.1"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.13"
+          gradle-version: "9.5.0"
 
       - name: Test, build debug APK, and lint
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon --console=plain \
+          gradle --no-daemon --console=plain --warning-mode=fail \
             testDebugUnitTest \
             :app:assembleDebug \
             :app:lintDebug 2>&1 | tee apk-build.log
