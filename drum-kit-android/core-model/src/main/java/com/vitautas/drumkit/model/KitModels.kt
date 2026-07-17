@@ -174,23 +174,23 @@ object StudioKitDefinition {
     val instruments: List<InstrumentDefinition> = listOf(
         instrument(
             id = InstrumentId.CRASH,
-            drawBounds = NormalizedRect(0.03f, 0.03f, 0.30f, 0.30f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.055f, 0.085f, 0.275f, 0.235f)),
+            drawBounds = NormalizedRect(0.03f, 0.10f, 0.30f, 0.37f),
+            hitRegion = EllipseHitRegion(NormalizedRect(0.055f, 0.145f, 0.275f, 0.285f)),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = -7f,
-            labelPosition = NormalizedPoint(0.165f, 0.31f),
+            labelPosition = NormalizedPoint(0.165f, 0.38f),
             rendererKey = InstrumentRendererKey.CYMBAL,
             pan = -0.55f,
         ),
         instrument(
             id = InstrumentId.RIDE,
-            drawBounds = NormalizedRect(0.70f, 0.04f, 0.97f, 0.31f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.725f, 0.095f, 0.945f, 0.245f)),
+            drawBounds = NormalizedRect(0.70f, 0.10f, 0.97f, 0.37f),
+            hitRegion = EllipseHitRegion(NormalizedRect(0.725f, 0.145f, 0.945f, 0.285f)),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = 6f,
-            labelPosition = NormalizedPoint(0.835f, 0.32f),
+            labelPosition = NormalizedPoint(0.835f, 0.38f),
             rendererKey = InstrumentRendererKey.CYMBAL,
             pan = 0.55f,
         ),
@@ -208,7 +208,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_HIGH,
             drawBounds = NormalizedRect(0.26f, 0.18f, 0.49f, 0.49f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.275f, 0.18f, 0.475f, 0.34f)),
+            hitRegion = EllipseHitRegion(NormalizedRect(0.275f, 0.185f, 0.475f, 0.325f)),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = -4f,
@@ -219,7 +219,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_MID,
             drawBounds = NormalizedRect(0.48f, 0.17f, 0.72f, 0.49f),
-            hitRegion = EllipseHitRegion(NormalizedRect(0.495f, 0.17f, 0.705f, 0.305f)),
+            hitRegion = EllipseHitRegion(NormalizedRect(0.495f, 0.175f, 0.705f, 0.315f)),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = 3f,
@@ -268,6 +268,21 @@ object StudioKitDefinition {
         compareByDescending<InstrumentDefinition> { it.layout.hitTestPriority }
             .thenByDescending { it.layout.renderZIndex },
     )
+
+    fun hitTest(screenX: Float, screenY: Float): InstrumentDefinition? {
+        for (definition in hitTestOrder) {
+            if (definition.layout.hitRegion.contains(screenX, screenY)) return definition
+        }
+        return null
+    }
+
+    fun matchingInstrumentCount(screenX: Float, screenY: Float): Int {
+        var count = 0
+        for (definition in instruments) {
+            if (definition.layout.hitRegion.contains(screenX, screenY)) count += 1
+        }
+        return count
+    }
 
     private fun instrument(
         id: InstrumentId,
