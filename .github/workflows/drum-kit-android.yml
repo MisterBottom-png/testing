@@ -11,33 +11,44 @@ on:
       - ".github/workflows/drum-kit-android.yml"
 
 jobs:
-  inspect-snare-sources:
+  inspect-kitty-source:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inspect supplemental sample sources
+      - name: Resolve Kitty archive link
         run: |
           set -eu
-          mkdir -p /tmp/snare-metadata
+          mkdir -p /tmp/kitty-link
           curl --fail --location --retry 3 \
-            'https://www.drumgizmo.org/wiki/doku.php?do=export_raw&id=kits:kitty' \
-            > /tmp/snare-metadata/kitty-page-source.txt
-          curl --fail --location --retry 3 \
-            'https://api.github.com/repos/sgossner/VSCO-2-CE/git/trees/440300901dfe9275fd84e0b7763af1f8443ae62e?recursive=1' \
-            > /tmp/snare-metadata/vsco-tree.json
+            'https://www.drumgizmo.org/wiki/doku.php?id=kits:kitty' \
+            > /tmp/kitty-link/kitty-page.html
           python - <<'PY'
-          import json
+          from html.parser import HTMLParser
           from pathlib import Path
-          tree = json.loads(Path('/tmp/snare-metadata/vsco-tree.json').read_text())['tree']
-          paths = [item['path'] for item in tree if item.get('type') == 'blob']
-          selected = [p for p in paths if 'snare' in p.lower() and any(k in p.lower() for k in ('rim', 'cross', 'stick'))]
-          Path('/tmp/snare-metadata/vsco-snare-articulations.txt').write_text('\n'.join(selected) + '\n')
+          from urllib.parse import urljoin
+
+          class Links(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.links = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'a':
+                      href = dict(attrs).get('href')
+                      if href:
+                          self.links.append(href)
+
+          parser = Links()
+          parser.feed(Path('/tmp/kitty-link/kitty-page.html').read_text(errors='replace'))
+          resolved = sorted({urljoin('https://www.drumgizmo.org/wiki/', link) for link in parser.links})
+          Path('/tmp/kitty-link/links.txt').write_text('\n'.join(resolved) + '\n')
+          likely = [link for link in resolved if any(token in link.lower() for token in ('kitty', '.zip', '.tar', 'download'))]
+          Path('/tmp/kitty-link/likely-links.txt').write_text('\n'.join(likely) + '\n')
           PY
 
-      - name: Upload supplemental metadata
+      - name: Upload Kitty link metadata
         uses: actions/upload-artifact@v4
         with:
-          name: supplemental-snare-metadata
-          path: /tmp/snare-metadata
+          name: kitty-link-metadata
+          path: /tmp/kitty-link
           if-no-files-found: error
