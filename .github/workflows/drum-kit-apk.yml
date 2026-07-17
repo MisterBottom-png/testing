@@ -12,7 +12,7 @@ on:
       - ".github/workflows/drum-kit-apk.yml"
 
 concurrency:
-  group: drum-kit-apk-${{ github.event.pull_request.number || github.ref }}
+  group: drum-kit-apk-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -21,7 +21,10 @@ permissions:
 
 jobs:
   build-apk:
-    if: github.event_name != 'pull_request' || github.event.label.name == 'build-apk'
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.label.name == 'build-apk' ||
+      github.event.label.name == 'enhancement'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,7 +100,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                name: 'build-apk',
+                name: context.payload.label.name,
               })
             } catch (error) {
               if (error.status !== 404) throw error
