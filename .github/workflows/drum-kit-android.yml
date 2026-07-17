@@ -11,46 +11,35 @@ on:
       - ".github/workflows/drum-kit-android.yml"
 
 jobs:
-  build:
+  inspect-snare-source:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: drum-kit-android
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inspect positional snare archive
+      - name: Download and inspect positional snare archive
         run: |
+          set -euo pipefail
+          mkdir -p /tmp/snare-metadata
           curl --fail --location --retry 3 \
             https://drumgizmo.org/kits/snare-position.zip \
             --output /tmp/snare-position.zip
-          unzip -l /tmp/snare-position.zip | tee /tmp/snare-position-list.txt
+          sha256sum /tmp/snare-position.zip | tee /tmp/snare-metadata/archive-sha256.txt
+          unzip -q /tmp/snare-position.zip -d /tmp/snare-source
+          cp /tmp/snare-source/snare-position/snare-position.xml /tmp/snare-metadata/
+          cp /tmp/snare-source/snare-position/artstar-positional.xml /tmp/snare-metadata/
+          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -print0 \
+            | sort -z \
+            | head -z -n 8 \
+            | xargs -0 -I{} ffprobe -v error -show_entries \
+              stream=codec_name,sample_fmt,sample_rate,channels,bits_per_raw_sample,duration \
+              -of default=noprint_wrappers=0 "{}" \
+            > /tmp/snare-metadata/sample-formats.txt
+          find /tmp/snare-source/snare-position/samples -type f -name '*.wav' -printf '%f\n' \
+            | sort > /tmp/snare-metadata/sample-files.txt
 
-      - name: Upload archive listing
+      - name: Upload snare metadata
         uses: actions/upload-artifact@v4
         with:
-          name: snare-position-listing
-          path: /tmp/snare-position-list.txt
+          name: snare-source-metadata
+          path: /tmp/snare-metadata
           if-no-files-found: error
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Install Android toolchain
-        run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager \
-            "platforms;android-36" \
-            "build-tools;35.0.0" \
-            "ndk;27.0.12077973" \
-            "cmake;3.22.1"
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.13"
-
-      - name: Build and lint
-        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
