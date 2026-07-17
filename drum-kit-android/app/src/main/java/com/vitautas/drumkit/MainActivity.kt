@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
 
-        val showDiagnostics = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val showDiagnostics = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         setContent {
             NativeDrumKitTheme {
                 DrumKitScreen(
