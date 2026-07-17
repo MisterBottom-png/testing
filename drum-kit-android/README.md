@@ -53,7 +53,7 @@ The GitHub Actions workflows install the required SDK, Build Tools, NDK, CMake, 
 
 ## Validation status
 
-The native engine has been checked locally with C++20, `-Wall`, `-Wextra`, and `-Werror`. Geometry and renderer Kotlin sources are syntax-checked during development, while the repository workflow performs the authoritative Android build, unit tests, lint checks, and APK packaging.
+GitHub Actions is the authoritative validation path. It runs unit tests, Kotlin and native C++ compilation, Android lint, and APK packaging with Gradle warnings treated as failures. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
 
 ## Current scope
 
