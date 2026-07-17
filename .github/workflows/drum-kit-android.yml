@@ -11,44 +11,36 @@ on:
       - ".github/workflows/drum-kit-android.yml"
 
 jobs:
-  inspect-kitty-source:
+  inspect-snare-source:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve Kitty archive link
+      - name: Inspect licensed Aasimonster snare layout
         run: |
           set -eu
-          mkdir -p /tmp/kitty-link
-          curl --fail --location --retry 3 \
-            'https://www.drumgizmo.org/wiki/doku.php?id=kits:kitty' \
-            > /tmp/kitty-link/kitty-page.html
+          python -m pip install --disable-pip-version-check remotezip==0.12.3
+          mkdir -p /tmp/aasimonster-layout
           python - <<'PY'
-          from html.parser import HTMLParser
           from pathlib import Path
-          from urllib.parse import urljoin
+          from remotezip import RemoteZip
 
-          class Links(HTMLParser):
-              def __init__(self):
-                  super().__init__()
-                  self.links = []
-              def handle_starttag(self, tag, attrs):
-                  if tag == 'a':
-                      href = dict(attrs).get('href')
-                      if href:
-                          self.links.append(href)
-
-          parser = Links()
-          parser.feed(Path('/tmp/kitty-link/kitty-page.html').read_text(errors='replace'))
-          resolved = sorted({urljoin('https://www.drumgizmo.org/wiki/', link) for link in parser.links})
-          Path('/tmp/kitty-link/links.txt').write_text('\n'.join(resolved) + '\n')
-          likely = [link for link in resolved if any(token in link.lower() for token in ('kitty', '.zip', '.tar', 'download'))]
-          Path('/tmp/kitty-link/likely-links.txt').write_text('\n'.join(likely) + '\n')
+          url = 'https://drumgizmo.org/kits/Aasimonster/aasimonster2_1.zip'
+          with RemoteZip(url) as archive:
+              names = archive.namelist()
+              xml_names = [name for name in names if name.lower().endswith('.xml')]
+              snare_names = [name for name in names if 'snare' in name.lower()]
+              Path('/tmp/aasimonster-layout/xml-files.txt').write_text('\n'.join(xml_names) + '\n')
+              Path('/tmp/aasimonster-layout/snare-files.txt').write_text('\n'.join(snare_names) + '\n')
+              for name in xml_names:
+                  if 'snare' in name.lower() or name.lower().endswith('aasimonster.xml'):
+                      target = Path('/tmp/aasimonster-layout') / Path(name).name
+                      target.write_bytes(archive.read(name))
           PY
 
-      - name: Upload Kitty link metadata
+      - name: Upload Aasimonster metadata
         uses: actions/upload-artifact@v4
         with:
-          name: kitty-link-metadata
-          path: /tmp/kitty-link
+          name: aasimonster-snare-layout
+          path: /tmp/aasimonster-layout
           if-no-files-found: error
