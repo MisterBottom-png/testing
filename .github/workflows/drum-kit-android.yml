@@ -25,9 +25,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android toolchain
         run: |
-          yes | sdkmanager --licenses >/dev/null
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager \
             "platforms;android-36" \
             "build-tools;35.0.0" \
@@ -39,4 +42,22 @@ jobs:
           gradle-version: "8.13"
 
       - name: Build and lint
-        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug :app:lintDebug 2>&1 | tee build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-build-log
+          path: drum-kit-android/build.log
+          if-no-files-found: error
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-debug-apk
+          path: drum-kit-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
