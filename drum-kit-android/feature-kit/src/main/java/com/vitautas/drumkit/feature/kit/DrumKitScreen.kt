@@ -1,5 +1,8 @@
 package com.vitautas.drumkit.feature.kit
 
+import android.graphics.Paint as AndroidPaint
+import android.graphics.Typeface
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +31,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.vitautas.drumkit.input.DrumSurfaceView
 import com.vitautas.drumkit.model.AudioDiagnostics
+import com.vitautas.drumkit.model.CircleHitRegion
 import com.vitautas.drumkit.model.DrumStrike
+import com.vitautas.drumkit.model.EllipseHitRegion
+import com.vitautas.drumkit.model.HitRegion
+import com.vitautas.drumkit.model.InstrumentId
+import com.vitautas.drumkit.model.NormalizedPoint
+import com.vitautas.drumkit.model.PolygonHitRegion
+import com.vitautas.drumkit.model.RectangleHitRegion
+import com.vitautas.drumkit.model.StudioKitDefinition
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -54,11 +74,14 @@ fun DrumKitScreen(
     var diagnostics by remember { mutableStateOf(AudioDiagnostics()) }
     var isRecording by remember { mutableStateOf(false) }
     var lastTake by remember { mutableStateOf<RecordedPerformance?>(null) }
+    var showHitRegions by remember { mutableStateOf(false) }
+    var lastDebugStrike by remember { mutableStateOf<DrumStrike?>(null) }
     val recorder = remember { PerformanceRecorder() }
-    val strikeDispatcher = remember(onStrike, recorder) {
+    val strikeDispatcher = remember(onStrike, recorder, showHitRegions) {
         { strike: DrumStrike ->
             onStrike(strike)
             recorder.record(strike)
+            if (showHitRegions) lastDebugStrike = strike
         }
     }
 
@@ -89,16 +112,20 @@ fun DrumKitScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
+        if (showDiagnostics && showHitRegions) {
+            HitRegionOverlay(lastStrike = lastDebugStrike)
+        }
+
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 10.dp),
+                .padding(start = 8.dp, top = 6.dp),
         ) {
             FilledTonalButton(
                 onClick = { kitSelectorExpanded = true },
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                modifier = Modifier.defaultMinSize(minWidth = 72.dp, minHeight = 48.dp),
             ) {
-                Text("STUDIO KIT")
+                Text("KIT")
             }
             DropdownMenu(
                 expanded = kitSelectorExpanded,
@@ -112,11 +139,11 @@ fun DrumKitScreen(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = 12.dp, top = 10.dp),
+                .padding(end = 8.dp, top = 6.dp),
         ) {
             FilledTonalButton(
                 onClick = {
@@ -132,13 +159,13 @@ fun DrumKitScreen(
                     containerColor = if (isRecording) Color(0xffa93232) else Color(0xff292d32),
                     contentColor = Color(0xfff7f4ee),
                 ),
-                modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp),
+                modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp),
             ) {
                 Text(if (isRecording) "STOP" else "REC")
             }
             FilledTonalButton(
                 onClick = { settingsExpanded = !settingsExpanded },
-                modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp),
+                modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp),
             ) {
                 Text(if (settingsExpanded) "CLOSE" else "MIX")
             }
@@ -152,7 +179,7 @@ fun DrumKitScreen(
                 tonalElevation = 8.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 12.dp, top = 70.dp)
+                    .padding(end = 8.dp, top = 64.dp)
                     .widthIn(min = 270.dp, max = 330.dp),
             ) {
                 Column(
@@ -189,6 +216,31 @@ fun DrumKitScreen(
                             onCheckedChange = { haptics = it },
                         )
                     }
+                    if (showDiagnostics) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 48.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Hit map")
+                                Text(
+                                    "Playable regions and last selected target",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xffaab2bf),
+                                )
+                            }
+                            Switch(
+                                checked = showHitRegions,
+                                onCheckedChange = {
+                                    showHitRegions = it
+                                    if (!it) lastDebugStrike = null
+                                },
+                            )
+                        }
+                    }
                     Surface(
                         color = Color(0xff1a1d22),
                         shape = MaterialTheme.shapes.medium,
@@ -222,6 +274,153 @@ fun DrumKitScreen(
             )
         }
     }
+}
+
+@Composable
+private fun HitRegionOverlay(lastStrike: DrumStrike?) {
+    val density = LocalDensity.current
+    val strokeWidth = with(density) { 1.5.dp.toPx() }
+    val selectedStrokeWidth = with(density) { 3.dp.toPx() }
+    val markerRadius = with(density) { 9.dp.toPx() }
+    val definitions = remember { StudioKitDefinition.hitTestOrder.asReversed() }
+    val textPaint = remember(density) {
+        AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textAlign = AndroidPaint.Align.CENTER
+            textSize = with(density) { 10.sp.toPx() }
+            typeface = Typeface.DEFAULT_BOLD
+            setShadowLayer(with(density) { 2.dp.toPx() }, 0f, with(density) { 1.dp.toPx() }, android.graphics.Color.BLACK)
+        }
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        for (definition in definitions) {
+            val selected = definition.id == lastStrike?.instrument
+            val color = debugColor(definition.id)
+            drawDebugHitRegion(
+                region = definition.layout.hitRegion,
+                color = color,
+                strokeWidth = if (selected) selectedStrokeWidth else strokeWidth,
+                selected = selected,
+            )
+            val center = regionCenter(definition.layout.hitRegion)
+            textPaint.color = color.toArgb()
+            drawContext.canvas.nativeCanvas.drawText(
+                "${definition.id.label.uppercase()} P${definition.layout.hitTestPriority}",
+                center.x * size.width,
+                center.y * size.height,
+                textPaint,
+            )
+        }
+
+        val strike = lastStrike ?: return@Canvas
+        val definition = StudioKitDefinition.instruments.firstOrNull { it.id == strike.instrument } ?: return@Canvas
+        val bounds = definition.layout.drawBounds
+        val screenX = bounds.left + strike.normalizedX * bounds.width
+        val screenY = bounds.top + strike.normalizedY * bounds.height
+        val marker = Offset(screenX * size.width, screenY * size.height)
+        val color = debugColor(strike.instrument)
+        val overlapCount = StudioKitDefinition.matchingInstrumentCount(screenX, screenY)
+
+        drawCircle(Color.Black.copy(alpha = 0.55f), markerRadius * 1.45f, marker)
+        drawCircle(color, markerRadius, marker, style = Stroke(width = selectedStrokeWidth))
+        drawLine(
+            color = color,
+            start = Offset(marker.x - markerRadius, marker.y),
+            end = Offset(marker.x + markerRadius, marker.y),
+            strokeWidth = strokeWidth,
+        )
+        drawLine(
+            color = color,
+            start = Offset(marker.x, marker.y - markerRadius),
+            end = Offset(marker.x, marker.y + markerRadius),
+            strokeWidth = strokeWidth,
+        )
+        textPaint.color = color.toArgb()
+        drawContext.canvas.nativeCanvas.drawText(
+            "${strike.instrument.label.uppercase()} · $overlapCount TARGET${if (overlapCount == 1) "" else "S"}",
+            marker.x,
+            marker.y - markerRadius * 1.7f,
+            textPaint,
+        )
+    }
+}
+
+private fun DrawScope.drawDebugHitRegion(
+    region: HitRegion,
+    color: Color,
+    strokeWidth: Float,
+    selected: Boolean,
+) {
+    val fillColor = color.copy(alpha = if (selected) 0.30f else 0.12f)
+    val strokeColor = color.copy(alpha = if (selected) 1f else 0.78f)
+
+    when (region) {
+        is RectangleHitRegion -> {
+            val bounds = region.bounds
+            val topLeft = Offset(bounds.left * size.width, bounds.top * size.height)
+            val regionSize = Size(bounds.width * size.width, bounds.height * size.height)
+            drawRect(fillColor, topLeft, regionSize)
+            drawRect(strokeColor, topLeft, regionSize, style = Stroke(width = strokeWidth))
+        }
+
+        is EllipseHitRegion -> {
+            val bounds = region.bounds
+            val topLeft = Offset(bounds.left * size.width, bounds.top * size.height)
+            val regionSize = Size(bounds.width * size.width, bounds.height * size.height)
+            drawOval(fillColor, topLeft, regionSize)
+            drawOval(strokeColor, topLeft, regionSize, style = Stroke(width = strokeWidth))
+        }
+
+        is CircleHitRegion -> {
+            val topLeft = Offset(
+                (region.center.x - region.radius) * size.width,
+                (region.center.y - region.radius) * size.height,
+            )
+            val regionSize = Size(region.radius * 2f * size.width, region.radius * 2f * size.height)
+            drawOval(fillColor, topLeft, regionSize)
+            drawOval(strokeColor, topLeft, regionSize, style = Stroke(width = strokeWidth))
+        }
+
+        is PolygonHitRegion -> {
+            val path = Path()
+            val first = region.points.first()
+            path.moveTo(first.x * size.width, first.y * size.height)
+            for (index in 1 until region.points.size) {
+                val point = region.points[index]
+                path.lineTo(point.x * size.width, point.y * size.height)
+            }
+            path.close()
+            drawPath(path, fillColor)
+            drawPath(path, strokeColor, style = Stroke(width = strokeWidth))
+        }
+    }
+}
+
+private fun regionCenter(region: HitRegion): NormalizedPoint = when (region) {
+    is RectangleHitRegion -> NormalizedPoint(region.bounds.centerX, region.bounds.centerY)
+    is EllipseHitRegion -> NormalizedPoint(region.bounds.centerX, region.bounds.centerY)
+    is CircleHitRegion -> region.center
+    is PolygonHitRegion -> {
+        var x = 0f
+        var y = 0f
+        for (point in region.points) {
+            x += point.x
+            y += point.y
+        }
+        NormalizedPoint(x / region.points.size, y / region.points.size)
+    }
+}
+
+private fun debugColor(instrument: InstrumentId): Color = when (instrument) {
+    InstrumentId.KICK -> Color(0xffff6b6b)
+    InstrumentId.SNARE -> Color(0xfff8f9fa)
+    InstrumentId.TOM_HIGH -> Color(0xffffd166)
+    InstrumentId.TOM_MID -> Color(0xfff8961e)
+    InstrumentId.FLOOR_TOM -> Color(0xffef476f)
+    InstrumentId.HI_HAT -> Color(0xff06d6a0)
+    InstrumentId.CRASH -> Color(0xff4cc9f0)
+    InstrumentId.RIDE -> Color(0xffb388ff)
 }
 
 @Composable
