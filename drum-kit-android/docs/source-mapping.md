@@ -17,7 +17,7 @@ This foundation was extracted from the supplied `hyper_realistic_android_drum_ki
 
 The native model now separates normalized draw bounds from independent typed hit regions. Supported hit-region shapes are ellipse, circle, polygon, and rectangle. Render z-index and hit-test priority are also modeled and sorted independently.
 
-Normalized strike coordinates remain in the existing `[0, 1]` instrument-local draw-bounds contract and do not depend on transient animation geometry.
+Normalized strike coordinates use a stable `[0, 1]` playable-surface-local contract. The same viewport-aware rotation transform now drives hit selection, strike coordinates, impact animation placement, and debug hit-region rendering. Transient animation geometry does not change the canonical playable region.
 
 ## Fixed camera contract
 
@@ -63,6 +63,8 @@ Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument 
 - Fixed-capacity strike-performance recording with relative timing and expressive input values
 - Debug-only audio diagnostics and diagnostics polling
 - Independent draw bounds and playable hit regions
+- Shared viewport-aware rotation for rendering, hit testing, strike positions, and debug overlays
+- Playable-surface-local strike coordinates for audio and animation input
 - Independent render z-index and hit-test priority
 - Labels outside playable heads with timed fade-out
 - Per-instrument strike position, velocity, start time, active-pointer count, deformation, and rotation state
@@ -114,4 +116,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, and the camera-aligned Phase 2 kit placement.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, and shared viewport-aware input geometry.
