@@ -1,6 +1,6 @@
 package com.vitautas.drumkit.model
 
-import kotlin.math.hypot
+import kotlin.math.sqrt
 
 object SnareArticulationResolver {
     private const val HeadCenterX = 0.5f
@@ -21,9 +21,10 @@ object SnareArticulationResolver {
             return SnareArticulation.CROSS_STICK
         }
 
-        val radialDistance = hypot(
-            (x - HeadCenterX) / HeadRadiusX,
-            (y - HeadCenterY) / HeadRadiusY,
+        val normalizedDx = (x - HeadCenterX) / HeadRadiusX
+        val normalizedDy = (y - HeadCenterY) / HeadRadiusY
+        val radialDistance = sqrt(
+            normalizedDx * normalizedDx + normalizedDy * normalizedDy,
         )
 
         if (radialDistance >= 0.88f) {
