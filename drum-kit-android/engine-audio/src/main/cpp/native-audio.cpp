@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace {
 
@@ -40,54 +41,39 @@ class NativeAudioEngine final : public oboe::AudioStreamDataCallback,
                                 public oboe::AudioStreamErrorCallback {
 public:
     bool start() {
+        desiredRunning_.store(true, std::memory_order_release);
+        std::lock_guard<std::mutex> lock(streamMutex_);
         if (running_.load(std::memory_order_acquire)) {
             return true;
         }
-
-        oboe::AudioStreamBuilder builder;
-        builder.setDirection(oboe::Direction::Output)
-            ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-            ->setSharingMode(oboe::SharingMode::Exclusive)
-            ->setFormat(oboe::AudioFormat::Float)
-            ->setChannelCount(kChannelCount)
-            ->setUsage(oboe::Usage::Game)
-            ->setContentType(oboe::ContentType::Music)
-            ->setDataCallback(this)
-            ->setErrorCallback(this);
-
-        auto result = builder.openStream(stream_);
-        if (result != oboe::Result::OK || !stream_) {
-            stream_.reset();
-            return false;
-        }
-
-        sampleRate_.store(stream_->getSampleRate(), std::memory_order_release);
-        framesPerBurst_.store(stream_->getFramesPerBurst(), std::memory_order_release);
-        clearRealtimeState();
-
-        result = stream_->requestStart();
-        if (result != oboe::Result::OK) {
-            stream_->close();
-            stream_.reset();
-            return false;
-        }
-
-        running_.store(true, std::memory_order_release);
-        return true;
+        return openStreamLocked();
     }
 
     void stop() {
-        running_.store(false, std::memory_order_release);
-        if (stream_) {
-            stream_->requestStop();
-            stream_->close();
-            stream_.reset();
+        desiredRunning_.store(false, std::memory_order_release);
+        std::shared_ptr<oboe::AudioStream> streamToClose;
+        {
+            std::lock_guard<std::mutex> lock(streamMutex_);
+            running_.store(false, std::memory_order_release);
+            sampleRate_.store(0, std::memory_order_release);
+            framesPerBurst_.store(0, std::memory_order_release);
+            streamToClose = std::move(stream_);
         }
-        sampleRate_.store(0, std::memory_order_release);
-        framesPerBurst_.store(0, std::memory_order_release);
+
+        if (streamToClose) {
+            streamToClose->requestStop();
+            streamToClose->close();
+        }
     }
 
     void trigger(int instrument, float velocity, float x, float y) {
+        if (!running_.load(std::memory_order_acquire)) {
+            return;
+        }
+        if (!std::isfinite(velocity) || !std::isfinite(x) || !std::isfinite(y)) {
+            return;
+        }
+
         const auto write = writeIndex_.load(std::memory_order_relaxed);
         const auto next = (write + 1U) % kEventCapacity;
         if (next == readIndex_.load(std::memory_order_acquire)) {
@@ -104,10 +90,12 @@ public:
     }
 
     void setMasterVolume(float value) {
+        if (!std::isfinite(value)) return;
         masterVolume_.store(std::clamp(value, 0.0f, 1.0f), std::memory_order_release);
     }
 
     void setRoomMix(float value) {
+        if (!std::isfinite(value)) return;
         roomMix_.store(std::clamp(value, 0.0f, 1.0f), std::memory_order_release);
     }
 
@@ -124,7 +112,8 @@ public:
     }
 
     int underrunCount() const {
-        if (!stream_) {
+        std::lock_guard<std::mutex> lock(streamMutex_);
+        if (!running_.load(std::memory_order_acquire) || !stream_) {
             return 0;
         }
         const auto result = stream_->getXRunCount();
@@ -183,12 +172,78 @@ public:
     }
 
     void onErrorAfterClose(oboe::AudioStream* audioStream, oboe::Result error) override {
-        (void)audioStream;
         (void)error;
+        std::lock_guard<std::mutex> lock(streamMutex_);
+        if (!stream_ || stream_.get() != audioStream) {
+            return;
+        }
+
         running_.store(false, std::memory_order_release);
+        sampleRate_.store(0, std::memory_order_release);
+        framesPerBurst_.store(0, std::memory_order_release);
+        stream_.reset();
+
+        if (desiredRunning_.load(std::memory_order_acquire)) {
+            openStreamLocked();
+        }
     }
 
 private:
+    bool openStreamLocked() {
+        if (!desiredRunning_.load(std::memory_order_acquire)) {
+            return false;
+        }
+
+        stream_.reset();
+        std::shared_ptr<oboe::AudioStream> candidate;
+        auto result = openOutputStream(oboe::SharingMode::Exclusive, candidate);
+        if (result != oboe::Result::OK || !candidate) {
+            candidate.reset();
+            result = openOutputStream(oboe::SharingMode::Shared, candidate);
+        }
+        if (result != oboe::Result::OK || !candidate) {
+            running_.store(false, std::memory_order_release);
+            sampleRate_.store(0, std::memory_order_release);
+            framesPerBurst_.store(0, std::memory_order_release);
+            return false;
+        }
+
+        stream_ = candidate;
+        sampleRate_.store(stream_->getSampleRate(), std::memory_order_release);
+        framesPerBurst_.store(stream_->getFramesPerBurst(), std::memory_order_release);
+        clearRealtimeState();
+
+        result = stream_->requestStart();
+        if (result != oboe::Result::OK) {
+            auto failedStream = std::move(stream_);
+            running_.store(false, std::memory_order_release);
+            sampleRate_.store(0, std::memory_order_release);
+            framesPerBurst_.store(0, std::memory_order_release);
+            failedStream->close();
+            return false;
+        }
+
+        running_.store(true, std::memory_order_release);
+        return true;
+    }
+
+    oboe::Result openOutputStream(
+        oboe::SharingMode sharingMode,
+        std::shared_ptr<oboe::AudioStream>& target
+    ) {
+        oboe::AudioStreamBuilder builder;
+        builder.setDirection(oboe::Direction::Output)
+            ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+            ->setSharingMode(sharingMode)
+            ->setFormat(oboe::AudioFormat::Float)
+            ->setChannelCount(kChannelCount)
+            ->setUsage(oboe::Usage::Game)
+            ->setContentType(oboe::ContentType::Music)
+            ->setDataCallback(this)
+            ->setErrorCallback(this);
+        return builder.openStream(target);
+    }
+
     void clearRealtimeState() {
         readIndex_.store(0, std::memory_order_relaxed);
         writeIndex_.store(0, std::memory_order_relaxed);
@@ -299,6 +354,7 @@ private:
     }
 
     static float softClip(float value) {
+        if (!std::isfinite(value)) return 0.0f;
         return value / (1.0f + std::abs(value));
     }
 
@@ -317,7 +373,9 @@ private:
         return decays[static_cast<size_t>(std::clamp(instrument, 0, 7))];
     }
 
+    mutable std::mutex streamMutex_;
     std::shared_ptr<oboe::AudioStream> stream_;
+    std::atomic<bool> desiredRunning_{false};
     std::atomic<bool> running_{false};
     std::atomic<int> sampleRate_{0};
     std::atomic<int> framesPerBurst_{0};
