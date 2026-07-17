@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.util.SparseArray
+import android.util.TypedValue
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -73,7 +74,11 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        textSize = resources.displayMetrics.scaledDensity * 11f
+        textSize = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_SP,
+    11f,
+    resources.displayMetrics,
+)
         isFakeBoldText = true
         setShadowLayer(density * 3f, 0f, density, Color.BLACK)
     }
