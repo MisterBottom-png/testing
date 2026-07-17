@@ -14,6 +14,7 @@ android {
         minSdk = 26
         externalNativeBuild {
             cmake {
+                arguments += "-DANDROID_STL=c++_shared"
                 cppFlags += listOf("-std=c++20", "-Wall", "-Wextra", "-Werror")
             }
         }
