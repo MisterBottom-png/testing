@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -16,11 +17,17 @@ import com.vitautas.drumkit.audio.AudioEngine
 import com.vitautas.drumkit.feature.kit.DrumKitScreen
 
 class MainActivity : ComponentActivity() {
+    private val audioAvailableState = mutableStateOf(true)
+    private lateinit var audioSessionController: AudioSessionController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         hideSystemBars()
 
+        audioSessionController = AudioSessionController(this) { available ->
+            audioAvailableState.value = available
+        }
         val showDiagnostics = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         setContent {
             NativeDrumKitTheme {
@@ -29,6 +36,7 @@ class MainActivity : ComponentActivity() {
                     onMasterVolumeChanged = AudioEngine::setMasterVolume,
                     onRoomMixChanged = AudioEngine::setRoomMix,
                     diagnosticsProvider = AudioEngine::diagnostics,
+                    audioAvailable = audioAvailableState.value,
                     showDiagnostics = showDiagnostics,
                 )
             }
@@ -37,11 +45,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        AudioEngine.start()
+        audioSessionController.start()
     }
 
     override fun onStop() {
-        AudioEngine.stop()
+        audioSessionController.stop()
         super.onStop()
     }
 
