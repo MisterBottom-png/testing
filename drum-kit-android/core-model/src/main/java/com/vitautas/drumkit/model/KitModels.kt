@@ -194,84 +194,86 @@ data class InstrumentDefinition(
 }
 
 object StudioKitDefinition {
+    const val CONTROL_SAFE_AREA_BOTTOM = 0.12f
+
     val instruments: List<InstrumentDefinition> = listOf(
         instrument(
             id = InstrumentId.CRASH,
-            drawBounds = NormalizedRect(0.03f, 0.10f, 0.30f, 0.37f),
+            drawBounds = cameraAlignedCymbalBounds(left = 0.05f, top = 0.10f, width = 0.25f),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = -7f,
-            labelPosition = NormalizedPoint(0.165f, 0.38f),
+            labelPosition = NormalizedPoint(0.175f, 0.30f),
             rendererKey = InstrumentRendererKey.CYMBAL,
             pan = -0.55f,
         ),
         instrument(
             id = InstrumentId.RIDE,
-            drawBounds = NormalizedRect(0.70f, 0.10f, 0.97f, 0.37f),
+            drawBounds = cameraAlignedCymbalBounds(left = 0.69f, top = 0.10f, width = 0.28f),
             renderZIndex = 10,
             hitTestPriority = 50,
             rotationDegrees = 6f,
-            labelPosition = NormalizedPoint(0.835f, 0.38f),
+            labelPosition = NormalizedPoint(0.83f, 0.32f),
             rendererKey = InstrumentRendererKey.CYMBAL,
             pan = 0.55f,
         ),
         instrument(
             id = InstrumentId.HI_HAT,
-            drawBounds = NormalizedRect(0.02f, 0.31f, 0.25f, 0.58f),
+            drawBounds = cameraAlignedCymbalBounds(left = 0.05f, top = 0.36f, width = 0.20f),
             renderZIndex = 45,
             hitTestPriority = 60,
             rotationDegrees = -4f,
-            labelPosition = NormalizedPoint(0.135f, 0.60f),
+            labelPosition = NormalizedPoint(0.15f, 0.53f),
             rendererKey = InstrumentRendererKey.HI_HAT,
             pan = -0.65f,
         ),
         instrument(
             id = InstrumentId.TOM_HIGH,
-            drawBounds = NormalizedRect(0.26f, 0.18f, 0.49f, 0.49f),
+            drawBounds = cameraAlignedDrumBounds(left = 0.33f, top = 0.22f, width = 0.17f),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = -4f,
-            labelPosition = NormalizedPoint(0.375f, 0.50f),
+            labelPosition = NormalizedPoint(0.415f, 0.47f),
             rendererKey = InstrumentRendererKey.DRUM,
             pan = -0.22f,
         ),
         instrument(
             id = InstrumentId.TOM_MID,
-            drawBounds = NormalizedRect(0.48f, 0.17f, 0.72f, 0.49f),
+            drawBounds = cameraAlignedDrumBounds(left = 0.49f, top = 0.21f, width = 0.19f),
             renderZIndex = 30,
             hitTestPriority = 80,
             rotationDegrees = 3f,
-            labelPosition = NormalizedPoint(0.60f, 0.50f),
+            labelPosition = NormalizedPoint(0.585f, 0.49f),
             rendererKey = InstrumentRendererKey.DRUM,
             pan = 0.14f,
         ),
         instrument(
             id = InstrumentId.KICK,
-            drawBounds = NormalizedRect(0.37f, 0.43f, 0.72f, 0.94f),
+            drawBounds = NormalizedRect(0.37f, 0.42f, 0.71f, 0.94f),
             renderZIndex = 35,
             hitTestPriority = 70,
             rotationDegrees = 0f,
-            labelPosition = NormalizedPoint(0.545f, 0.96f),
+            labelPosition = NormalizedPoint(0.54f, 0.96f),
             rendererKey = InstrumentRendererKey.KICK,
             pan = 0f,
         ),
         instrument(
             id = InstrumentId.FLOOR_TOM,
-            drawBounds = NormalizedRect(0.70f, 0.46f, 0.97f, 0.84f),
+            drawBounds = cameraAlignedDrumBounds(left = 0.70f, top = 0.48f, width = 0.24f),
             renderZIndex = 40,
             hitTestPriority = 90,
             rotationDegrees = 4f,
-            labelPosition = NormalizedPoint(0.835f, 0.86f),
+            labelPosition = NormalizedPoint(0.82f, 0.83f),
             rendererKey = InstrumentRendererKey.DRUM,
             pan = 0.46f,
         ),
         instrument(
             id = InstrumentId.SNARE,
-            drawBounds = NormalizedRect(0.18f, 0.47f, 0.48f, 0.82f),
+            drawBounds = cameraAlignedDrumBounds(left = 0.18f, top = 0.50f, width = 0.27f),
             renderZIndex = 50,
             hitTestPriority = 100,
             rotationDegrees = -3f,
-            labelPosition = NormalizedPoint(0.33f, 0.84f),
+            labelPosition = NormalizedPoint(0.315f, 0.89f),
             rendererKey = InstrumentRendererKey.SNARE,
             pan = -0.18f,
         ),
@@ -298,6 +300,22 @@ object StudioKitDefinition {
         }
         return count
     }
+
+    private fun cameraAlignedDrumBounds(left: Float, top: Float, width: Float): NormalizedRect =
+        NormalizedRect(
+            left = left,
+            top = top,
+            right = left + width,
+            bottom = top + StudioKitCamera.drumDrawBoundsHeight(width),
+        )
+
+    private fun cameraAlignedCymbalBounds(left: Float, top: Float, width: Float): NormalizedRect =
+        NormalizedRect(
+            left = left,
+            top = top,
+            right = left + width,
+            bottom = top + StudioKitCamera.cymbalDrawBoundsHeight(width),
+        )
 
     private fun playableHitRegion(
         drawBounds: NormalizedRect,
