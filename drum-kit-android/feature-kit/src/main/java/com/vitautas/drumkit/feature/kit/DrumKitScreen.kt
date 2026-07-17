@@ -42,7 +42,7 @@ fun DrumKitScreen(
     modifier: Modifier = Modifier,
 ) {
     var volume by remember { mutableFloatStateOf(0.76f) }
-    var room by remember { mutableFloatStateOf(0.32f) }
+    var room by remember { mutableFloatStateOf(0.12f) }
     var haptics by remember { mutableStateOf(true) }
     var diagnostics by remember { mutableStateOf(AudioDiagnostics()) }
 
@@ -89,7 +89,7 @@ fun DrumKitScreen(
                 Column {
                     Text("STUDIO KIT", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "native low-latency foundation",
+                        "acoustic snare · 6 layers · 4 round robins",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xffaab2bf),
                     )
