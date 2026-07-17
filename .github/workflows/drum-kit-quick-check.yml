@@ -60,6 +60,6 @@ jobs:
           gradle --no-daemon --console=plain --warning-mode=fail
           :core-model:testDebugUnitTest
           :engine-input:compileDebugKotlin
-          :engine-audio:compileDebugKotlin
-          :feature-kit:compileDebugKotlin
+          :engine-audio:testDebugUnitTest
+          :feature-kit:testDebugUnitTest
           :app:compileDebugKotlin
