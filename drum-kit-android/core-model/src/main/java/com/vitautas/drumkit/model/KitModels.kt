@@ -59,6 +59,7 @@ data class DrumStrike(
     val pressure: Float,
     val contactSize: Float,
     val eventTimeNanos: Long,
+    val snareArticulation: SnareArticulation = SnareArticulation.CENTER,
 )
 
 data class AudioDiagnostics(
