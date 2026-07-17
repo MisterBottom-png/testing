@@ -34,6 +34,24 @@ class KitCameraTest {
         assertTrue(cymbalHeight < drumHeight)
     }
 
+    @Test
+    fun drawBoundsProduceCameraAlignedPlayableSurfaces() {
+        val normalizedWidth = 0.24f
+        val drumDrawHeight = StudioKitCamera.drumDrawBoundsHeight(normalizedWidth)
+        val cymbalDrawHeight = StudioKitCamera.cymbalDrawBoundsHeight(normalizedWidth)
+
+        assertEquals(
+            StudioKitCamera.projectedDrumHeadHeight(normalizedWidth),
+            drumDrawHeight * StudioKitCamera.DRUM_HEAD_HEIGHT_FRACTION_OF_DRAW_BOUNDS,
+            0.000001f,
+        )
+        assertEquals(
+            StudioKitCamera.projectedCymbalHeight(normalizedWidth),
+            cymbalDrawHeight * StudioKitCamera.CYMBAL_HEIGHT_FRACTION_OF_DRAW_BOUNDS,
+            0.000001f,
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun projectedSurfaceHeightRejectsOutOfRangeWidth() {
         StudioKitCamera.projectedDrumHeadHeight(1.01f)
