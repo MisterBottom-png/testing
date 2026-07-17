@@ -26,15 +26,15 @@ jobs:
         working-directory: drum-kit-android
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android toolchain
         shell: bash
@@ -46,9 +46,10 @@ jobs:
             "ndk;28.2.13676358" \
             "cmake;3.22.1"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.5.0"
+          cache-provider: basic
 
       - name: Test, lint, and build release artifacts
         shell: bash
@@ -62,7 +63,7 @@ jobs:
 
       - name: Upload release build log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drum-kit-release-build-log
           path: drum-kit-android/release-build.log
@@ -71,7 +72,7 @@ jobs:
 
       - name: Upload unsigned release artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drum-kit-unsigned-release
           path: |
