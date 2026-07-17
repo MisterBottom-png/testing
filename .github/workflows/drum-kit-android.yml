@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install snare bank tooling
-        run: python -m pip install numpy==2.2.6 remotezip==0.12.3
+        run: python -m pip install numpy==2.2.6 remotezip==0.12.3 soundfile==0.13.1
 
       - name: Cache downloaded acoustic samples
         uses: actions/cache@v4
@@ -35,11 +35,22 @@ jobs:
 
       - name: Build predecoded snare PCM bank
         run: |
-          python -m py_compile tools/prepare_snare_bank.py
-          python tools/prepare_snare_bank.py \
+          mkdir -p build
+          python -m py_compile tools/prepare_snare_bank.py tools/build_snare_bank.py
+          set -o pipefail
+          python tools/build_snare_bank.py \
             --output engine-audio/src/main/assets/snare/snare-bank.pcm \
             --manifest build/snare-bank-manifest.json \
-            --cache-dir ~/.cache/native-drum-kit
+            --cache-dir ~/.cache/native-drum-kit \
+            2>&1 | tee build/snare-bank-build.log
+
+      - name: Upload snare build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snare-bank-build-diagnostics
+          path: drum-kit-android/build/snare-bank-build.log
+          if-no-files-found: warn
 
       - name: Verify snare bank structure
         run: |
