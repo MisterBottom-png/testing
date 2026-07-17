@@ -11,36 +11,92 @@ on:
       - ".github/workflows/drum-kit-android.yml"
 
 jobs:
-  inspect-snare-source:
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inspect licensed Aasimonster snare layout
-        run: |
-          set -eu
-          python -m pip install --disable-pip-version-check remotezip==0.12.3
-          mkdir -p /tmp/aasimonster-layout
-          python - <<'PY'
-          from pathlib import Path
-          from remotezip import RemoteZip
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
 
-          url = 'https://drumgizmo.org/kits/Aasimonster/aasimonster2_1.zip'
-          with RemoteZip(url) as archive:
-              names = archive.namelist()
-              xml_names = [name for name in names if name.lower().endswith('.xml')]
-              snare_names = [name for name in names if 'snare' in name.lower()]
-              Path('/tmp/aasimonster-layout/xml-files.txt').write_text('\n'.join(xml_names) + '\n')
-              Path('/tmp/aasimonster-layout/snare-files.txt').write_text('\n'.join(snare_names) + '\n')
-              for name in xml_names:
-                  if 'snare' in name.lower() or name.lower().endswith('aasimonster.xml'):
-                      target = Path('/tmp/aasimonster-layout') / Path(name).name
-                      target.write_bytes(archive.read(name))
+      - name: Install snare bank tooling
+        run: python -m pip install numpy==2.2.6 remotezip==0.12.3
+
+      - name: Cache downloaded acoustic samples
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/native-drum-kit
+          key: snare-sources-v1
+
+      - name: Build predecoded snare PCM bank
+        run: |
+          python -m py_compile tools/prepare_snare_bank.py
+          python tools/prepare_snare_bank.py \
+            --output engine-audio/src/main/assets/snare/snare-bank.pcm \
+            --manifest build/snare-bank-manifest.json \
+            --cache-dir ~/.cache/native-drum-kit
+
+      - name: Verify snare bank structure
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import struct
+          from pathlib import Path
+
+          bank = Path("engine-audio/src/main/assets/snare/snare-bank.pcm")
+          manifest_path = Path("build/snare-bank-manifest.json")
+          manifest = json.loads(manifest_path.read_text())
+          raw = bank.read_bytes()
+          header = struct.unpack_from("<8sIIIIII", raw)
+          assert header == (b"SNAREPCM", 1, 48000, 5, 6, 4, 120), header
+          assert len(manifest["samples"]) == 120
+          assert manifest["bank_sha256"] == hashlib.sha256(raw).hexdigest()
+          assert set(manifest["articulations"]) == {
+              "center", "off_center", "edge", "rimshot", "cross_stick"
+          }
+          print(f"Verified {len(raw) / 1048576:.1f} MiB PCM bank with 120 samples")
           PY
 
-      - name: Upload Aasimonster metadata
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Test, build, and lint
+        run: gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: aasimonster-snare-layout
-          path: /tmp/aasimonster-layout
+          name: native-drum-kit-debug-apk
+          path: drum-kit-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload snare bank manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: snare-bank-manifest
+          path: drum-kit-android/build/snare-bank-manifest.json
           if-no-files-found: error
