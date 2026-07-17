@@ -29,14 +29,17 @@ internal class PerformanceRecorder(
     capacity: Int = DefaultRecordingCapacity,
     private val clockNanos: () -> Long = System::nanoTime,
 ) {
-    private val offsetsNanos = LongArray(capacity)
-    private val pointerIds = IntArray(capacity)
-    private val instrumentOrdinals = IntArray(capacity)
-    private val velocities = FloatArray(capacity)
-    private val normalizedXs = FloatArray(capacity)
-    private val normalizedYs = FloatArray(capacity)
-    private val pressures = FloatArray(capacity)
-    private val contactSizes = FloatArray(capacity)
+    private val validatedCapacity = capacity.also {
+        require(it > 0) { "capacity must be positive" }
+    }
+    private val offsetsNanos = LongArray(validatedCapacity)
+    private val pointerIds = IntArray(validatedCapacity)
+    private val instrumentOrdinals = IntArray(validatedCapacity)
+    private val velocities = FloatArray(validatedCapacity)
+    private val normalizedXs = FloatArray(validatedCapacity)
+    private val normalizedYs = FloatArray(validatedCapacity)
+    private val pressures = FloatArray(validatedCapacity)
+    private val contactSizes = FloatArray(validatedCapacity)
 
     var isRecording: Boolean = false
         private set
@@ -44,10 +47,6 @@ internal class PerformanceRecorder(
     private var startedAtNanos: Long = 0L
     private var strikeCount: Int = 0
     private var truncated: Boolean = false
-
-    init {
-        require(capacity > 0) { "capacity must be positive" }
-    }
 
     fun start() {
         strikeCount = 0
@@ -67,13 +66,15 @@ internal class PerformanceRecorder(
         offsetsNanos[index] = (clockNanos() - startedAtNanos).coerceAtLeast(0L)
         pointerIds[index] = strike.pointerId
         instrumentOrdinals[index] = strike.instrument.ordinal
-        velocities[index] = strike.velocity
-        normalizedXs[index] = strike.normalizedX
-        normalizedYs[index] = strike.normalizedY
-        pressures[index] = strike.pressure
-        contactSizes[index] = strike.contactSize
+        velocities[index] = strike.velocity.finiteOr(0.8f).coerceIn(0.05f, 1f)
+        normalizedXs[index] = strike.normalizedX.finiteOr(0.5f).coerceIn(0f, 1f)
+        normalizedYs[index] = strike.normalizedY.finiteOr(0.5f).coerceIn(0f, 1f)
+        pressures[index] = strike.pressure.finiteOr(0f).coerceAtLeast(0f)
+        contactSizes[index] = strike.contactSize.finiteOr(0f).coerceAtLeast(0f)
         strikeCount += 1
     }
+
+    fun stopIfRecording(): RecordedPerformance? = if (isRecording) stop() else null
 
     fun stop(): RecordedPerformance {
         if (!isRecording) {
@@ -105,4 +106,6 @@ internal class PerformanceRecorder(
             truncated = truncated,
         )
     }
+
+    private fun Float.finiteOr(defaultValue: Float): Float = if (isFinite()) this else defaultValue
 }
