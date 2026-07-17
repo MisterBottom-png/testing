@@ -20,6 +20,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Inspect positional snare archive
+        run: |
+          curl --fail --location --retry 3 \
+            https://drumgizmo.org/kits/snare-position.zip \
+            --output /tmp/snare-position.zip
+          unzip -l /tmp/snare-position.zip | tee /tmp/snare-position-list.txt
+
+      - name: Upload archive listing
+        uses: actions/upload-artifact@v4
+        with:
+          name: snare-position-listing
+          path: /tmp/snare-position-list.txt
+          if-no-files-found: error
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
