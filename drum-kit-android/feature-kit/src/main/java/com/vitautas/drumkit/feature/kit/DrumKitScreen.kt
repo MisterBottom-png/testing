@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.weight
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -32,6 +35,7 @@ import com.vitautas.drumkit.input.DrumSurfaceView
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 @Composable
 fun DrumKitScreen(
@@ -40,13 +44,19 @@ fun DrumKitScreen(
     onRoomMixChanged: (Float) -> Unit,
     diagnosticsProvider: () -> AudioDiagnostics,
     modifier: Modifier = Modifier,
+    showDiagnostics: Boolean = false,
+    isRecording: Boolean = false,
+    onRecordingToggle: (() -> Unit)? = null,
 ) {
     var volume by remember { mutableFloatStateOf(0.76f) }
     var room by remember { mutableFloatStateOf(0.32f) }
     var haptics by remember { mutableStateOf(true) }
+    var settingsExpanded by remember { mutableStateOf(false) }
+    var kitSelectorExpanded by remember { mutableStateOf(false) }
     var diagnostics by remember { mutableStateOf(AudioDiagnostics()) }
 
-    LaunchedEffect(diagnosticsProvider) {
+    LaunchedEffect(showDiagnostics, diagnosticsProvider) {
+        if (!showDiagnostics) return@LaunchedEffect
         while (true) {
             diagnostics = diagnosticsProvider()
             delay(500)
@@ -56,7 +66,7 @@ fun DrumKitScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xff05070a)),
+            .background(Color(0xff08090b)),
     ) {
         AndroidView(
             factory = { context ->
@@ -72,81 +82,138 @@ fun DrumKitScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
-        Surface(
-            color = Color(0xcc0d1016),
-            contentColor = Color(0xfff3f5f8),
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 6.dp,
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .align(Alignment.TopStart)
+                .padding(start = 12.dp, top = 10.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            FilledTonalButton(
+                onClick = { kitSelectorExpanded = true },
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
             ) {
-                Column {
-                    Text("STUDIO KIT", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "native low-latency foundation",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xffaab2bf),
-                    )
-                }
-
-                Spacer(Modifier.weight(1f))
-
-                ControlSlider(
-                    label = "Room",
-                    value = room,
-                    onValueChange = {
-                        room = it
-                        onRoomMixChanged(it)
-                    },
+                Text("STUDIO KIT")
+            }
+            DropdownMenu(
+                expanded = kitSelectorExpanded,
+                onDismissRequest = { kitSelectorExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Studio Kit") },
+                    onClick = { kitSelectorExpanded = false },
                 )
-
-                ControlSlider(
-                    label = "Volume",
-                    value = volume,
-                    onValueChange = {
-                        volume = it
-                        onMasterVolumeChanged(it)
-                    },
-                )
-
-                Text("Haptic", style = MaterialTheme.typography.labelSmall)
-                Switch(checked = haptics, onCheckedChange = { haptics = it })
             }
         }
 
-        Text(
-            text = diagnostics.toDisplayText(),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xffaab2bf),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Color(0x99000000), MaterialTheme.shapes.small)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-        )
+                .align(Alignment.TopEnd)
+                .padding(end = 12.dp, top = 10.dp),
+        ) {
+            FilledTonalButton(
+                onClick = { onRecordingToggle?.invoke() },
+                enabled = onRecordingToggle != null,
+                modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp),
+            ) {
+                Text(if (isRecording) "STOP" else "REC")
+            }
+            FilledTonalButton(
+                onClick = { settingsExpanded = !settingsExpanded },
+                modifier = Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp),
+            ) {
+                Text(if (settingsExpanded) "CLOSE" else "MIX")
+            }
+        }
+
+        if (settingsExpanded) {
+            Surface(
+                color = Color(0xee111318),
+                contentColor = Color(0xfff3f5f8),
+                shape = MaterialTheme.shapes.large,
+                tonalElevation = 8.dp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 70.dp)
+                    .widthIn(min = 270.dp, max = 330.dp),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    Text("Mixer", style = MaterialTheme.typography.titleMedium)
+                    CompactSlider(
+                        label = "Volume",
+                        value = volume,
+                        onValueChange = {
+                            volume = it
+                            onMasterVolumeChanged(it)
+                        },
+                    )
+                    CompactSlider(
+                        label = "Room",
+                        value = room,
+                        onValueChange = {
+                            room = it
+                            onRoomMixChanged(it)
+                        },
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 48.dp),
+                    ) {
+                        Text("Haptics", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = haptics,
+                            onCheckedChange = { haptics = it },
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showDiagnostics) {
+            Text(
+                text = diagnostics.toDisplayText(),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xffaab2bf),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(Color(0x99000000), MaterialTheme.shapes.small)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun ControlSlider(
+private fun CompactSlider(
     label: String,
     value: Float,
     onValueChange: (Float) -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xffaab2bf))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+            Text(
+                "${(value * 100f).roundToInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xffaab2bf),
+            )
+        }
         Slider(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.width(110.dp),
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
