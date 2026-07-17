@@ -1,0 +1,1 @@
+-keep class com.vitautas.drumkit.audio.AudioEngine { *; }
