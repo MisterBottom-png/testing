@@ -19,6 +19,18 @@ The native model now separates normalized draw bounds from independent typed hit
 
 Normalized strike coordinates remain in the existing `[0, 1]` instrument-local draw-bounds contract and do not depend on transient animation geometry.
 
+## Fixed camera contract
+
+Phase 2 Step 2.1 defines one shared elevated drummer-view camera in `StudioKitCamera`:
+
+- Elevation: 24 degrees
+- Normalized horizon: 0.68 from the top of the playable surface
+- Reference landscape viewport: 1536 by 707 pixels
+- Drum-head ellipse compression: 0.27 minor axis to major axis
+- Cymbal ellipse compression: 0.18 minor axis to major axis
+
+The elevation and horizon retain the prototype's slightly elevated viewpoint and floor transition. The compression ratios normalize the representative drum and cymbal profiles from the prototype into explicit screen-space targets. Instrument positions, scale by depth, and occlusion remain separate work for Steps 2.2 through 2.4.
+
 ## Prototype behavior represented in the base
 
 - Multi-touch strike input
@@ -47,13 +59,15 @@ Normalized strike coordinates remain in the existing `[0, 1]` instrument-local d
 - Animation-only redraw through `postInvalidateOnAnimation()`
 - System-respecting haptic feedback with restrained velocity thresholds
 - Audio dispatch before recording, haptic, and visual state updates
+- Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
 The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
-- A measured single elevated drummer-view camera applied to final artwork
+- Apply the fixed camera contract while repositioning and scaling the complete kit
+- Correct depth relationships, hardware occlusion, and the shared floor plane
 - Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
@@ -86,4 +100,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, and fixed-capacity expressive strike-performance capture.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, and the fixed camera contract for the next layout batch.
