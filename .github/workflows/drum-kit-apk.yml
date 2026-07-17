@@ -1,0 +1,104 @@
+name: Drum Kit APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - labeled
+  push:
+    branches:
+      - agent/drum-kit-ui-redesign-phase1
+    paths:
+      - ".github/workflows/drum-kit-apk.yml"
+
+concurrency:
+  group: drum-kit-apk-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-apk:
+    if: github.event_name != 'pull_request' || github.event.label.name == 'build-apk'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platforms;android-36" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Test, build debug APK, and lint
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain \
+            testDebugUnitTest \
+            :app:assembleDebug \
+            :app:lintDebug 2>&1 | tee apk-build.log
+
+      - name: Upload APK build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-apk-build-log
+          path: drum-kit-android/apk-build.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-debug-apk
+          path: drum-kit-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drum-kit-lint-reports
+          path: drum-kit-android/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove APK request label
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'build-apk',
+              })
+            } catch (error) {
+              if (error.status !== 404) throw error
+            }
