@@ -7,12 +7,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HitRegionTest {
+    private val landscapeAspectRatio = 1536f / 707f
+
     @Test
     fun ellipseRejectsTransparentCorners() {
         val region = EllipseHitRegion(NormalizedRect(0.2f, 0.2f, 0.8f, 0.6f))
 
         assertTrue(region.contains(0.5f, 0.4f))
         assertFalse(region.contains(0.21f, 0.21f))
+    }
+
+    @Test
+    fun rotatedEllipseUsesViewportAspectRatio() {
+        val region = EllipseHitRegion(
+            bounds = NormalizedRect(0.2f, 0.3f, 0.8f, 0.5f),
+            rotationDegrees = 20f,
+            rotationCenter = NormalizedPoint(0.5f, 0.4f),
+        )
+
+        assertTrue(region.contains(0.5f, 0.4f, landscapeAspectRatio))
+        assertTrue(region.contains(0.74f, 0.44f, landscapeAspectRatio))
+        assertFalse(region.contains(0.78f, 0.30f, landscapeAspectRatio))
     }
 
     @Test
@@ -59,34 +74,41 @@ class HitRegionTest {
 
     @Test
     fun topControlStripDoesNotTriggerCymbals() {
-        assertNull(StudioKitDefinition.hitTest(0.08f, 0.08f))
-        assertNull(StudioKitDefinition.hitTest(0.88f, 0.08f))
+        assertNull(StudioKitDefinition.hitTest(0.08f, 0.08f, landscapeAspectRatio))
+        assertNull(StudioKitDefinition.hitTest(0.88f, 0.08f, landscapeAspectRatio))
     }
 
     @Test
-    fun representativeHeadCentersResolveToExpectedInstruments() {
+    fun representativeRenderedHeadCentersResolveToExpectedInstruments() {
         val expectedHits = listOf(
-            Triple(0.165f, 0.215f, InstrumentId.CRASH),
-            Triple(0.835f, 0.215f, InstrumentId.RIDE),
-            Triple(0.135f, 0.43f, InstrumentId.HI_HAT),
-            Triple(0.375f, 0.255f, InstrumentId.TOM_HIGH),
-            Triple(0.60f, 0.245f, InstrumentId.TOM_MID),
-            Triple(0.33f, 0.55f, InstrumentId.SNARE),
-            Triple(0.545f, 0.68f, InstrumentId.KICK),
-            Triple(0.835f, 0.545f, InstrumentId.FLOOR_TOM),
+            Triple(0.165f, 0.2215f, InstrumentId.CRASH),
+            Triple(0.835f, 0.2215f, InstrumentId.RIDE),
+            Triple(0.135f, 0.4315f, InstrumentId.HI_HAT),
+            Triple(0.375f, 0.2451f, InstrumentId.TOM_HIGH),
+            Triple(0.60f, 0.2372f, InstrumentId.TOM_MID),
+            Triple(0.33f, 0.5435f, InstrumentId.SNARE),
+            Triple(0.545f, 0.6901f, InstrumentId.KICK),
+            Triple(0.835f, 0.5398f, InstrumentId.FLOOR_TOM),
         )
 
         for ((x, y, expected) in expectedHits) {
-            assertEquals(expected, StudioKitDefinition.hitTest(x, y)?.id)
+            assertEquals(expected, StudioKitDefinition.hitTest(x, y, landscapeAspectRatio)?.id)
         }
     }
 
     @Test
-    fun snareWinsIntentionalKickOverlap() {
-        val x = 0.447f
-        val y = 0.575f
+    fun snareUsesEntireRenderedHeadInsteadOfDetachedInset() {
+        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.205f, 0.545f, landscapeAspectRatio)?.id)
+        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.455f, 0.545f, landscapeAspectRatio)?.id)
+        assertNull(StudioKitDefinition.hitTest(0.33f, 0.65f, landscapeAspectRatio))
+    }
 
-        assertEquals(2, StudioKitDefinition.matchingInstrumentCount(x, y))
-        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(x, y)?.id)
+    @Test
+    fun snareWinsIntentionalKickOverlap() {
+        val x = 0.44f
+        val y = 0.56f
+
+        assertEquals(2, StudioKitDefinition.matchingInstrumentCount(x, y, landscapeAspectRatio))
+        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(x, y, landscapeAspectRatio)?.id)
     }
 }
