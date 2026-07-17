@@ -1,0 +1,61 @@
+name: Format drum kit font scaling fix
+
+on:
+  push:
+    branches:
+      - agent/drum-kit-ui-redesign-phase1
+
+permissions:
+  contents: write
+
+jobs:
+  format-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/drum-kit-ui-redesign-phase1
+
+      - name: Correct Kotlin indentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          source = Path(
+              "drum-kit-android/engine-input/src/main/java/"
+              "com/vitautas/drumkit/input/DrumSurfaceView.kt"
+          )
+          text = source.read_text(encoding="utf-8")
+          old = (
+              "        textSize = TypedValue.applyDimension(\n"
+              "    TypedValue.COMPLEX_UNIT_SP,\n"
+              "    11f,\n"
+              "    resources.displayMetrics,\n"
+              ")"
+          )
+          new = (
+              "        textSize = TypedValue.applyDimension(\n"
+              "            TypedValue.COMPLEX_UNIT_SP,\n"
+              "            11f,\n"
+              "            resources.displayMetrics,\n"
+              "        )"
+          )
+
+          if text.count(old) != 1:
+              raise SystemExit("Expected one unformatted TypedValue call")
+
+          source.write_text(text.replace(old, new), encoding="utf-8")
+
+      - name: Commit formatting fix and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/drum-kit-format-font-scaling-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/drum-kit-format-font-scaling-fix.yml \
+            drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt
+          git commit -m "Format font scaling fix"
+          git push origin HEAD:agent/drum-kit-ui-redesign-phase1
