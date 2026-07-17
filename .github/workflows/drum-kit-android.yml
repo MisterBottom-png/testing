@@ -95,9 +95,23 @@ jobs:
           gradle-version: "8.13"
 
       - name: Test, build, and lint
-        run: gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug
+        id: validation
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          gradle --no-daemon testDebugUnitTest :app:assembleDebug :app:lintDebug \
+            2>&1 | tee build/gradle-validation.log
+
+      - name: Upload Gradle validation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-validation-log
+          path: drum-kit-android/build/gradle-validation.log
+          if-no-files-found: warn
 
       - name: Upload debug APK
+        if: steps.validation.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: native-drum-kit-debug-apk
@@ -105,8 +119,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload snare bank manifest
+        if: steps.validation.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: snare-bank-manifest
           path: drum-kit-android/build/snare-bank-manifest.json
           if-no-files-found: error
+
+      - name: Fail when validation failed
+        if: steps.validation.outcome != 'success'
+        run: exit 1
