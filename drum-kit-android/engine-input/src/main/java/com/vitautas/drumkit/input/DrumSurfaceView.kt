@@ -217,6 +217,16 @@ class DrumSurfaceView @JvmOverloads constructor(
         return true
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (width <= 0 || height <= 0) return
+
+        labelsVisibleSinceNanos = System.nanoTime()
+        removeCallbacks(labelFadeRunnable)
+        postDelayed(labelFadeRunnable, LabelHoldMillis + 16L)
+        postInvalidateOnAnimation()
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(labelFadeRunnable)
         clearActivePointers()
