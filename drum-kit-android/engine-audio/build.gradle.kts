@@ -33,6 +33,10 @@ android {
         }
     }
 
+    androidResources {
+        noCompress += "pcm"
+    }
+
     buildFeatures {
         prefab = true
     }
