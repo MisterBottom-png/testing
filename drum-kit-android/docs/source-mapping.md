@@ -55,7 +55,10 @@ Phase 2 Step 2.3 separates the renderer into background-shadow, support-hardware
 - Rack-tom mount stems render behind both the kick and rack-tom surfaces.
 - Kick legs, floor-tom legs, the snare stand, and cymbal stands terminate at the shared normalized floor plane `StudioKitCamera.FLOOR_PLANE_Y = 0.94`.
 - Instrument rotation applies to playable surfaces and shadows, not to floor anchors, so stand feet remain grounded.
-- Exact segment clipping and hidden-hardware masks remain reserved for Step 2.4.
+
+## Hardware occlusion and shadow masks
+
+Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of drawing every stand behind every drum. Rack-tom mounts remain behind the kick, while foreground snare, floor-tom, and hi-hat supports remain in front of background drums and behind their own surfaces. Canonical rotated surface masks are cached during `onSizeChanged()` and reused to clip grounded shadows out of shells, heads, kicks, and cymbals without steady-state allocation. Animated deformation does not alter the canonical occlusion mask or playable hit region.
 
 ## Prototype behavior represented in the base
 
@@ -93,14 +96,13 @@ Phase 2 Step 2.3 separates the renderer into background-shadow, support-hardware
 - Audio dispatch before recording, haptic, and visual state updates
 - Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
 - Camera-aligned instrument positions, scale relationships, and control-safe placement
-- Explicit drummer-view surface depth, background support hardware, and one shared floor plane
+- Explicit drummer-view surface depth, independently layered support hardware, cached occlusion masks, and one shared floor plane
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
 The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP or lifecycle finalization, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
-- Correct hardware occlusion and clipping
 - Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
@@ -133,4 +135,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, cached surface masks, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.

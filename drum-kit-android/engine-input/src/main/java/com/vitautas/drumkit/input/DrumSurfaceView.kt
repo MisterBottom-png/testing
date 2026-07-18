@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -17,6 +19,7 @@ import android.view.View
 import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentId
+import com.vitautas.drumkit.model.InstrumentRenderLayerKind
 import com.vitautas.drumkit.model.InstrumentRendererKey
 import com.vitautas.drumkit.model.StudioKitCamera
 import com.vitautas.drumkit.model.StudioKitDefinition
@@ -39,6 +42,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val activePointers = SparseArray<InstrumentId>()
     private val renderStates = ArrayList<InstrumentRenderState>(StudioKitDefinition.instruments.size)
+    private val renderStatesByInstrument = arrayOfNulls<InstrumentRenderState>(InstrumentId.entries.size)
     private val animationStates = Array(InstrumentId.entries.size) { InstrumentAnimationState() }
     private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
     private var rackMountX = 0f
@@ -89,7 +93,10 @@ class DrumSurfaceView @JvmOverloads constructor(
     }
 
     private val spotlightRect = RectF()
+    private val floorClipRect = RectF()
     private val scratchRect = RectF()
+    private val instrumentOcclusionPath = Path()
+    private val surfaceRotationMatrix = Matrix()
     private var labelsVisibleSinceNanos = System.nanoTime()
     private val labelFadeRunnable = Runnable { postInvalidateOnAnimation() }
 
@@ -121,16 +128,21 @@ class DrumSurfaceView @JvmOverloads constructor(
             Shader.TileMode.CLAMP,
         )
         spotlightRect.set(-width * 0.10f, -height * 0.25f, width * 1.10f, height * 0.95f)
+        floorClipRect.set(0f, StudioKitCamera.HORIZON_Y * height, width.toFloat(), height.toFloat())
 
         val kickBounds = kickDefinition.layout.drawBounds
         rackMountX = kickBounds.centerX * width.toFloat()
         rackMountY = (kickBounds.top + kickBounds.height * 0.14f) * height.toFloat()
 
         renderStates.clear()
+        renderStatesByInstrument.fill(null)
+        instrumentOcclusionPath.reset()
         for (definition in StudioKitDefinition.renderOrder) {
             val state = InstrumentRenderState(definition)
             configureRenderState(state, width.toFloat(), height.toFloat())
             renderStates += state
+            renderStatesByInstrument[definition.id.ordinal] = state
+            instrumentOcclusionPath.addPath(state.surfaceOcclusionPath)
         }
 
         labelsVisibleSinceNanos = System.nanoTime()
@@ -155,12 +167,16 @@ class DrumSurfaceView @JvmOverloads constructor(
         for (renderState in renderStates) {
             drawInstrumentShadow(canvas, renderState)
         }
-        for (renderState in renderStates) {
-            drawInstrumentSupport(canvas, renderState)
-        }
-        for (renderState in renderStates) {
-            val animationState = animationStates[renderState.definition.id.ordinal]
-            drawInstrumentSurface(canvas, renderState, animationState)
+        for (renderLayer in StudioKitDefinition.renderLayers) {
+            val renderState = renderStatesByInstrument[renderLayer.instrumentId.ordinal] ?: continue
+            when (renderLayer.kind) {
+                InstrumentRenderLayerKind.SUPPORT -> drawInstrumentSupport(canvas, renderState)
+                InstrumentRenderLayerKind.SURFACE -> drawInstrumentSurface(
+                    canvas,
+                    renderState,
+                    animationStates[renderState.definition.id.ordinal],
+                )
+            }
         }
 
         val labelAlpha = labelAlpha(nowNanos)
@@ -392,17 +408,78 @@ class DrumSurfaceView @JvmOverloads constructor(
                 )
             }
         }
+        configureGroundedShadow(state, viewHeight)
+        configureSurfaceOcclusionPath(state)
+    }
+
+    private fun configureGroundedShadow(state: InstrumentRenderState, viewHeight: Float) {
+        val source = state.primaryRect
+        val widthScale = when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL -> 0.62f
+            InstrumentRendererKey.HI_HAT -> 0.52f
+            InstrumentRendererKey.DRUM -> 0.78f
+            InstrumentRendererKey.SNARE -> 0.76f
+            InstrumentRendererKey.KICK -> 0.88f
+        }
+        val floorY = StudioKitCamera.FLOOR_PLANE_Y * viewHeight
+        val shadowWidth = source.width() * widthScale
+        val shadowHeight = maxOf(density * 5f, state.drawBounds.height() * 0.055f)
+        val centerX = source.centerX()
+        state.shadowRect.set(
+            centerX - shadowWidth * 0.5f,
+            floorY - shadowHeight * 0.72f,
+            centerX + shadowWidth * 0.5f,
+            floorY + shadowHeight * 0.28f,
+        )
+    }
+
+    private fun configureSurfaceOcclusionPath(state: InstrumentRenderState) {
+        val path = state.surfaceOcclusionPath
+        path.reset()
+        when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL,
+            InstrumentRendererKey.HI_HAT,
+            -> path.addOval(state.primaryRect, Path.Direction.CW)
+
+            InstrumentRendererKey.DRUM,
+            InstrumentRendererKey.SNARE,
+            -> {
+                val shell = state.primaryRect
+                path.addRoundRect(
+                    shell,
+                    shell.width() * 0.16f,
+                    shell.height() * 0.12f,
+                    Path.Direction.CW,
+                )
+                path.addOval(state.secondaryRect, Path.Direction.CW)
+            }
+
+            InstrumentRendererKey.KICK -> {
+                path.addOval(state.primaryRect, Path.Direction.CW)
+                path.addOval(state.secondaryRect, Path.Direction.CW)
+            }
+        }
+
+        val rotationDegrees = state.definition.layout.rotationDegrees
+        if (rotationDegrees != 0f) {
+            val bounds = state.drawBounds
+            surfaceRotationMatrix.reset()
+            surfaceRotationMatrix.setRotate(rotationDegrees, bounds.centerX(), bounds.centerY())
+            path.transform(surfaceRotationMatrix)
+        }
     }
 
     private fun drawInstrumentShadow(canvas: Canvas, state: InstrumentRenderState) {
         val saveCount = canvas.save()
-        val bounds = state.drawBounds
+        canvas.clipRect(floorClipRect)
+        canvas.clipOutPath(instrumentOcclusionPath)
+        val shadow = state.shadowRect
         canvas.rotate(
-            state.definition.layout.rotationDegrees,
-            bounds.centerX(),
-            bounds.centerY(),
+            state.definition.layout.rotationDegrees * 0.35f,
+            shadow.centerX(),
+            shadow.centerY(),
         )
-        canvas.drawOval(state.shadowRect, shadowPaint)
+        canvas.drawOval(shadow, shadowPaint)
         canvas.restoreToCount(saveCount)
     }
 
@@ -762,6 +839,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         val primaryRect = RectF()
         val secondaryRect = RectF()
         val shadowRect = RectF()
+        val surfaceOcclusionPath = Path()
         val label: String = definition.id.label.uppercase()
         var labelX: Float = 0f
         var labelY: Float = 0f

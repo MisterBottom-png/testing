@@ -28,12 +28,24 @@ enum class InstrumentRendererKey {
 
 object StudioKitDepth {
     const val BACK_CYMBAL = 10
+    const val RACK_TOM_MOUNT = 15
     const val KICK = 20
     const val RACK_TOM = 30
     const val FLOOR_TOM = 40
     const val HI_HAT = 45
     const val SNARE = 50
 }
+
+enum class InstrumentRenderLayerKind {
+    SUPPORT,
+    SURFACE,
+}
+
+data class InstrumentRenderLayer(
+    val instrumentId: InstrumentId,
+    val kind: InstrumentRenderLayerKind,
+    val zIndex: Int,
+)
 
 data class NormalizedPoint(
     val x: Float,
@@ -184,10 +196,14 @@ data class InstrumentLayout(
     val rotationDegrees: Float,
     val labelPosition: NormalizedPoint,
     val rendererKey: InstrumentRendererKey,
+    val supportRenderZIndex: Int? = null,
     val supportFloorY: Float? = null,
 ) {
     init {
         require(rotationDegrees.isFinite()) { "rotation must be finite" }
+        require(supportRenderZIndex == null || supportRenderZIndex < renderZIndex) {
+            "support hardware must render behind its instrument surface"
+        }
         require(supportFloorY == null || supportFloorY.isFinite() && supportFloorY in 0f..1f) {
             "support floor must be normalized and finite"
         }
@@ -294,6 +310,19 @@ object StudioKitDefinition {
 
     val renderOrder: List<InstrumentDefinition> = instruments.sortedBy { it.layout.renderZIndex }
 
+    val renderLayers: List<InstrumentRenderLayer> = buildList(instruments.size * 2) {
+        for (definition in instruments) {
+            definition.layout.supportRenderZIndex?.let { supportZIndex ->
+                add(InstrumentRenderLayer(definition.id, InstrumentRenderLayerKind.SUPPORT, supportZIndex))
+            }
+            add(InstrumentRenderLayer(definition.id, InstrumentRenderLayerKind.SURFACE, definition.layout.renderZIndex))
+        }
+    }.sortedWith(
+        compareBy<InstrumentRenderLayer> { it.zIndex }
+            .thenBy { it.kind.ordinal }
+            .thenBy { it.instrumentId.ordinal },
+    )
+
     val hitTestOrder: List<InstrumentDefinition> = instruments.sortedWith(
         compareByDescending<InstrumentDefinition> { it.layout.hitTestPriority }
             .thenByDescending { it.layout.renderZIndex },
@@ -389,6 +418,13 @@ object StudioKitDefinition {
             rotationDegrees = rotationDegrees,
             labelPosition = labelPosition,
             rendererKey = rendererKey,
+            supportRenderZIndex = when (id) {
+                InstrumentId.TOM_HIGH,
+                InstrumentId.TOM_MID,
+                -> StudioKitDepth.RACK_TOM_MOUNT
+
+                else -> renderZIndex - 1
+            },
             supportFloorY = when (id) {
                 InstrumentId.TOM_HIGH,
                 InstrumentId.TOM_MID,
