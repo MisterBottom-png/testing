@@ -58,6 +58,8 @@ jobs:
           for line in workflow[start:end].splitlines():
               if not line:
                   script_lines.append("")
+              elif line == '"""':
+                  script_lines.append(line)
               elif line.startswith("          "):
                   script_lines.append(line[10:])
               else:
