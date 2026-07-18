@@ -36,7 +36,7 @@ internal class InstrumentArtworkCache(
     }
 }
 
-private class CachedArtworkLayer(
+internal class CachedArtworkLayer(
     private val bitmap: Bitmap,
     private val left: Float,
     private val top: Float,
