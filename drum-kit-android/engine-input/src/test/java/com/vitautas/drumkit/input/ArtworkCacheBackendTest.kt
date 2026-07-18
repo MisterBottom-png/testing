@@ -5,9 +5,9 @@ import org.junit.Test
 
 class ArtworkCacheBackendTest {
     @Test
-    fun api29HardwareCanvasUsesRenderNode() {
+    fun api29HardwareCanvasUsesStableBitmapCache() {
         assertEquals(
-            ArtworkCacheBackend.RENDER_NODE,
+            ArtworkCacheBackend.BITMAP,
             ArtworkCacheBackendPolicy.select(sdkInt = 29, hardwareAccelerated = true),
         )
     }
