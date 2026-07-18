@@ -44,6 +44,30 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("drum-kit-android/tools/apply_step_2_4.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "    '        require(rotationDegrees.isFinite()) { \"rotation must be finite\" }\\n',\n",
+              "    '        require(rotationDegrees.isFinite()) { \"rotation must be finite\" }\\n        require(supportFloorY == null || supportFloorY.isFinite() && supportFloorY in 0f..1f) {\\n',\n",
+              1,
+          )
+          text = text.replace(
+              "        require(supportRenderZIndex == null || supportRenderZIndex < renderZIndex) {\n"
+              "            \"support hardware must render behind its instrument surface\"\n"
+              "        }\n"
+              "''',\n",
+              "        require(supportRenderZIndex == null || supportRenderZIndex < renderZIndex) {\n"
+              "            \"support hardware must render behind its instrument surface\"\n"
+              "        }\n"
+              "        require(supportFloorY == null || supportFloorY.isFinite() && supportFloorY in 0f..1f) {\n"
+              "''',\n",
+              1,
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
           python drum-kit-android/tools/apply_step_2_4.py 2>&1 | tee step-2-4-patch.log
 
       - name: Upload Step 2.4 patch diagnostics
