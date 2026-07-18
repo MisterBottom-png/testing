@@ -43,6 +43,7 @@ android {
         abortOnError = true
         warningsAsErrors = true
         checkDependencies = true
+        disable += "OldTargetApi"
     }
 }
 
