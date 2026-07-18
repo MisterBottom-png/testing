@@ -39,8 +39,8 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 
 - Android Studio compatible with Android Gradle Plugin 9.3.x
 - JDK 17
-- Android SDK 37
-- Android SDK Build Tools 37.0.0
+- Android SDK 37 from the Android 17 preview channel
+- Android SDK Build Tools 37.0.0 from the preview channel
 - NDK 29.0.14206865
 - CMake 3.22.1 or newer
 - Gradle 9.5.0 when building outside Android Studio
