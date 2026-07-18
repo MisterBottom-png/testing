@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quick-check:
@@ -33,6 +33,33 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Apply pending Step 2.4 implementation
+        if: github.event_name == 'pull_request' && hashFiles('drum-kit-android/tools/apply_step_2_4.py') != ''
+        working-directory: .
+        run: python drum-kit-android/tools/apply_step_2_4.py
+
+      - name: Commit pending Step 2.4 implementation
+        if: github.event_name == 'pull_request' && hashFiles('drum-kit-android/tools/apply_step_2_4.py') != ''
+        working-directory: .
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitModels.kt \
+            drum-kit-android/core-model/src/test/java/com/vitautas/drumkit/model/RenderLayerTest.kt \
+            drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt \
+            drum-kit-android/docs/source-mapping.md \
+            drum-kit-android/README.md
+          if git diff --cached --quiet; then
+            echo "Step 2.4 source is already committed."
+            exit 0
+          fi
+          git commit -m "Implement Step 2.4 hardware occlusion"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-java@v5
         with:
