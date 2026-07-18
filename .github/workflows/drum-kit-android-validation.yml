@@ -1,0 +1,67 @@
+name: Drum Kit Android Validation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-android-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-android-validation.yml"
+
+concurrency:
+  group: drum-kit-android-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ""
+
+      - name: Install compile SDK
+        shell: bash
+        run: |
+          sdkmanager --channel=3 \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-cleanup: on-success
+
+      - name: Run Android unit tests and compile app
+        run: >-
+          gradle --no-daemon --console=plain --warning-mode=fail
+          :engine-input:testDebugUnitTest
+          :engine-audio:testDebugUnitTest
+          :feature-kit:testDebugUnitTest
+          :app:compileDebugKotlin
