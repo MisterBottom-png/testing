@@ -32,7 +32,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 ## Modules
 
 - `app`: activity lifecycle, immersive mode, debug configuration, and dependency wiring
-- `core-model`: instrument IDs, normalized draw geometry, typed hit regions, render metadata, strike data, and diagnostics models
+- `core-model`: pure Kotlin/JVM instrument IDs, normalized draw geometry, typed hit regions, render metadata, strike data, and diagnostics models
 - `engine-input`: raw multi-touch, priority hit testing, strike extraction, haptics, animation state, and Canvas rendering
 - `engine-audio`: JNI bridge and Oboe real-time audio callback
 - `feature-kit`: Compose play screen, compact controls, fixed-capacity performance capture, settings overlays, and playable-surface embedding
@@ -46,20 +46,20 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - NDK 29.0.14206865
 - CMake 3.22.1 or newer
 - Gradle 9.5.0 when building outside Android Studio
-- Kotlin 2.4.10 through Android Gradle Plugin built-in Kotlin support
+- Kotlin 2.4.10 through Android Gradle Plugin built-in Kotlin support and the Kotlin/JVM plugin
 - Compose BOM 2026.06.01
 
 From this directory:
 
 ```bash
-gradle --no-daemon --warning-mode=fail testDebugUnitTest :app:assembleDebug :app:lintDebug
+gradle --no-daemon --warning-mode=fail :core-model:check testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-The GitHub Actions workflows install the required SDK, Build Tools, NDK, CMake, and Gradle versions explicitly. Builds fail on Gradle deprecation warnings. Successful APK runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
+The GitHub Actions workflows pin the required tool versions and treat Gradle warnings as failures. `Drum Kit Quick Check` runs only the pure JVM `core-model` checks and does not install Android tooling. `Drum Kit Android Validation` independently installs only the compile SDK and Build Tools needed for Android unit tests and Kotlin compilation. On-demand APK and release workflows install the NDK and CMake as required. Successful APK runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
 
 ## Validation status
 
-GitHub Actions is the authoritative validation path. It runs unit tests, Kotlin and native C++ compilation, Android lint, and APK packaging with Gradle warnings treated as failures. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
+GitHub Actions is the authoritative validation path. The JVM quick check and Android validation run concurrently on pull requests. Together they cover core-model tests, Android module unit tests, and application Kotlin compilation. On-demand APK and release workflows provide native C++ compilation, Android lint, and packaging validation. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
 
 ## Current scope
 
