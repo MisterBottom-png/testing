@@ -42,6 +42,16 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("tools/apply_modernization_m1_m2.py")
+          text = path.read_text(encoding="utf-8")
+          old = '    if workflow.name == "drum-kit-quick-check.yml":\n        text = replace_once(text, ":engine-input:compileDebugKotlin", ":engine-input:testDebugUnitTest", "quick-check engine-input tests")\n'
+          new = '    if workflow.name == "drum-kit-quick-check.yml":\n        if ":engine-input:compileDebugKotlin" in text:\n            text = replace_once(text, ":engine-input:compileDebugKotlin", ":engine-input:testDebugUnitTest", "quick-check engine-input tests")\n        elif ":engine-input:testDebugUnitTest" not in text:\n            raise RuntimeError("quick-check engine-input tests: expected compile or test task")\n'
+          if text.count(old) != 1:
+              raise RuntimeError("modernization runner guard anchor changed")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
           python3 tools/apply_modernization_m1_m2.py 2>&1 | tee modernization-patch.log
 
       - name: Upload modernization patch log
