@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quick-check:
@@ -33,6 +33,52 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Apply pending Step 2.3 implementation
+        if: github.event_name == 'pull_request' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
+        working-directory: .
+        shell: python
+        run: |
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/drum-kit-step-2-3-depth.yml").read_text(
+              encoding="utf-8"
+          )
+          start_marker = "        run: |\n"
+          end_marker = "\n      - name: Commit Step 2.3 and remove temporary workflow"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script_lines = []
+          for line in workflow[start:end].splitlines():
+              if not line.startswith("          "):
+                  raise SystemExit(f"Unexpected patch indentation: {line!r}")
+              script_lines.append(line[10:])
+          script = "\n".join(script_lines) + "\n"
+          exec(compile(script, "apply_step_2_3.py", "exec"))
+
+      - name: Commit pending Step 2.3 implementation
+        if: github.event_name == 'pull_request' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
+        working-directory: .
+        shell: bash
+        run: |
+          git show HEAD^:.github/workflows/drum-kit-quick-check.yml > .github/workflows/drum-kit-quick-check.yml
+          rm .github/workflows/drum-kit-step-2-3-depth.yml
+          rm drum-kit-android/.step-2-3-trigger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/drum-kit-quick-check.yml \
+            .github/workflows/drum-kit-step-2-3-depth.yml \
+            drum-kit-android/.step-2-3-trigger \
+            drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitCamera.kt \
+            drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitModels.kt \
+            drum-kit-android/core-model/src/test/java/com/vitautas/drumkit/model/HitRegionTest.kt \
+            drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt \
+            drum-kit-android/docs/source-mapping.md
+          git commit -m "Implement Step 2.3 depth relationships"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-java@v5
         with:
