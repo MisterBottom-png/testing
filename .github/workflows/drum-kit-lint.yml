@@ -62,7 +62,6 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon --console=plain --warning-mode=fail \
-            -PdrumKitAbis=arm64-v8a \
             -PdrumKitCmakeVersion=3.31.5 \
             :app:lintDebug 2>&1 | tee lint-build.log
 
