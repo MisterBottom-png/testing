@@ -37,10 +37,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: Apply pending Step 2.3 implementation
+        id: apply-depth
         if: github.event_name == 'pull_request' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
+        continue-on-error: true
         working-directory: .
-        shell: python
+        shell: bash
         run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee step-2-3-patch.log
           from pathlib import Path
 
           workflow = Path(".github/workflows/drum-kit-step-2-3-depth.yml").read_text(
@@ -60,9 +64,19 @@ jobs:
                   raise SystemExit(f"Unexpected patch indentation: {line!r}")
           script = "\n".join(script_lines) + "\n"
           exec(compile(script, "apply_step_2_3.py", "exec"))
+          PY
+
+      - name: Upload Step 2.3 patch diagnostics
+        if: steps.apply-depth.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: step-2-3-patch-log
+          path: step-2-3-patch.log
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Commit pending Step 2.3 implementation
-        if: github.event_name == 'pull_request' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
+        if: steps.apply-depth.outcome == 'success' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
         working-directory: .
         shell: bash
         run: |
@@ -151,14 +165,17 @@ jobs:
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-java@v5
+        if: steps.apply-depth.outcome == 'success'
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
+        if: steps.apply-depth.outcome == 'success'
         uses: android-actions/setup-android@v4
 
       - name: Install compile SDK
+        if: steps.apply-depth.outcome == 'success'
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
@@ -167,11 +184,13 @@ jobs:
             "build-tools;36.0.0"
 
       - uses: gradle/actions/setup-gradle@v6
+        if: steps.apply-depth.outcome == 'success'
         with:
           gradle-version: "9.5.0"
           cache-provider: basic
 
       - name: Compile Kotlin and run unit tests
+        if: steps.apply-depth.outcome == 'success'
         run: >-
           gradle --no-daemon --console=plain --warning-mode=fail
           :core-model:testDebugUnitTest
