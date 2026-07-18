@@ -29,6 +29,11 @@ android {
         }
     }
 
+    androidResources {
+        // Keep the predecoded runtime bank directly readable from the APK asset table.
+        noCompress += "pcm"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
