@@ -16,6 +16,8 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Preallocated synthesized voice pool for kick, snare, three toms, hi-hat, crash, and ride
 - Independent normalized draw bounds and typed hit regions
 - Separate render z-index and hit-test priority
+- Fixed elevated drummer-view camera and camera-aligned instrument placement
+- Explicit surface depth, background support-hardware passes, and one shared floor plane
 - Compact kit, recording, and mixer controls with an expandable settings panel
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
@@ -59,13 +61,13 @@ GitHub Actions is the authoritative validation path. It runs unit tests, Kotlin 
 
 This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion, and the renderer still uses procedural Canvas layers rather than final pre-rendered or fully RenderNode-cached instrument artwork.
 
-The current redesign implementation separates drawing from touch geometry, resolves overlaps explicitly, removes the permanent HUD, restricts diagnostics to debuggable builds, fades labels, caches renderer objects outside steady-state drawing, and drives local instrument-specific feedback rather than lifting the whole instrument.
+The current redesign implementation separates drawing from touch geometry, resolves overlaps explicitly, applies one fixed camera, orders surfaces by drummer-view depth, renders support hardware behind playable surfaces, anchors supported instruments to one normalized floor plane, removes the permanent HUD, restricts diagnostics to debuggable builds, fades labels, caches renderer objects outside steady-state drawing, and drives local instrument-specific feedback rather than lifting the whole instrument.
 
 The recording control now captures an expressive strike-event take using fixed-capacity primitive buffers. Audio dispatch remains first; recording copies timing, instrument, velocity, normalized position, pressure, and contact size afterward. The take is materialized only when recording stops. PCM/WAV export remains deferred.
 
 ## Next milestone
 
-1. Establish a single measured drummer-view camera and rebuild every instrument layer to that perspective.
+1. Correct hardware occlusion and clip hidden stand or leg segments around shells and cymbals.
 2. Replace transitional procedural surfaces with cached layered assets or RenderNodes.
 3. Profile rapid multi-touch rendering on representative phones and tablets.
 4. Tune hit regions and overlap priority using physical-device play tests.
