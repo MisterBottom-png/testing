@@ -54,16 +54,33 @@ jobs:
           end_marker = "\n      - name: Commit Step 2.3 and remove temporary workflow"
           start = workflow.index(start_marker) + len(start_marker)
           end = workflow.index(end_marker, start)
-          script_lines = []
+          extracted_lines = []
           for line in workflow[start:end].splitlines():
               if not line:
-                  script_lines.append("")
+                  extracted_lines.append("")
               elif line == '"""':
-                  script_lines.append(line)
+                  extracted_lines.append(line)
               elif line.startswith("          "):
-                  script_lines.append(line[10:])
+                  extracted_lines.append(line[10:])
               else:
                   raise SystemExit(f"Unexpected patch indentation: {line!r}")
+
+          script_lines = []
+          inside_multiline_literal = False
+          for line in extracted_lines:
+              if inside_multiline_literal:
+                  if line == '"""':
+                      script_lines.append(line)
+                      inside_multiline_literal = False
+                  else:
+                      script_lines.append(f"    {line}" if line else "")
+              else:
+                  script_lines.append(line)
+                  if '= """' in line and not line.endswith('"""'):
+                      inside_multiline_literal = True
+          if inside_multiline_literal:
+              raise SystemExit("Unclosed multiline patch literal")
+
           script = "\n".join(script_lines) + "\n"
           exec(compile(script, "apply_step_2_3.py", "exec"))
           PY
