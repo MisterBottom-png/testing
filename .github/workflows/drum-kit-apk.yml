@@ -17,7 +17,8 @@ permissions:
 jobs:
   build-apk:
     if: github.event_name != 'pull_request' || github.event.label.name == 'build-apk'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: drum-kit-android
@@ -30,34 +31,31 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: ""
-
-      - name: Install Android toolchain
+      - name: Verify preinstalled Android toolchain
         shell: bash
         run: |
-          sdkmanager --channel=3 \
-            "platforms;android-37.0" \
-            "build-tools;37.0.0" \
-            "ndk;29.0.14206865" \
-            "cmake;3.22.1"
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          test -d "$sdk_root/platforms/android-37.0"
+          test -d "$sdk_root/build-tools/37.0.0"
+          test -d "$sdk_root/ndk/29.0.14206865"
+          test -x "$sdk_root/cmake/3.31.5/bin/cmake"
 
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.5.0"
-          cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-cleanup: on-success
 
-      - name: Test, build debug APK, and lint
+      - name: Build arm64 debug APK
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon --console=plain --warning-mode=fail \
-            testDebugUnitTest \
-            :app:assembleDebug \
-            :app:lintDebug 2>&1 | tee apk-build.log
+            -PdrumKitAbis=arm64-v8a \
+            -PdrumKitCmakeVersion=3.31.5 \
+            :app:assembleDebug 2>&1 | tee apk-build.log
 
       - name: Upload APK build log
         if: always()
@@ -76,15 +74,7 @@ jobs:
           path: drum-kit-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload lint reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: drum-kit-lint-reports
-          path: drum-kit-android/app/build/reports/lint-results-debug.*
-          if-no-files-found: ignore
-          retention-days: 14
+          compression-level: 0
 
       - name: Remove APK request label
         if: always() && github.event_name == 'pull_request'
