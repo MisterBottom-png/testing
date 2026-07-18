@@ -32,11 +32,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: ""
 
       - name: Install Android toolchain
         shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager --channel=3 \
             "platforms;android-37.0" \
             "build-tools;37.0.0" \
@@ -47,6 +48,7 @@ jobs:
         with:
           gradle-version: "9.5.0"
           cache-provider: basic
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Test, build debug APK, and lint
         shell: bash
