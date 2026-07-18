@@ -170,19 +170,40 @@ class HitRegionTest {
     }
 
     @Test
-    fun snareUsesEntireRenderedHeadInsteadOfDetachedInset() {
-        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.195f, 0.579f, landscapeAspectRatio)?.id)
-        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.435f, 0.579f, landscapeAspectRatio)?.id)
-        assertNull(StudioKitDefinition.hitTest(0.315f, 0.69f, landscapeAspectRatio))
+    fun visualSurfaceBoundsAndHitRegionsAreIndependent() {
+        for (definition in StudioKitDefinition.instruments) {
+            val surface = definition.layout.playableSurfaceBounds
+            val hit = StudioKitGeometry.playableBounds(definition.layout, landscapeAspectRatio)
+
+            assertTrue(hit.left > surface.left)
+            assertTrue(hit.top > surface.top)
+            assertTrue(hit.right < surface.right)
+            assertTrue(hit.bottom < surface.bottom)
+        }
     }
 
     @Test
-    fun snareWinsIntentionalKickOverlap() {
-        val x = 0.42f
-        val y = 0.57f
+    fun tunedStudioKitHitRegionsDoNotOverlapAtReferenceViewport() {
+        for (yIndex in 0..140) {
+            val y = yIndex / 140f
+            for (xIndex in 0..280) {
+                val x = xIndex / 280f
+                assertTrue(
+                    "overlapping targets at ($x, $y)",
+                    StudioKitDefinition.matchingInstrumentCount(x, y, landscapeAspectRatio) <= 1,
+                )
+            }
+        }
+    }
 
-        assertEquals(2, StudioKitDefinition.matchingInstrumentCount(x, y, landscapeAspectRatio))
-        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(x, y, landscapeAspectRatio)?.id)
+    @Test
+    fun formerKickSnareOverlapResolvesToOneVisibleTarget() {
+        val snareX = 0.42f
+        val snareY = 0.57f
+
+        assertEquals(1, StudioKitDefinition.matchingInstrumentCount(snareX, snareY, landscapeAspectRatio))
+        assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(snareX, snareY, landscapeAspectRatio)?.id)
+        assertEquals(InstrumentId.KICK, StudioKitDefinition.hitTest(0.51f, 0.685f, landscapeAspectRatio)?.id)
     }
 
     private fun definition(id: InstrumentId): InstrumentDefinition =

@@ -220,7 +220,6 @@ class DrumSurfaceView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         removeCallbacks(labelFadeRunnable)
         clearActivePointers()
-        releaseArtworkCaches()
         super.onDetachedFromWindow()
     }
 
@@ -301,10 +300,7 @@ class DrumSurfaceView @JvmOverloads constructor(
 
     private fun configureRenderState(state: InstrumentRenderState, viewWidth: Float, viewHeight: Float) {
         val normalized = state.definition.layout.drawBounds
-        val playable = StudioKitGeometry.playableBounds(
-            layout = state.definition.layout,
-            aspectRatio = viewWidth / viewHeight,
-        )
+        val playable = state.definition.layout.playableSurfaceBounds
         val bounds = state.drawBounds
         bounds.set(
             normalized.left * viewWidth,

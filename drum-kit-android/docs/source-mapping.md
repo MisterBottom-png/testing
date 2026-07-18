@@ -62,7 +62,11 @@ Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of 
 
 ## Cached layered instrument artwork
 
-Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymbal primitives with renderer-key artwork profiles and cached Canvas layers built during `onSizeChanged()`. Drum caches separate shell, bottom hoop, lugs, reflections, and wear from the animated batter head and top hoop. The snare uses a brushed-steel material profile. The kick separates its wine shell and rear hoop from the animated dark front head, port, badge, and front hoop. Cymbal caches include bronze edge shading, six lathe rings, deterministic hammering marks, raised bells, highlights, felt/bolt hardware, and a darker lower hi-hat disc. Body and playable layers remain separate so existing position- and velocity-driven deformation continues without rebuilding static detail. Cached bitmaps are released on resize and view detachment.
+Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymbal primitives with renderer-key artwork profiles and cached Canvas layers built during `onSizeChanged()`. Drum caches separate shell, bottom hoop, lugs, reflections, and wear from the animated batter head and top hoop. The snare uses a brushed-steel material profile. The kick separates its wine shell and rear hoop from the animated dark front head, port, badge, and front hoop. Cymbal caches include bronze edge shading, six lathe rings, deterministic hammering marks, raised bells, highlights, felt/bolt hardware, and a darker lower hi-hat disc. Body and playable layers remain separate so existing position- and velocity-driven deformation continues without rebuilding static detail. Cached bitmaps are released and rebuilt on resize and retained across temporary View detach/reattach cycles.
+
+## Pre-2.6 corrective audit
+
+The corrective audit separates complete artwork bounds, rendered playable-surface bounds, and touch hit regions into three explicit contracts. Artwork no longer changes size when hit boxes are tuned. All kit-level hit APIs now delegate to the same viewport-aware geometry used by `DrumSurfaceView`. Head and cymbal hit ellipses are inset from visible rims and hardware, and the former kick/snare overlap is removed at the reference landscape viewport.
 
 ## Prototype behavior represented in the base
 
@@ -86,7 +90,7 @@ Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymb
 - Android audio-focus acquisition, loss handling, delayed focus support, and startup retry
 - Automatic Oboe stream recovery after unexpected closure, with shared-mode fallback when exclusive opening fails
 - Closed-stream-safe diagnostics access and finite-value validation at Kotlin and native audio boundaries
-- Independent draw bounds and playable hit regions
+- Independent draw bounds, visual playable-surface bounds, and playable hit regions
 - Shared viewport-aware rotation for rendering, hit testing, strike positions, and debug overlays
 - Playable-surface-local strike coordinates for audio and animation input
 - Independent render z-index and hit-test priority
@@ -138,4 +142,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, Step 2.5 cached layered artwork, cached surface masks, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, Step 2.5 cached layered artwork, the pre-2.6 geometry and cache-lifecycle corrections, cached surface masks, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.

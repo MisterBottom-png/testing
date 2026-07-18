@@ -38,26 +38,23 @@ Implemented:
 - Kotlin and Jetpack Compose application shell
 - Landscape-only immersive activity
 - Raw multi-touch input through a custom Android `View`
-- Normalized instrument geometry and rectangular hit testing
+- Independent draw bounds, visual playable-surface bounds, and typed hit regions
+- Viewport-aware rotation shared by rendering, hit testing, strike coordinates, and diagnostics
+- Independent render depth and hit-test priority
+- Cached layered Canvas artwork, support hardware, occlusion masks, and grounded shadows
+- Position-, velocity-, and instrument-specific deformation and rebound
 - Pressure, contact-size, position, and velocity data capture
-- Kotlin-to-C++ JNI bridge
-- Native C++20 audio engine using Oboe
-- Fixed-capacity event queue and preallocated voice pool
-- Synthesized placeholder sounds for eight instruments
-- Master volume, room mix, haptics, and basic diagnostics
-- Basic procedural Canvas drawing for drums and cymbals
+- Kotlin-to-C++ JNI bridge and native C++20 Oboe audio engine
+- Fixed-capacity event queue, voice pool, and expressive performance recorder
+- Compact controls, debug-only diagnostics, and system-respecting haptics
 
-Known redesign targets:
+Known remaining redesign targets:
 
-- Drawing and hit testing currently reuse rectangular bounds.
-- Render order and hit priority are not independently modeled.
-- Gradients and temporary geometry are created during drawing.
-- Instruments use basic clip-art gradients rather than layered 2.5D artwork.
-- Active feedback lifts whole instruments instead of deforming the struck surface.
-- Labels are drawn inside playable areas and remain permanently visible.
-- The Compose HUD occupies the full width of the playing screen.
-- Diagnostics are visible in normal builds.
-- Haptics use direct one-shot vibration on ordinary strikes.
+- Complete RenderNode caching where profiling justifies it
+- Representative-device frame-time and bitmap-memory profiling
+- Physical-device hit-region refinement and accessibility play testing
+- Production samples, velocity layers, round robins, and expressive zones
+- Continuous hi-hat, damping, pitch, choke, and recording-export behavior
 
 Deliberately deferred unless a task explicitly includes them:
 
@@ -154,6 +151,7 @@ Each instrument layout entry must provide, directly or through typed sub-models:
 
 - `InstrumentId`
 - Draw bounds
+- Visual playable-surface bounds
 - Hit region
 - Render z-index
 - Hit-test priority
@@ -172,8 +170,9 @@ Model hit regions as an exhaustive typed hierarchy supporting:
 
 Rules:
 
-- Draw bounds describe where artwork is composed.
-- Hit regions describe where input is accepted.
+- Draw bounds describe where the complete instrument artwork is composed.
+- Visual playable-surface bounds describe the rendered head or cymbal independently from touch acceptance.
+- Hit regions describe where input is accepted and must not be reused to size artwork.
 - Render z-index determines visual overlap only.
 - Hit-test priority resolves overlapping playable regions only.
 - Rotation must be applied consistently to artwork, labels, and hit-region transforms where required.

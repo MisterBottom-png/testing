@@ -196,11 +196,18 @@ data class InstrumentLayout(
     val rotationDegrees: Float,
     val labelPosition: NormalizedPoint,
     val rendererKey: InstrumentRendererKey,
+    val playableSurfaceBounds: NormalizedRect = drawBounds,
     val supportRenderZIndex: Int? = null,
     val supportFloorY: Float? = null,
 ) {
     init {
         require(rotationDegrees.isFinite()) { "rotation must be finite" }
+        require(
+            playableSurfaceBounds.left >= drawBounds.left &&
+                playableSurfaceBounds.top >= drawBounds.top &&
+                playableSurfaceBounds.right <= drawBounds.right &&
+                playableSurfaceBounds.bottom <= drawBounds.bottom,
+        ) { "playable surface bounds must stay inside draw bounds" }
         require(supportRenderZIndex == null || supportRenderZIndex < renderZIndex) {
             "support hardware must render behind its instrument surface"
         }
@@ -328,20 +335,11 @@ object StudioKitDefinition {
             .thenByDescending { it.layout.renderZIndex },
     )
 
-    fun hitTest(screenX: Float, screenY: Float, aspectRatio: Float = 1f): InstrumentDefinition? {
-        for (definition in hitTestOrder) {
-            if (definition.layout.hitRegion.contains(screenX, screenY, aspectRatio)) return definition
-        }
-        return null
-    }
+    fun hitTest(screenX: Float, screenY: Float, aspectRatio: Float = 1f): InstrumentDefinition? =
+        StudioKitGeometry.hitTest(screenX, screenY, aspectRatio)?.definition
 
-    fun matchingInstrumentCount(screenX: Float, screenY: Float, aspectRatio: Float = 1f): Int {
-        var count = 0
-        for (definition in instruments) {
-            if (definition.layout.hitRegion.contains(screenX, screenY, aspectRatio)) count += 1
-        }
-        return count
-    }
+    fun matchingInstrumentCount(screenX: Float, screenY: Float, aspectRatio: Float = 1f): Int =
+        StudioKitGeometry.matchingInstrumentCount(screenX, screenY, aspectRatio)
 
     private fun cameraAlignedDrumBounds(left: Float, top: Float, width: Float): NormalizedRect =
         NormalizedRect(
@@ -359,14 +357,29 @@ object StudioKitDefinition {
             bottom = top + StudioKitCamera.cymbalDrawBoundsHeight(width),
         )
 
-    private fun playableHitRegion(
+    private data class HitRegionInsets(
+        val left: Float,
+        val top: Float,
+        val right: Float,
+        val bottom: Float,
+    ) {
+        init {
+            require(left >= 0f && top >= 0f && right >= 0f && bottom >= 0f) {
+                "hit-region insets must be non-negative"
+            }
+            require(left + right < 1f && top + bottom < 1f) {
+                "hit-region insets must preserve positive size"
+            }
+        }
+    }
+
+    private fun visualSurfaceBounds(
         drawBounds: NormalizedRect,
         rendererKey: InstrumentRendererKey,
-        rotationDegrees: Float,
-    ): HitRegion {
+    ): NormalizedRect {
         val width = drawBounds.width
         val height = drawBounds.height
-        val playableBounds = when (rendererKey) {
+        return when (rendererKey) {
             InstrumentRendererKey.CYMBAL,
             InstrumentRendererKey.HI_HAT,
             -> NormalizedRect(
@@ -382,7 +395,7 @@ object StudioKitDefinition {
                 left = drawBounds.left,
                 top = drawBounds.top,
                 right = drawBounds.right,
-                bottom = drawBounds.top + height * 0.42f,
+                bottom = drawBounds.top + height * StudioKitCamera.DRUM_HEAD_HEIGHT_FRACTION_OF_DRAW_BOUNDS,
             )
 
             InstrumentRendererKey.KICK -> NormalizedRect(
@@ -392,12 +405,42 @@ object StudioKitDefinition {
                 bottom = drawBounds.bottom - height * 0.10f,
             )
         }
-        return EllipseHitRegion(
-            bounds = playableBounds,
-            rotationDegrees = rotationDegrees,
-            rotationCenter = NormalizedPoint(drawBounds.centerX, drawBounds.centerY),
-        )
     }
+
+    private fun playableHitRegion(
+        instrumentId: InstrumentId,
+        surfaceBounds: NormalizedRect,
+    ): HitRegion {
+        val insets = when (instrumentId) {
+            InstrumentId.CRASH,
+            InstrumentId.RIDE,
+            -> HitRegionInsets(left = 0.04f, top = 0.10f, right = 0.04f, bottom = 0.10f)
+
+            InstrumentId.HI_HAT ->
+                HitRegionInsets(left = 0.05f, top = 0.12f, right = 0.05f, bottom = 0.12f)
+
+            InstrumentId.TOM_HIGH,
+            InstrumentId.TOM_MID,
+            InstrumentId.FLOOR_TOM,
+            -> HitRegionInsets(left = 0.05f, top = 0.08f, right = 0.05f, bottom = 0.08f)
+
+            InstrumentId.SNARE ->
+                HitRegionInsets(left = 0.06f, top = 0.08f, right = 0.06f, bottom = 0.08f)
+
+            InstrumentId.KICK ->
+                HitRegionInsets(left = 0.18f, top = 0.18f, right = 0.08f, bottom = 0.10f)
+        }
+        val hitBounds = inset(surfaceBounds, insets)
+        return EllipseHitRegion(bounds = hitBounds)
+    }
+
+    private fun inset(bounds: NormalizedRect, insets: HitRegionInsets): NormalizedRect =
+        NormalizedRect(
+            left = bounds.left + bounds.width * insets.left,
+            top = bounds.top + bounds.height * insets.top,
+            right = bounds.right - bounds.width * insets.right,
+            bottom = bounds.bottom - bounds.height * insets.bottom,
+        )
 
     private fun instrument(
         id: InstrumentId,
@@ -408,33 +451,38 @@ object StudioKitDefinition {
         labelPosition: NormalizedPoint,
         rendererKey: InstrumentRendererKey,
         pan: Float,
-    ): InstrumentDefinition = InstrumentDefinition(
-        layout = InstrumentLayout(
-            instrumentId = id,
-            drawBounds = drawBounds,
-            hitRegion = playableHitRegion(drawBounds, rendererKey, rotationDegrees),
-            renderZIndex = renderZIndex,
-            hitTestPriority = hitTestPriority,
-            rotationDegrees = rotationDegrees,
-            labelPosition = labelPosition,
-            rendererKey = rendererKey,
-            supportRenderZIndex = when (id) {
-                InstrumentId.TOM_HIGH,
-                InstrumentId.TOM_MID,
-                -> StudioKitDepth.RACK_TOM_MOUNT
+    ): InstrumentDefinition {
+        val playableSurfaceBounds = visualSurfaceBounds(drawBounds, rendererKey)
+        return InstrumentDefinition(
+            layout = InstrumentLayout(
+                instrumentId = id,
+                drawBounds = drawBounds,
+                hitRegion = playableHitRegion(id, playableSurfaceBounds),
+                renderZIndex = renderZIndex,
+                hitTestPriority = hitTestPriority,
+                rotationDegrees = rotationDegrees,
+                labelPosition = labelPosition,
+                rendererKey = rendererKey,
+                playableSurfaceBounds = playableSurfaceBounds,
+                supportRenderZIndex = when (id) {
+                    InstrumentId.TOM_HIGH,
+                    InstrumentId.TOM_MID,
+                    -> StudioKitDepth.RACK_TOM_MOUNT
 
-                else -> renderZIndex - 1
-            },
-            supportFloorY = when (id) {
-                InstrumentId.TOM_HIGH,
-                InstrumentId.TOM_MID,
-                -> null
+                    else -> renderZIndex - 1
+                },
+                supportFloorY = when (id) {
+                    InstrumentId.TOM_HIGH,
+                    InstrumentId.TOM_MID,
+                    -> null
 
-                else -> StudioKitCamera.FLOOR_PLANE_Y
-            },
-        ),
-        pan = pan,
-    )
+                    else -> StudioKitCamera.FLOOR_PLANE_Y
+                },
+            ),
+            pan = pan,
+        )
+    }
+
 }
 
 data class DrumStrike(
