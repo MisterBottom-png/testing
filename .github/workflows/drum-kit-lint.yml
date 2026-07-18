@@ -1,0 +1,85 @@
+name: Drum Kit Android Lint
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-lint.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-lint.yml"
+
+concurrency:
+  group: drum-kit-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Verify preinstalled Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          test -d "$sdk_root/platforms/android-37.0"
+          test -d "$sdk_root/build-tools/37.0.0"
+          test -d "$sdk_root/ndk/29.0.14206865"
+          test -x "$sdk_root/cmake/3.31.5/bin/cmake"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-cleanup: on-success
+
+      - name: Run Android lint
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain --warning-mode=fail \
+            -PdrumKitAbis=arm64-v8a \
+            -PdrumKitCmakeVersion=3.31.5 \
+            :app:lintDebug 2>&1 | tee lint-build.log
+
+      - name: Upload lint build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-lint-build-log
+          path: drum-kit-android/lint-build.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-lint-reports
+          path: drum-kit-android/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+          retention-days: 14
