@@ -37,7 +37,19 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - name: Apply pending Step 2.5 integration
-        run: python ../tools/apply_step_2_5.py
+        shell: bash
+        run: |
+          set -o pipefail
+          python ../tools/apply_step_2_5.py 2>&1 | tee ../step-2-5-patch.log
+
+      - name: Upload Step 2.5 patch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: step-2-5-patch-log
+          path: step-2-5-patch.log
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Commit pending Step 2.5 integration
         shell: bash
