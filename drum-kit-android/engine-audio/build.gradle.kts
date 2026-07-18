@@ -1,3 +1,15 @@
+val configuredAbis = providers.gradleProperty("drumKitAbis")
+    .map { value ->
+        value.split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .ifEmpty { error("drumKitAbis must contain at least one ABI") }
+    }
+    .orElse(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+
+val configuredCmakeVersion = providers.gradleProperty("drumKitCmakeVersion")
+    .orElse("3.22.1")
+
 plugins {
     alias(libs.plugins.android.library)
 }
@@ -17,7 +29,7 @@ android {
             }
         }
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += configuredAbis.get()
         }
     }
 
@@ -28,7 +40,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = configuredCmakeVersion.get()
         }
     }
 
