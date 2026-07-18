@@ -99,82 +99,9 @@ jobs:
         working-directory: .
         shell: bash
         run: |
-          cat > .github/workflows/drum-kit-quick-check.yml <<'WORKFLOW'
-          name: Drum Kit Quick Check
-
-          on:
-            pull_request:
-              types:
-                - opened
-                - synchronize
-                - reopened
-                - ready_for_review
-              paths:
-                - "drum-kit-android/**"
-                - ".github/workflows/drum-kit-quick-check.yml"
-            push:
-              branches:
-                - main
-              paths:
-                - "drum-kit-android/**"
-                - ".github/workflows/drum-kit-quick-check.yml"
-
-          concurrency:
-            group: drum-kit-quick-${{ github.event.pull_request.number || github.ref }}
-            cancel-in-progress: true
-
-          permissions:
-            contents: read
-
-          jobs:
-            quick-check:
-              runs-on: ubuntu-latest
-              defaults:
-                run:
-                  working-directory: drum-kit-android
-
-              steps:
-                - uses: actions/checkout@v6
-
-                - uses: actions/setup-java@v5
-                  with:
-                    distribution: temurin
-                    java-version: "17"
-
-                - name: Set up Android SDK
-                  uses: android-actions/setup-android@v4
-
-                - name: Install compile SDK
-                  shell: bash
-                  run: |
-                    yes | sdkmanager --licenses >/dev/null || true
-                    sdkmanager \
-                      "platforms;android-36" \
-                      "build-tools;36.0.0"
-
-                - uses: gradle/actions/setup-gradle@v6
-                  with:
-                    gradle-version: "9.5.0"
-                    cache-provider: basic
-
-                - name: Compile Kotlin and run unit tests
-                  run: >-
-                    gradle --no-daemon --console=plain --warning-mode=fail
-                    :core-model:testDebugUnitTest
-                    :engine-input:compileDebugKotlin
-                    :engine-audio:testDebugUnitTest
-                    :feature-kit:testDebugUnitTest
-                    :app:compileDebugKotlin
-          WORKFLOW
-          sed -i 's/^          //' .github/workflows/drum-kit-quick-check.yml
-          rm .github/workflows/drum-kit-step-2-3-depth.yml
-          rm drum-kit-android/.step-2-3-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
-            .github/workflows/drum-kit-quick-check.yml \
-            .github/workflows/drum-kit-step-2-3-depth.yml \
-            drum-kit-android/.step-2-3-trigger \
             drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitCamera.kt \
             drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitModels.kt \
             drum-kit-android/core-model/src/test/java/com/vitautas/drumkit/model/HitRegionTest.kt \
