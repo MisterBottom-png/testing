@@ -40,6 +40,7 @@ jobs:
         shell: bash
         working-directory: .
         run: |
+          python tools/correct_step_2_5_marker.py
           set -o pipefail
           python tools/apply_step_2_5.py 2>&1 | tee step-2-5-patch.log
 
@@ -60,7 +61,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md docs/source-mapping.md engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt
+          git add README.md docs/source-mapping.md engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt ../tools/apply_step_2_5.py
           git commit -m "Integrate Step 2.5 layered artwork"
           git push origin HEAD:${{ github.head_ref }}
 
