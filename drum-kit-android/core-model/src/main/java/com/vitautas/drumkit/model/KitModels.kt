@@ -135,8 +135,13 @@ data class CircleHitRegion(
         require(radius > 0f && radius <= 1f) { "radius must be within the normalized coordinate space" }
     }
 
-    override fun contains(x: Float, y: Float): Boolean {
-        val dx = x - center.x
+    override fun contains(x: Float, y: Float): Boolean = contains(x, y, 1f)
+
+    override fun contains(x: Float, y: Float, aspectRatio: Float): Boolean {
+        require(aspectRatio.isFinite() && aspectRatio > 0f) {
+            "aspect ratio must be positive and finite"
+        }
+        val dx = (x - center.x) * aspectRatio
         val dy = y - center.y
         return dx * dx + dy * dy <= radius * radius
     }

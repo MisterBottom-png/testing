@@ -100,6 +100,13 @@ object StudioKitGeometry {
         require(aspectRatio.isFinite() && aspectRatio > 0f) {
             "aspect ratio must be positive and finite"
         }
+        return layout.playableSurfaceBounds.toGeometryBounds()
+    }
+
+    fun hitBounds(layout: InstrumentLayout, aspectRatio: Float): GeometryBounds {
+        require(aspectRatio.isFinite() && aspectRatio > 0f) {
+            "aspect ratio must be positive and finite"
+        }
         return boundsFor(layout.hitRegion, aspectRatio)
     }
 
@@ -115,7 +122,7 @@ object StudioKitGeometry {
             "aspect ratio must be positive and finite"
         }
 
-        val bounds = boundsFor(layout.hitRegion, aspectRatio)
+        val bounds = layout.playableSurfaceBounds.toGeometryBounds()
         val unrotatedX = bounds.left + normalizedX * bounds.width
         val unrotatedY = bounds.top + normalizedY * bounds.height
         return rotateScreenPoint(
@@ -145,7 +152,7 @@ object StudioKitGeometry {
         )
         if (!containsUnrotated(layout.hitRegion, unrotated.x, unrotated.y, aspectRatio)) return null
 
-        val bounds = boundsFor(layout.hitRegion, aspectRatio)
+        val bounds = layout.playableSurfaceBounds.toGeometryBounds()
         return InstrumentHit(
             definition = definition,
             normalizedX = ((unrotated.x - bounds.left) / bounds.width).coerceIn(0f, 1f),

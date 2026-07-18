@@ -103,6 +103,29 @@ class InstrumentGeometryTest {
     }
 
     @Test
+    fun insetKickHitCenterKeepsVisualSurfaceLocalCoordinates() {
+        val kick = definition(InstrumentId.KICK)
+        val surface = StudioKitGeometry.playableBounds(kick.layout, landscapeAspectRatio)
+        val hitBounds = StudioKitGeometry.hitBounds(kick.layout, landscapeAspectRatio)
+        val expectedX = (hitBounds.centerX - surface.left) / surface.width
+        val expectedY = (hitBounds.centerY - surface.top) / surface.height
+
+        val hit = StudioKitGeometry.hitTest(hitBounds.centerX, hitBounds.centerY, landscapeAspectRatio)
+        assertEquals(InstrumentId.KICK, hit?.definition?.id)
+        assertEquals(expectedX, hit?.normalizedX ?: Float.NaN, 0.00001f)
+        assertEquals(expectedY, hit?.normalizedY ?: Float.NaN, 0.00001f)
+
+        val roundTrip = StudioKitGeometry.screenPoint(
+            layout = kick.layout,
+            normalizedX = expectedX,
+            normalizedY = expectedY,
+            aspectRatio = landscapeAspectRatio,
+        )
+        assertEquals(hitBounds.centerX, roundTrip.x, 0.00001f)
+        assertEquals(hitBounds.centerY, roundTrip.y, 0.00001f)
+    }
+
+    @Test
     fun snareVisualCenterIsAcousticCenter() {
         val snare = definition(InstrumentId.SNARE)
         val screenPoint = StudioKitGeometry.screenPoint(

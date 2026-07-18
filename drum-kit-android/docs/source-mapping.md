@@ -66,7 +66,7 @@ Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymb
 
 ## Pre-2.6 corrective audit
 
-The corrective audit separates complete artwork bounds, rendered playable-surface bounds, and touch hit regions into three explicit contracts. Artwork no longer changes size when hit boxes are tuned. All kit-level hit APIs now delegate to the same viewport-aware geometry used by `DrumSurfaceView`. Head and cymbal hit ellipses are inset from visible rims and hardware, and the former kick/snare overlap is removed at the reference landscape viewport.
+The corrective audit separates complete artwork bounds, rendered playable-surface bounds, and touch hit regions into three explicit contracts. Artwork no longer changes size when hit boxes are tuned. All kit-level hit APIs now delegate to the same viewport-aware geometry used by `DrumSurfaceView`. Head and cymbal hit ellipses are inset from visible rims and hardware, and the former kick/snare overlap is removed at the reference landscape viewport. Containment uses the inset region while normalized strike coordinates remain local to the rendered playable surface, keeping animation and position-sensitive audio aligned with the physical tap.
 
 ## Prototype behavior represented in the base
 

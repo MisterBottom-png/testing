@@ -36,6 +36,8 @@ class HitRegionTest {
 
         assertTrue(region.contains(0.6f, 0.5f))
         assertFalse(region.contains(0.8f, 0.5f))
+        assertTrue(region.contains(0.5f + 0.19f / landscapeAspectRatio, 0.5f, landscapeAspectRatio))
+        assertFalse(region.contains(0.69f, 0.5f, landscapeAspectRatio))
     }
 
     @Test
@@ -173,7 +175,7 @@ class HitRegionTest {
     fun visualSurfaceBoundsAndHitRegionsAreIndependent() {
         for (definition in StudioKitDefinition.instruments) {
             val surface = definition.layout.playableSurfaceBounds
-            val hit = StudioKitGeometry.playableBounds(definition.layout, landscapeAspectRatio)
+            val hit = StudioKitGeometry.hitBounds(definition.layout, landscapeAspectRatio)
 
             assertTrue(hit.left > surface.left)
             assertTrue(hit.top > surface.top)
