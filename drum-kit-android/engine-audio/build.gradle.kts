@@ -4,8 +4,9 @@ plugins {
 
 android {
     namespace = "com.vitautas.drumkit.audio"
-    compileSdk = 36
-    ndkVersion = "28.2.13676358"
+    compileSdk = 37
+    buildToolsVersion = "37.0.0"
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 26
@@ -34,6 +35,17 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
     }
 }
 

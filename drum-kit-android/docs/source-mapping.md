@@ -64,6 +64,10 @@ Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of 
 
 Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymbal primitives with renderer-key artwork profiles and cached Canvas layers built during `onSizeChanged()`. Drum caches separate shell, bottom hoop, lugs, reflections, and wear from the animated batter head and top hoop. The snare uses a brushed-steel material profile. The kick separates its wine shell and rear hoop from the animated dark front head, port, badge, and front hoop. Cymbal caches include bronze edge shading, six lathe rings, deterministic hammering marks, raised bells, highlights, felt/bolt hardware, and a darker lower hi-hat disc. Body and playable layers remain separate so existing position- and velocity-driven deformation continues without rebuilding static detail. Cached bitmaps are released and rebuilt on resize and retained across temporary View detach/reattach cycles. Reattachment also restarts the timed label-fade schedule so a removed callback cannot leave labels permanently visible.
 
+## RenderNode-backed static artwork
+
+Phase 2 Step 2.6 records complete static body and playable artwork layers into RenderNode display lists on API 29 and newer hardware-accelerated canvases. API 26–28 and software canvases retain the bitmap cache. Display lists are re-recorded if Android discards them, and Compose permanently releases cached resources through AndroidView's release callback. Input geometry, support ordering, animation transforms, and audio dispatch remain independent from the cache backend.
+
 ## Pre-2.6 corrective audit
 
 The corrective audit separates complete artwork bounds, rendered playable-surface bounds, and touch hit regions into three explicit contracts. Artwork no longer changes size when hit boxes are tuned. All kit-level hit APIs now delegate to the same viewport-aware geometry used by `DrumSurfaceView`. Head and cymbal hit ellipses are inset from visible rims and hardware, and the former kick/snare overlap is removed at the reference landscape viewport. Containment uses the inset region while normalized strike coordinates remain local to the rendered playable surface, keeping animation and position-sensitive audio aligned with the physical tap.
@@ -111,7 +115,6 @@ The performance recorder uses preallocated primitive arrays during play. It mate
 
 ## Redesign behavior remaining
 
-- RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
 - Strike-take playback and PCM/WAV export
 - Optional AGSL effects after profiling

@@ -1,12 +1,12 @@
 package com.vitautas.drumkit.input
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.RenderNode
 import android.os.Build
+import androidx.annotation.RequiresApi
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -51,12 +51,18 @@ internal object CachedArtworkLayerFactory {
                 drawLayer = drawLayer,
             )
 
-            ArtworkCacheBackend.RENDER_NODE -> {
-                check(Build.VERSION.SDK_INT >= ArtworkCacheBackendPolicy.RENDER_NODE_MIN_SDK) {
-                    "RenderNode artwork requires API ${ArtworkCacheBackendPolicy.RENDER_NODE_MIN_SDK}+"
-                }
+            ArtworkCacheBackend.RENDER_NODE -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 Api29RenderNodeArtworkLayer(
                     name = name,
+                    width = width,
+                    height = height,
+                    left = left,
+                    top = top,
+                    localRect = localRect,
+                    drawLayer = drawLayer,
+                )
+            } else {
+                BitmapArtworkLayer(
                     width = width,
                     height = height,
                     left = left,
@@ -93,7 +99,7 @@ private class BitmapArtworkLayer(
     }
 }
 
-@SuppressLint("NewApi")
+@RequiresApi(Build.VERSION_CODES.Q)
 private class Api29RenderNodeArtworkLayer(
     name: String,
     private val width: Int,

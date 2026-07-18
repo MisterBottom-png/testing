@@ -1,6 +1,5 @@
 package com.vitautas.drumkit.input
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -12,9 +11,7 @@ import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentRendererKey
 import com.vitautas.drumkit.model.StudioKitArtworkProfiles
 import kotlin.math.PI
-import kotlin.math.ceil
 import kotlin.math.cos
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.sin
 
@@ -33,20 +30,6 @@ internal class InstrumentArtworkCache(
     fun release() {
         bodyLayer?.release()
         playableLayer.release()
-    }
-}
-
-internal class CachedArtworkLayer(
-    private val bitmap: Bitmap,
-    private val left: Float,
-    private val top: Float,
-) {
-    fun draw(canvas: Canvas, paint: Paint) {
-        canvas.drawBitmap(bitmap, left, top, paint)
-    }
-
-    fun release() {
-        if (!bitmap.isRecycled) bitmap.recycle()
     }
 }
 
@@ -69,43 +52,55 @@ internal class LayeredInstrumentArtworkFactory(
         definition: InstrumentDefinition,
         bodyRect: RectF,
         playableRect: RectF,
+        backend: ArtworkCacheBackend,
     ): InstrumentArtworkCache {
         val profile = StudioKitArtworkProfiles.forRenderer(definition.layout.rendererKey)
         return when (definition.layout.rendererKey) {
             InstrumentRendererKey.DRUM,
             InstrumentRendererKey.SNARE,
-            -> createDrumArtwork(bodyRect, playableRect, profile.material)
+            -> createDrumArtwork(definition.id.name, bodyRect, playableRect, profile.material, backend)
 
-            InstrumentRendererKey.KICK -> createKickArtwork(bodyRect, playableRect)
-            InstrumentRendererKey.CYMBAL -> createCymbalArtwork(playableRect, hiHat = false)
-            InstrumentRendererKey.HI_HAT -> createCymbalArtwork(playableRect, hiHat = true)
+            InstrumentRendererKey.KICK -> createKickArtwork(definition.id.name, bodyRect, playableRect, backend)
+            InstrumentRendererKey.CYMBAL -> createCymbalArtwork(definition.id.name, playableRect, hiHat = false, backend)
+            InstrumentRendererKey.HI_HAT -> createCymbalArtwork(definition.id.name, playableRect, hiHat = true, backend)
         }
     }
 
     private fun createDrumArtwork(
+        name: String,
         shellRect: RectF,
         headRect: RectF,
         material: InstrumentArtworkMaterial,
+        backend: ArtworkCacheBackend,
     ): InstrumentArtworkCache = InstrumentArtworkCache(
-        bodyLayer = createLayer(shellRect, density * 5f) { canvas, localRect ->
+        bodyLayer = createLayer(backend, "$name-body", shellRect, density * 5f) { canvas, localRect ->
             drawDrumBody(canvas, localRect, material)
         },
-        playableLayer = createLayer(headRect, density * 5f) { canvas, localRect ->
+        playableLayer = createLayer(backend, "$name-playable", headRect, density * 5f) { canvas, localRect ->
             drawDrumHead(canvas, localRect, material == InstrumentArtworkMaterial.BRUSHED_STEEL)
         },
     )
 
-    private fun createKickArtwork(shellRect: RectF, headRect: RectF): InstrumentArtworkCache =
-        InstrumentArtworkCache(
-            bodyLayer = createLayer(shellRect, density * 6f, ::drawKickBody),
-            playableLayer = createLayer(headRect, density * 6f, ::drawKickHead),
-        )
+    private fun createKickArtwork(
+        name: String,
+        shellRect: RectF,
+        headRect: RectF,
+        backend: ArtworkCacheBackend,
+    ): InstrumentArtworkCache = InstrumentArtworkCache(
+        bodyLayer = createLayer(backend, "$name-body", shellRect, density * 6f, ::drawKickBody),
+        playableLayer = createLayer(backend, "$name-playable", headRect, density * 6f, ::drawKickHead),
+    )
 
-    private fun createCymbalArtwork(discRect: RectF, hiHat: Boolean): InstrumentArtworkCache {
+    private fun createCymbalArtwork(
+        name: String,
+        discRect: RectF,
+        hiHat: Boolean,
+        backend: ArtworkCacheBackend,
+    ): InstrumentArtworkCache {
         val lowerDisc = if (hiHat) {
             val lowerRect = RectF(discRect)
             lowerRect.offset(0f, discRect.height() * 0.16f)
-            createLayer(lowerRect, density * 5f) { canvas, localRect ->
+            createLayer(backend, "$name-lower", lowerRect, density * 5f) { canvas, localRect ->
                 drawCymbalDisc(canvas, localRect, brightness = 0.72f, includeWasher = false)
             }
         } else {
@@ -113,34 +108,25 @@ internal class LayeredInstrumentArtworkFactory(
         }
         return InstrumentArtworkCache(
             bodyLayer = lowerDisc,
-            playableLayer = createLayer(discRect, density * 5f) { canvas, localRect ->
+            playableLayer = createLayer(backend, "$name-playable", discRect, density * 5f) { canvas, localRect ->
                 drawCymbalDisc(canvas, localRect, brightness = 1f, includeWasher = true)
             },
         )
     }
 
     private fun createLayer(
+        backend: ArtworkCacheBackend,
+        name: String,
         sourceRect: RectF,
         padding: Float,
         drawLayer: (Canvas, RectF) -> Unit,
-    ): CachedArtworkLayer {
-        val left = floor(sourceRect.left - padding)
-        val top = floor(sourceRect.top - padding)
-        val right = ceil(sourceRect.right + padding)
-        val bottom = ceil(sourceRect.bottom + padding)
-        val width = (right - left).toInt().coerceAtLeast(1)
-        val height = (bottom - top).toInt().coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val localRect = RectF(
-            sourceRect.left - left,
-            sourceRect.top - top,
-            sourceRect.right - left,
-            sourceRect.bottom - top,
-        )
-        drawLayer(canvas, localRect)
-        return CachedArtworkLayer(bitmap, left, top)
-    }
+    ): CachedArtworkLayer = CachedArtworkLayerFactory.create(
+        backend = backend,
+        name = name,
+        sourceRect = sourceRect,
+        padding = padding,
+        drawLayer = drawLayer,
+    )
 
     private fun drawDrumBody(
         canvas: Canvas,

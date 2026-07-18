@@ -42,6 +42,7 @@ Implemented:
 - Viewport-aware rotation shared by rendering, hit testing, strike coordinates, and diagnostics
 - Independent render depth and hit-test priority
 - Cached layered Canvas artwork, support hardware, occlusion masks, and grounded shadows
+- RenderNode display-list caching on API 29+ hardware canvases with bitmap fallback on API 26–28 and software canvases
 - Position-, velocity-, and instrument-specific deformation and rebound
 - Pressure, contact-size, position, and velocity data capture
 - Kotlin-to-C++ JNI bridge and native C++20 Oboe audio engine
@@ -50,7 +51,6 @@ Implemented:
 
 Known remaining redesign targets:
 
-- Complete RenderNode caching where profiling justifies it
 - Representative-device frame-time and bitmap-memory profiling
 - Physical-device hit-region refinement and accessibility play testing
 - Production samples, velocity layers, round robins, and expressive zones
@@ -94,11 +94,11 @@ Build from the `drum-kit-android/` directory.
 Required versions:
 
 - JDK 17
-- Android SDK 36
-- Android SDK Build Tools 36.0.0
+- Android SDK 37
+- Android SDK Build Tools 37.0.0
 - Android Gradle Plugin 9.3.x
 - Gradle 9.5.0
-- NDK 28.2.13676358
+- NDK 29.0.14206865
 - CMake 3.22.1
 - Kotlin 2.4.x through Android Gradle Plugin built-in Kotlin support
 - C++20

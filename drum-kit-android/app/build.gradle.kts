@@ -5,12 +5,13 @@ plugins {
 
 android {
     namespace = "com.vitautas.drumkit"
-    compileSdk = 36
+    compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.vitautas.drumkit"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
 
@@ -35,6 +36,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        checkDependencies = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
 }
 
 dependencies {
@@ -43,6 +56,7 @@ dependencies {
     implementation(project(":feature-kit"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)

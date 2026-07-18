@@ -22,6 +22,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
 - Cached layered Canvas artwork, geometry, and masks created during size changes
+- RenderNode display-list caching on API 29+ hardware canvases with bitmap fallback on API 26–28 and software canvases
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
 - System-respecting, restrained instrument haptics
 - GitHub Actions tests, build, lint, and downloadable debug APK artifact
@@ -38,9 +39,9 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 
 - Android Studio compatible with Android Gradle Plugin 9.3.x
 - JDK 17
-- Android SDK 36
-- Android SDK Build Tools 36.0.0
-- NDK 28.2.13676358
+- Android SDK 37
+- Android SDK Build Tools 37.0.0
+- NDK 29.0.14206865
 - CMake 3.22.1 or newer
 - Gradle 9.5.0 when building outside Android Studio
 - Kotlin 2.4.0 through Android Gradle Plugin built-in Kotlin support
@@ -59,7 +60,7 @@ GitHub Actions is the authoritative validation path. It runs unit tests, Kotlin 
 
 ## Current scope
 
-This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion. The renderer now uses reusable material profiles and cached layered Canvas artwork, while complete RenderNode caching and externally authored texture packs remain deferred.
+This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion. The renderer uses reusable material profiles and cached layered artwork. Static body and playable layers use RenderNode display lists on supported hardware and retain a bitmap fallback for older or software-rendered environments; externally authored texture packs remain deferred.
 
 The current redesign implementation keeps complete draw bounds, rendered playable-surface bounds, and touch hit regions independent; uses one viewport-aware hit path for runtime input, tests, and diagnostics; removes the former kick/snare target overlap; applies one fixed camera; merges independently modeled support and surface layers by drummer-view depth; clips grounded shadows around cached canonical instrument masks; renders wine-shell drums, a brushed-steel snare, a detailed dark kick, bronze cymbals, and paired hi-hat discs from cached body/playable artwork layers; retains artwork across temporary View detach/reattach cycles; anchors supported instruments to one normalized floor plane; removes the permanent HUD; restricts diagnostics to debuggable builds; fades labels; caches renderer objects outside steady-state drawing; and drives local instrument-specific feedback rather than lifting the whole instrument.
 
@@ -67,11 +68,10 @@ The recording control now captures an expressive strike-event take using fixed-c
 
 ## Next milestone
 
-1. Move complete static instrument layers to RenderNode caching where profiling justifies it.
-2. Profile rapid multi-touch rendering on representative phones and tablets.
-3. Validate and refine the corrected hit regions using physical-device play tests.
-4. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.
-5. Add strike-take playback and later PCM/WAV recording export.
-6. Consider AGSL or OpenGL only after profiling proves the Canvas/RenderNode path insufficient.
+1. Profile rapid multi-touch rendering and cache memory on representative phones and tablets.
+2. Validate and refine the corrected hit regions using physical-device play tests.
+3. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.
+4. Add strike-take playback and later PCM/WAV recording export.
+5. Consider AGSL or OpenGL only after profiling proves the Canvas/RenderNode path insufficient.
 
 The raw `MotionEvent` input path, custom playable `View`, normalized strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.

@@ -1,6 +1,5 @@
 package com.vitautas.drumkit
 
-import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,7 +29,7 @@ class MainActivity : ComponentActivity() {
         audioSessionController = AudioSessionController(this) { available ->
             audioAvailableState.value = available
         }
-        val showDiagnostics = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        val showDiagnostics = BuildConfig.DEBUG
         setContent {
             NativeDrumKitTheme {
                 DrumKitScreen(

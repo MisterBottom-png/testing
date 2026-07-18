@@ -40,6 +40,10 @@ struct Voice {
 class NativeAudioEngine final : public oboe::AudioStreamDataCallback,
                                 public oboe::AudioStreamErrorCallback {
 public:
+    NativeAudioEngine()
+        : dataCallback_(this, [](oboe::AudioStreamDataCallback*) {}),
+          errorCallback_(this, [](oboe::AudioStreamErrorCallback*) {}) {}
+
     bool start() {
         desiredRunning_.store(true, std::memory_order_release);
         std::lock_guard<std::mutex> lock(streamMutex_);
@@ -239,8 +243,8 @@ private:
             ->setChannelCount(kChannelCount)
             ->setUsage(oboe::Usage::Game)
             ->setContentType(oboe::ContentType::Music)
-            ->setDataCallback(this)
-            ->setErrorCallback(this);
+            ->setDataCallback(dataCallback_)
+            ->setErrorCallback(errorCallback_);
         return builder.openStream(target);
     }
 
@@ -373,6 +377,8 @@ private:
         return decays[static_cast<size_t>(std::clamp(instrument, 0, 7))];
     }
 
+    std::shared_ptr<oboe::AudioStreamDataCallback> dataCallback_;
+    std::shared_ptr<oboe::AudioStreamErrorCallback> errorCallback_;
     mutable std::mutex streamMutex_;
     std::shared_ptr<oboe::AudioStream> stream_;
     std::atomic<bool> desiredRunning_{false};

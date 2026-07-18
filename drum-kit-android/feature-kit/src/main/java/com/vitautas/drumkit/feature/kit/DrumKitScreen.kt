@@ -133,6 +133,8 @@ fun DrumKitScreen(
                 surface.onStrike = strikeDispatcher
                 surface.hapticsEnabled = haptics
             },
+            onReset = null,
+            onRelease = { surface -> surface.releaseResources() },
             modifier = Modifier.fillMaxSize(),
         )
 

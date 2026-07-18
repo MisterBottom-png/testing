@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.os.Build
 import android.util.AttributeSet
 import android.util.SparseArray
 import android.util.TypedValue
@@ -48,6 +49,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
     private var rackMountX = 0f
     private var rackMountY = 0f
+    private var artworkBackend = ArtworkCacheBackend.BITMAP
 
     private val stagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val spotlightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -106,6 +108,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         super.onSizeChanged(width, height, oldWidth, oldHeight)
         if (width <= 0 || height <= 0) return
 
+        artworkBackend = ArtworkCacheBackendPolicy.select(Build.VERSION.SDK_INT, isHardwareAccelerated)
         stagePaint.shader = LinearGradient(
             0f,
             0f,
@@ -221,6 +224,10 @@ class DrumSurfaceView @JvmOverloads constructor(
         super.onAttachedToWindow()
         if (width <= 0 || height <= 0) return
 
+        val desiredBackend = ArtworkCacheBackendPolicy.select(Build.VERSION.SDK_INT, isHardwareAccelerated)
+        if (desiredBackend != artworkBackend) {
+            rebuildArtworkCaches(desiredBackend)
+        }
         labelsVisibleSinceNanos = System.nanoTime()
         removeCallbacks(labelFadeRunnable)
         postDelayed(labelFadeRunnable, LabelHoldMillis + 16L)
@@ -231,6 +238,15 @@ class DrumSurfaceView @JvmOverloads constructor(
         removeCallbacks(labelFadeRunnable)
         clearActivePointers()
         super.onDetachedFromWindow()
+    }
+
+    fun releaseResources() {
+        removeCallbacks(labelFadeRunnable)
+        clearActivePointers()
+        releaseArtworkCaches()
+        renderStates.clear()
+        renderStatesByInstrument.fill(null)
+        instrumentOcclusionPath.reset()
     }
 
     private fun handlePointerDown(event: MotionEvent, pointerIndex: Int) {
@@ -298,6 +314,21 @@ class DrumSurfaceView @JvmOverloads constructor(
             state.artwork = null
         }
     }
+
+    private fun rebuildArtworkCaches(backend: ArtworkCacheBackend) {
+        releaseArtworkCaches()
+        artworkBackend = backend
+        for (state in renderStates) {
+            state.artwork = createArtwork(state)
+        }
+    }
+
+    private fun createArtwork(state: InstrumentRenderState): InstrumentArtworkCache = artworkFactory.create(
+        definition = state.definition,
+        bodyRect = state.primaryRect,
+        playableRect = state.secondaryRect.takeUnless { it.isEmpty } ?: state.primaryRect,
+        backend = artworkBackend,
+    )
 
     private fun estimateVelocity(pressure: Float, contactSize: Float, eventTime: Long): Float {
         val pressureVelocity = if (pressure > 0.02f && pressure != 0.5f) {
@@ -376,11 +407,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         }
         configureGroundedShadow(state, viewHeight)
         configureSurfaceOcclusionPath(state)
-        state.artwork = artworkFactory.create(
-            definition = state.definition,
-            bodyRect = state.primaryRect,
-            playableRect = state.secondaryRect.takeUnless { it.isEmpty } ?: state.primaryRect,
-        )
+        state.artwork = createArtwork(state)
     }
 
     private fun configureGroundedShadow(state: InstrumentRenderState, viewHeight: Float) {
