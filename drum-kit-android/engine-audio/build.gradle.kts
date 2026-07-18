@@ -29,6 +29,8 @@ android {
             }
         }
         ndk {
+            // The default set includes x86_64. CI intentionally overrides this only for arm64 debug APKs.
+            //noinspection ChromeOsAbiSupport
             abiFilters += configuredAbis.get()
         }
     }
