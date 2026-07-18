@@ -87,10 +87,21 @@ jobs:
           cache-provider: basic
 
       - name: Compile Kotlin and run unit tests
-        run: >-
-          gradle --no-daemon --console=plain --warning-mode=fail
-          :core-model:testDebugUnitTest
-          :engine-input:compileDebugKotlin
-          :engine-audio:testDebugUnitTest
-          :feature-kit:testDebugUnitTest
-          :app:compileDebugKotlin
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain --warning-mode=fail \
+            :core-model:testDebugUnitTest \
+            :engine-input:compileDebugKotlin \
+            :engine-audio:testDebugUnitTest \
+            :feature-kit:testDebugUnitTest \
+            :app:compileDebugKotlin 2>&1 | tee ../step-2-5-quick-check.log
+
+      - name: Upload Step 2.5 compile diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: step-2-5-quick-check-log
+          path: step-2-5-quick-check.log
+          if-no-files-found: ignore
+          retention-days: 1
