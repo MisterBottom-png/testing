@@ -39,7 +39,19 @@ jobs:
 
       - name: Apply modernization M1 and M2
         working-directory: .
-        run: python3 tools/apply_modernization_m1_m2.py
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/apply_modernization_m1_m2.py 2>&1 | tee modernization-patch.log
+
+      - name: Upload modernization patch log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: modernization-patch-log
+          path: modernization-patch.log
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Commit modernization M1 and M2
         working-directory: .
