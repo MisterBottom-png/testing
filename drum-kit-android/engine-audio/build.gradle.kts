@@ -1,3 +1,12 @@
+val configuredAbis = providers.gradleProperty("drumKitAbis")
+    .map { value ->
+        value.split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .ifEmpty { error("drumKitAbis must contain at least one ABI") }
+    }
+    .orElse(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+
 val configuredCmakeVersion = providers.gradleProperty("drumKitCmakeVersion")
     .orElse("3.22.1")
 
@@ -20,7 +29,7 @@ android {
             }
         }
         ndk {
-            abiFilters += setOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += configuredAbis.get()
         }
     }
 
@@ -43,6 +52,8 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = true
+        // The normal ABI set includes x86_64. CI may intentionally narrow a downloadable debug APK to arm64.
+        disable += "ChromeOsAbiSupport"
     }
 }
 
