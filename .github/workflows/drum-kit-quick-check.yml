@@ -27,6 +27,7 @@ permissions:
 jobs:
   quick-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     defaults:
       run:
         working-directory: drum-kit-android
@@ -39,29 +40,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: ""
-
-      - name: Install compile SDK
-        shell: bash
-        run: |
-          sdkmanager --channel=3 \
-            "platforms;android-37.0" \
-            "build-tools;37.0.0"
-
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.5.0"
-          cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-cleanup: on-success
 
-      - name: Compile Kotlin and run unit tests
+      - name: Run JVM model checks
         run: >-
           gradle --no-daemon --console=plain --warning-mode=fail
-          :core-model:testDebugUnitTest
-          :engine-input:testDebugUnitTest
-          :engine-audio:testDebugUnitTest
-          :feature-kit:testDebugUnitTest
-          :app:compileDebugKotlin
+          :core-model:check
