@@ -18,6 +18,7 @@ import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentId
 import com.vitautas.drumkit.model.InstrumentRendererKey
+import com.vitautas.drumkit.model.StudioKitCamera
 import com.vitautas.drumkit.model.StudioKitDefinition
 import com.vitautas.drumkit.model.StudioKitGeometry
 import kotlin.math.PI
@@ -39,6 +40,9 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val activePointers = SparseArray<InstrumentId>()
     private val renderStates = ArrayList<InstrumentRenderState>(StudioKitDefinition.instruments.size)
     private val animationStates = Array(InstrumentId.entries.size) { InstrumentAnimationState() }
+    private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
+    private var rackMountX = 0f
+    private var rackMountY = 0f
 
     private val stagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val spotlightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -118,6 +122,10 @@ class DrumSurfaceView @JvmOverloads constructor(
         )
         spotlightRect.set(-width * 0.10f, -height * 0.25f, width * 1.10f, height * 0.95f)
 
+        val kickBounds = kickDefinition.layout.drawBounds
+        rackMountX = kickBounds.centerX * width.toFloat()
+        rackMountY = (kickBounds.top + kickBounds.height * 0.14f) * height.toFloat()
+
         renderStates.clear()
         for (definition in StudioKitDefinition.renderOrder) {
             val state = InstrumentRenderState(definition)
@@ -142,7 +150,17 @@ class DrumSurfaceView @JvmOverloads constructor(
             if (updateAnimation(renderState.definition, animationState, nowNanos)) {
                 animationActive = true
             }
-            drawInstrument(canvas, renderState, animationState)
+        }
+
+        for (renderState in renderStates) {
+            drawInstrumentShadow(canvas, renderState)
+        }
+        for (renderState in renderStates) {
+            drawInstrumentSupport(canvas, renderState)
+        }
+        for (renderState in renderStates) {
+            val animationState = animationStates[renderState.definition.id.ordinal]
+            drawInstrumentSurface(canvas, renderState, animationState)
         }
 
         val labelAlpha = labelAlpha(nowNanos)
@@ -376,7 +394,118 @@ class DrumSurfaceView @JvmOverloads constructor(
         }
     }
 
-    private fun drawInstrument(
+    private fun drawInstrumentShadow(canvas: Canvas, state: InstrumentRenderState) {
+        val saveCount = canvas.save()
+        val bounds = state.drawBounds
+        canvas.rotate(
+            state.definition.layout.rotationDegrees,
+            bounds.centerX(),
+            bounds.centerY(),
+        )
+        canvas.drawOval(state.shadowRect, shadowPaint)
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawInstrumentSupport(canvas: Canvas, state: InstrumentRenderState) {
+        when (state.definition.id) {
+            InstrumentId.CRASH,
+            InstrumentId.RIDE,
+            InstrumentId.HI_HAT,
+            -> drawCymbalStand(canvas, state)
+
+            InstrumentId.TOM_HIGH,
+            InstrumentId.TOM_MID,
+            -> drawRackTomMount(canvas, state)
+
+            InstrumentId.KICK -> drawKickLegs(canvas, state)
+            InstrumentId.FLOOR_TOM -> drawFloorTomLegs(canvas, state)
+            InstrumentId.SNARE -> drawSnareStand(canvas, state)
+        }
+    }
+
+    private fun drawCymbalStand(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val disc = state.primaryRect
+        val bounds = state.drawBounds
+        val centerX = disc.centerX()
+        val jointY = floorY - maxOf(bounds.height() * 0.08f, density * 10f)
+        val footSpread = bounds.width() * 0.18f
+
+        canvas.drawLine(centerX, disc.centerY(), centerX, jointY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX - footSpread, floorY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX + footSpread, floorY, standPaint)
+    }
+
+    private fun drawRackTomMount(canvas: Canvas, state: InstrumentRenderState) {
+        val shell = state.primaryRect
+        val startX = if (state.definition.id == InstrumentId.TOM_HIGH) {
+            shell.right - shell.width() * 0.22f
+        } else {
+            shell.left + shell.width() * 0.22f
+        }
+        val startY = shell.bottom - shell.height() * 0.08f
+
+        canvas.drawLine(startX, startY, rackMountX, rackMountY, hardwarePaint)
+        canvas.drawCircle(rackMountX, rackMountY, density * 3f, hardwarePaint)
+    }
+
+    private fun drawKickLegs(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+
+        canvas.drawLine(
+            shell.left + shell.width() * 0.18f,
+            shell.bottom - shell.height() * 0.08f,
+            bounds.left - bounds.width() * 0.02f,
+            floorY,
+            standPaint,
+        )
+        canvas.drawLine(
+            shell.right - shell.width() * 0.18f,
+            shell.bottom - shell.height() * 0.08f,
+            bounds.right + bounds.width() * 0.02f,
+            floorY,
+            standPaint,
+        )
+    }
+
+    private fun drawFloorTomLegs(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+
+        canvas.drawLine(
+            shell.left + shell.width() * 0.16f,
+            shell.bottom - shell.height() * 0.12f,
+            bounds.left + bounds.width() * 0.04f,
+            floorY,
+            standPaint,
+        )
+        canvas.drawLine(
+            shell.right - shell.width() * 0.16f,
+            shell.bottom - shell.height() * 0.12f,
+            bounds.right - bounds.width() * 0.04f,
+            floorY,
+            standPaint,
+        )
+    }
+
+    private fun drawSnareStand(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+        val centerX = shell.centerX()
+        val stemTopY = shell.bottom - shell.height() * 0.08f
+        val jointY = floorY - (floorY - shell.bottom) * 0.28f
+        val footSpread = bounds.width() * 0.18f
+
+        canvas.drawLine(centerX, stemTopY, centerX, jointY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX - footSpread, floorY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX + footSpread, floorY, standPaint)
+    }
+
+    private fun drawInstrumentSurface(
         canvas: Canvas,
         state: InstrumentRenderState,
         animation: InstrumentAnimationState,
@@ -389,7 +518,6 @@ class DrumSurfaceView @JvmOverloads constructor(
             bounds.centerY(),
         )
 
-        canvas.drawOval(state.shadowRect, shadowPaint)
         when (state.definition.layout.rendererKey) {
             InstrumentRendererKey.CYMBAL -> drawCymbal(canvas, state, animation, hiHat = false)
             InstrumentRendererKey.HI_HAT -> drawCymbal(canvas, state, animation, hiHat = true)
@@ -408,10 +536,6 @@ class DrumSurfaceView @JvmOverloads constructor(
     ) {
         val shell = state.primaryRect
         val head = state.secondaryRect
-        val bounds = state.drawBounds
-
-        canvas.drawLine(shell.left + shell.width() * 0.18f, shell.bottom, bounds.left + bounds.width() * 0.08f, bounds.bottom, standPaint)
-        canvas.drawLine(shell.right - shell.width() * 0.18f, shell.bottom, bounds.right - bounds.width() * 0.08f, bounds.bottom, standPaint)
 
         shellPaint.shader = state.primaryShader
         canvas.drawRoundRect(shell, shell.width() * 0.16f, shell.height() * 0.12f, shellPaint)
@@ -459,10 +583,6 @@ class DrumSurfaceView @JvmOverloads constructor(
     ) {
         val shell = state.primaryRect
         val head = state.secondaryRect
-        val bounds = state.drawBounds
-
-        canvas.drawLine(shell.left + shell.width() * 0.18f, shell.bottom, bounds.left, bounds.bottom, standPaint)
-        canvas.drawLine(shell.right - shell.width() * 0.18f, shell.bottom, bounds.right, bounds.bottom, standPaint)
 
         shellPaint.shader = state.primaryShader
         canvas.drawOval(shell, shellPaint)
@@ -495,10 +615,6 @@ class DrumSurfaceView @JvmOverloads constructor(
         val centerY = disc.centerY()
         val impactX = disc.left + animation.strikeX * disc.width()
         val impactY = disc.top + animation.strikeY * disc.height()
-
-        canvas.drawLine(centerX, centerY, centerX, bounds.bottom, standPaint)
-        canvas.drawLine(centerX, bounds.bottom - bounds.height() * 0.05f, bounds.left + bounds.width() * 0.28f, bounds.bottom, standPaint)
-        canvas.drawLine(centerX, bounds.bottom - bounds.height() * 0.05f, bounds.right - bounds.width() * 0.28f, bounds.bottom, standPaint)
 
         cymbalPaint.shader = state.primaryShader
         if (hiHat) {

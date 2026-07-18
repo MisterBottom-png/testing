@@ -26,6 +26,15 @@ enum class InstrumentRendererKey {
     HI_HAT,
 }
 
+object StudioKitDepth {
+    const val BACK_CYMBAL = 10
+    const val KICK = 20
+    const val RACK_TOM = 30
+    const val FLOOR_TOM = 40
+    const val HI_HAT = 45
+    const val SNARE = 50
+}
+
 data class NormalizedPoint(
     val x: Float,
     val y: Float,
@@ -175,9 +184,13 @@ data class InstrumentLayout(
     val rotationDegrees: Float,
     val labelPosition: NormalizedPoint,
     val rendererKey: InstrumentRendererKey,
+    val supportFloorY: Float? = null,
 ) {
     init {
         require(rotationDegrees.isFinite()) { "rotation must be finite" }
+        require(supportFloorY == null || supportFloorY.isFinite() && supportFloorY in 0f..1f) {
+            "support floor must be normalized and finite"
+        }
     }
 }
 
@@ -200,7 +213,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.CRASH,
             drawBounds = cameraAlignedCymbalBounds(left = 0.05f, top = 0.10f, width = 0.25f),
-            renderZIndex = 10,
+            renderZIndex = StudioKitDepth.BACK_CYMBAL,
             hitTestPriority = 50,
             rotationDegrees = -7f,
             labelPosition = NormalizedPoint(0.175f, 0.30f),
@@ -210,7 +223,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.RIDE,
             drawBounds = cameraAlignedCymbalBounds(left = 0.69f, top = 0.10f, width = 0.28f),
-            renderZIndex = 10,
+            renderZIndex = StudioKitDepth.BACK_CYMBAL,
             hitTestPriority = 50,
             rotationDegrees = 6f,
             labelPosition = NormalizedPoint(0.83f, 0.32f),
@@ -220,7 +233,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.HI_HAT,
             drawBounds = cameraAlignedCymbalBounds(left = 0.05f, top = 0.36f, width = 0.20f),
-            renderZIndex = 45,
+            renderZIndex = StudioKitDepth.HI_HAT,
             hitTestPriority = 60,
             rotationDegrees = -4f,
             labelPosition = NormalizedPoint(0.15f, 0.53f),
@@ -230,7 +243,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_HIGH,
             drawBounds = cameraAlignedDrumBounds(left = 0.33f, top = 0.22f, width = 0.17f),
-            renderZIndex = 30,
+            renderZIndex = StudioKitDepth.RACK_TOM,
             hitTestPriority = 80,
             rotationDegrees = -4f,
             labelPosition = NormalizedPoint(0.415f, 0.47f),
@@ -240,7 +253,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.TOM_MID,
             drawBounds = cameraAlignedDrumBounds(left = 0.51f, top = 0.21f, width = 0.19f),
-            renderZIndex = 30,
+            renderZIndex = StudioKitDepth.RACK_TOM,
             hitTestPriority = 80,
             rotationDegrees = 3f,
             labelPosition = NormalizedPoint(0.605f, 0.49f),
@@ -250,7 +263,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.KICK,
             drawBounds = NormalizedRect(0.34f, 0.42f, 0.68f, 0.94f),
-            renderZIndex = 35,
+            renderZIndex = StudioKitDepth.KICK,
             hitTestPriority = 70,
             rotationDegrees = 0f,
             labelPosition = NormalizedPoint(0.51f, 0.96f),
@@ -260,7 +273,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.FLOOR_TOM,
             drawBounds = cameraAlignedDrumBounds(left = 0.70f, top = 0.48f, width = 0.24f),
-            renderZIndex = 40,
+            renderZIndex = StudioKitDepth.FLOOR_TOM,
             hitTestPriority = 90,
             rotationDegrees = 4f,
             labelPosition = NormalizedPoint(0.82f, 0.83f),
@@ -270,7 +283,7 @@ object StudioKitDefinition {
         instrument(
             id = InstrumentId.SNARE,
             drawBounds = cameraAlignedDrumBounds(left = 0.18f, top = 0.50f, width = 0.27f),
-            renderZIndex = 50,
+            renderZIndex = StudioKitDepth.SNARE,
             hitTestPriority = 100,
             rotationDegrees = -3f,
             labelPosition = NormalizedPoint(0.315f, 0.89f),
@@ -376,6 +389,13 @@ object StudioKitDefinition {
             rotationDegrees = rotationDegrees,
             labelPosition = labelPosition,
             rendererKey = rendererKey,
+            supportFloorY = when (id) {
+                InstrumentId.TOM_HIGH,
+                InstrumentId.TOM_MID,
+                -> null
+
+                else -> StudioKitCamera.FLOOR_PLANE_Y
+            },
         ),
         pan = pan,
     )

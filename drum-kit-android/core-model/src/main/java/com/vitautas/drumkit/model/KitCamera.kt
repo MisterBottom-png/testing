@@ -10,6 +10,7 @@ package com.vitautas.drumkit.model
 object StudioKitCamera {
     const val ELEVATION_DEGREES = 24f
     const val HORIZON_Y = 0.68f
+    const val FLOOR_PLANE_Y = 0.94f
     const val REFERENCE_VIEWPORT_ASPECT_RATIO = 1536f / 707f
     const val DRUM_HEAD_ELLIPSE_COMPRESSION = 0.27f
     const val CYMBAL_ELLIPSE_COMPRESSION = 0.18f

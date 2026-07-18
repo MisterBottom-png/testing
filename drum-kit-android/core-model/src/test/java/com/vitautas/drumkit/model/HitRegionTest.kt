@@ -128,6 +128,48 @@ class HitRegionTest {
     }
 
     @Test
+    fun renderDepthMatchesElevatedDrummerView() {
+        val renderOrder = StudioKitDefinition.renderOrder.map { it.id }
+
+        assertTrue(renderOrder.indexOf(InstrumentId.CRASH) < renderOrder.indexOf(InstrumentId.KICK))
+        assertTrue(renderOrder.indexOf(InstrumentId.RIDE) < renderOrder.indexOf(InstrumentId.KICK))
+        assertTrue(renderOrder.indexOf(InstrumentId.KICK) < renderOrder.indexOf(InstrumentId.TOM_HIGH))
+        assertTrue(renderOrder.indexOf(InstrumentId.KICK) < renderOrder.indexOf(InstrumentId.TOM_MID))
+        assertTrue(renderOrder.indexOf(InstrumentId.TOM_HIGH) < renderOrder.indexOf(InstrumentId.SNARE))
+        assertTrue(renderOrder.indexOf(InstrumentId.TOM_MID) < renderOrder.indexOf(InstrumentId.SNARE))
+        assertTrue(renderOrder.indexOf(InstrumentId.KICK) < renderOrder.indexOf(InstrumentId.FLOOR_TOM))
+        assertTrue(renderOrder.indexOf(InstrumentId.KICK) < renderOrder.indexOf(InstrumentId.SNARE))
+    }
+
+    @Test
+    fun floorSupportedHardwareUsesOneSharedPlane() {
+        val floorSupported = listOf(
+            InstrumentId.CRASH,
+            InstrumentId.RIDE,
+            InstrumentId.HI_HAT,
+            InstrumentId.KICK,
+            InstrumentId.FLOOR_TOM,
+            InstrumentId.SNARE,
+        )
+
+        for (instrument in floorSupported) {
+            assertEquals(
+                StudioKitCamera.FLOOR_PLANE_Y,
+                definition(instrument).layout.supportFloorY ?: Float.NaN,
+                0.00001f,
+            )
+        }
+        assertNull(definition(InstrumentId.TOM_HIGH).layout.supportFloorY)
+        assertNull(definition(InstrumentId.TOM_MID).layout.supportFloorY)
+        assertTrue(StudioKitCamera.FLOOR_PLANE_Y > StudioKitCamera.HORIZON_Y)
+        assertEquals(
+            definition(InstrumentId.KICK).layout.drawBounds.bottom,
+            StudioKitCamera.FLOOR_PLANE_Y,
+            0.00001f,
+        )
+    }
+
+    @Test
     fun snareUsesEntireRenderedHeadInsteadOfDetachedInset() {
         assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.195f, 0.579f, landscapeAspectRatio)?.id)
         assertEquals(InstrumentId.SNARE, StudioKitDefinition.hitTest(0.435f, 0.579f, landscapeAspectRatio)?.id)

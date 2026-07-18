@@ -42,7 +42,20 @@ Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument 
 - The crash and ride are rebalanced around the rack toms, with the ride remaining larger.
 - Cymbal and drum draw-bound heights are derived from the shared camera compression targets.
 - The top 12 percent of the playable surface remains reserved as a control-safe area.
-- Existing render order and hit-test priority remain unchanged pending the dedicated depth and occlusion steps.
+- Hit-test priority remains unchanged; Step 2.3 subsequently revises visual depth independently.
+
+## Depth relationships and shared floor plane
+
+Phase 2 Step 2.3 separates the renderer into background-shadow, support-hardware, and playable-surface passes:
+
+- Crash and ride remain the farthest visual surfaces.
+- The kick renders behind the rack toms, floor tom, hi-hat, and snare.
+- Rack toms render behind the player-side snare while remaining in front of the kick.
+- Cymbal and hi-hat stands render before every drum surface, so hardware stays visually behind shells.
+- Rack-tom mount stems render behind both the kick and rack-tom surfaces.
+- Kick legs, floor-tom legs, the snare stand, and cymbal stands terminate at the shared normalized floor plane `StudioKitCamera.FLOOR_PLANE_Y = 0.94`.
+- Instrument rotation applies to playable surfaces and shadows, not to floor anchors, so stand feet remain grounded.
+- Exact segment clipping and hidden-hardware masks remain reserved for Step 2.4.
 
 ## Prototype behavior represented in the base
 
@@ -80,13 +93,13 @@ Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument 
 - Audio dispatch before recording, haptic, and visual state updates
 - Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
 - Camera-aligned instrument positions, scale relationships, and control-safe placement
+- Explicit drummer-view surface depth, background support hardware, and one shared floor plane
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
 The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP or lifecycle finalization, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
-- Correct depth relationships and establish one shared floor plane
 - Correct hardware occlusion and clipping
 - Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
@@ -120,4 +133,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
