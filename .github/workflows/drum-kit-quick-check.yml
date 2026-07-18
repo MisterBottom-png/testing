@@ -42,27 +42,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Inspect Android 17 packages
-        shell: bash
-        run: |
-          sdkmanager --list --channel=3 | grep -E "platforms;android-(37|Cinnamon)|build-tools;37|ndk;29" | tee android-17-packages.txt || true
-
       - name: Install compile SDK
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager --channel=3 \
-            "platforms;android-37" \
+            "platforms;android-37.0" \
             "build-tools;37.0.0"
-
-      - name: Upload Android 17 package list
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-17-sdk-packages
-          path: drum-kit-android/android-17-packages.txt
-          if-no-files-found: error
-          retention-days: 2
 
       - uses: gradle/actions/setup-gradle@v6
         with:
