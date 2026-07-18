@@ -1,30 +1,20 @@
 plugins {
-    alias(libs.plugins.android.library)
-}
-
-android {
-    namespace = "com.vitautas.drumkit.model"
-    compileSdk = 37
-    buildToolsVersion = "37.0.0"
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    lint {
-        abortOnError = true
-        warningsAsErrors = true
-    }
+    alias(libs.plugins.kotlin.jvm)
 }
 
 kotlin {
+    jvmToolchain(17)
     compilerOptions {
         allWarningsAsErrors.set(true)
+    }
+}
+
+sourceSets {
+    main {
+        kotlin.srcDir("src/main/java")
+    }
+    test {
+        kotlin.srcDir("src/test/java")
     }
 }
 
