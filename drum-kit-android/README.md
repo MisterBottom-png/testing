@@ -7,7 +7,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 ## Included foundation
 
 - Kotlin and Jetpack Compose application shell
-- Immersive, resizable activity optimized for landscape while adapting to current orientation and window size
+- Immersive sensor-landscape activity for the playable instrument
 - Modern adaptive and themed launcher icon
 - Modular project structure
 - Raw Android multi-touch input through a custom `View`
@@ -24,7 +24,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
 - Cached layered Canvas artwork, geometry, and masks created during size changes
-- RenderNode display-list caching on API 29+ hardware canvases with bitmap fallback on API 26–28 and software canvases
+- Stable bitmap artwork caching on all supported devices; the experimental RenderNode backend remains disabled pending device validation
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
 - System-respecting, restrained instrument haptics
 - GitHub Actions tests, build, lint, and downloadable debug APK artifact
@@ -43,6 +43,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - JDK 17
 - Android SDK 37 from the Android 17 preview channel
 - Android SDK Build Tools 37.0.0 from the preview channel
+- Target SDK 36 while landscape compatibility is required on large screens
 - NDK 29.0.14206865
 - CMake 3.22.1 or newer
 - Gradle 9.5.0 when building outside Android Studio
@@ -63,7 +64,7 @@ GitHub Actions is the authoritative validation path. The JVM quick check and And
 
 ## Current scope
 
-This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion. The renderer uses reusable material profiles and cached layered artwork. Static body and playable layers use RenderNode display lists on supported hardware and retain a bitmap fallback for older or software-rendered environments; externally authored texture packs remain deferred.
+This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion. The renderer uses reusable material profiles and cached layered artwork. Static body and playable layers use the proven bitmap cache across supported Android versions; the RenderNode implementation remains in source for later profiling but is not selected by the production cache policy. Externally authored texture packs remain deferred.
 
 The current redesign implementation keeps complete draw bounds, rendered playable-surface bounds, and touch hit regions independent; uses one viewport-aware hit path for runtime input, tests, and diagnostics; removes the former kick/snare target overlap; applies one fixed camera; merges independently modeled support and surface layers by drummer-view depth; clips grounded shadows around cached canonical instrument masks; renders wine-shell drums, a brushed-steel snare, a detailed dark kick, bronze cymbals, and paired hi-hat discs from cached body/playable artwork layers; retains artwork across temporary View detach/reattach cycles; anchors supported instruments to one normalized floor plane; keeps compact overlays inside safe drawing insets without shrinking the playable canvas; removes the permanent HUD; restricts diagnostics to debuggable builds; fades labels; caches renderer objects outside steady-state drawing; and drives local instrument-specific feedback rather than lifting the whole instrument.
 
@@ -71,10 +72,10 @@ The recording control now captures an expressive strike-event take using fixed-c
 
 ## Next milestone
 
-1. Profile rapid multi-touch rendering and cache memory on representative phones and tablets.
-2. Validate and refine the corrected hit regions using physical-device play tests.
-3. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.
-4. Add strike-take playback and later PCM/WAV recording export.
-5. Consider AGSL or OpenGL only after profiling proves the Canvas/RenderNode path insufficient.
+1. Diagnose and device-test the RenderNode missing-artwork regression before re-enabling that backend.
+2. Profile rapid multi-touch rendering and cache memory on representative phones and tablets.
+3. Validate and refine the corrected hit regions using physical-device play tests.
+4. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.
+5. Add strike-take playback and later PCM/WAV recording export.
 
 The raw `MotionEvent` input path, custom playable `View`, normalized strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.
