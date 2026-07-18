@@ -7,7 +7,8 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 ## Included foundation
 
 - Kotlin and Jetpack Compose application shell
-- Landscape-only immersive activity
+- Immersive, resizable activity optimized for landscape while adapting to current orientation and window size
+- Modern adaptive and themed launcher icon
 - Modular project structure
 - Raw Android multi-touch input through a custom `View`
 - Position, pressure, contact-size, and velocity-aware strike events
@@ -29,7 +30,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 
 ## Modules
 
-- `app`: activity, lifecycle, immersive mode, debug configuration, and dependency wiring
+- `app`: activity lifecycle, immersive mode, debug configuration, and dependency wiring
 - `core-model`: instrument IDs, normalized draw geometry, typed hit regions, render metadata, strike data, and diagnostics models
 - `engine-input`: raw multi-touch, priority hit testing, strike extraction, haptics, animation state, and Canvas rendering
 - `engine-audio`: JNI bridge and Oboe real-time audio callback
@@ -44,7 +45,8 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - NDK 29.0.14206865
 - CMake 3.22.1 or newer
 - Gradle 9.5.0 when building outside Android Studio
-- Kotlin 2.4.0 through Android Gradle Plugin built-in Kotlin support
+- Kotlin 2.4.10 through Android Gradle Plugin built-in Kotlin support
+- Compose BOM 2026.06.01
 
 From this directory:
 
