@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quick-check:
@@ -33,95 +33,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-
-      - name: Apply pending Step 2.3 implementation
-        id: apply-depth
-        if: github.event_name == 'pull_request' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
-        continue-on-error: true
-        working-directory: .
-        shell: bash
-        run: |
-          set -o pipefail
-          python - <<'PY' 2>&1 | tee step-2-3-patch.log
-          from pathlib import Path
-
-          workflow = Path(".github/workflows/drum-kit-step-2-3-depth.yml").read_text(
-              encoding="utf-8"
-          )
-          start_marker = "        run: |\n"
-          end_marker = "\n      - name: Commit Step 2.3 and remove temporary workflow"
-          start = workflow.index(start_marker) + len(start_marker)
-          end = workflow.index(end_marker, start)
-          extracted_lines = []
-          for line in workflow[start:end].splitlines():
-              if not line:
-                  extracted_lines.append("")
-              elif line == '"""':
-                  extracted_lines.append(line)
-              elif line.startswith("          "):
-                  extracted_lines.append(line[10:])
-              else:
-                  raise SystemExit(f"Unexpected patch indentation: {line!r}")
-
-          script_lines = []
-          inside_multiline_literal = False
-          for line in extracted_lines:
-              if inside_multiline_literal:
-                  if line == '"""':
-                      script_lines.append(line)
-                      inside_multiline_literal = False
-                  else:
-                      script_lines.append(f"    {line}" if line else "")
-              else:
-                  script_lines.append(line)
-                  if '= """' in line and not line.endswith('"""'):
-                      inside_multiline_literal = True
-          if inside_multiline_literal:
-              raise SystemExit("Unclosed multiline patch literal")
-
-          script = "\n".join(script_lines) + "\n"
-          exec(compile(script, "apply_step_2_3.py", "exec"))
-          PY
-
-      - name: Upload Step 2.3 patch diagnostics
-        if: steps.apply-depth.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: step-2-3-patch-log
-          path: step-2-3-patch.log
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Commit pending Step 2.3 implementation
-        if: steps.apply-depth.outcome == 'success' && hashFiles('.github/workflows/drum-kit-step-2-3-depth.yml') != ''
-        working-directory: .
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitCamera.kt \
-            drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitModels.kt \
-            drum-kit-android/core-model/src/test/java/com/vitautas/drumkit/model/HitRegionTest.kt \
-            drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt \
-            drum-kit-android/docs/source-mapping.md
-          git commit -m "Implement Step 2.3 depth relationships"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-java@v5
-        if: steps.apply-depth.outcome == 'success'
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
-        if: steps.apply-depth.outcome == 'success'
         uses: android-actions/setup-android@v4
 
       - name: Install compile SDK
-        if: steps.apply-depth.outcome == 'success'
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
@@ -130,13 +51,11 @@ jobs:
             "build-tools;36.0.0"
 
       - uses: gradle/actions/setup-gradle@v6
-        if: steps.apply-depth.outcome == 'success'
         with:
           gradle-version: "9.5.0"
           cache-provider: basic
 
       - name: Compile Kotlin and run unit tests
-        if: steps.apply-depth.outcome == 'success'
         run: >-
           gradle --no-daemon --console=plain --warning-mode=fail
           :core-model:testDebugUnitTest
