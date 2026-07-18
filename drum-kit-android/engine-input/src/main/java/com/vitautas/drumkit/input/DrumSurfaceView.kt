@@ -40,6 +40,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     var hapticsEnabled: Boolean = true
 
     private val density = resources.displayMetrics.density
+    private val artworkFactory = LayeredInstrumentArtworkFactory(density)
     private val activePointers = SparseArray<InstrumentId>()
     private val renderStates = ArrayList<InstrumentRenderState>(StudioKitDefinition.instruments.size)
     private val renderStatesByInstrument = arrayOfNulls<InstrumentRenderState>(InstrumentId.entries.size)
@@ -51,9 +52,9 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val stagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val spotlightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x70000000 }
-    private val shellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val cymbalPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val artworkPaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
+    )
     private val standPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xff858b91.toInt()
         style = Paint.Style.STROKE
@@ -65,11 +66,6 @@ class DrumSurfaceView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = density * 1.5f
-    }
-    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xffd3d6d8.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = density * 3f
     }
     private val impactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xff17191c.toInt()
@@ -134,6 +130,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         rackMountX = kickBounds.centerX * width.toFloat()
         rackMountY = (kickBounds.top + kickBounds.height * 0.14f) * height.toFloat()
 
+        releaseArtworkCaches()
         renderStates.clear()
         renderStatesByInstrument.fill(null)
         instrumentOcclusionPath.reset()
@@ -223,6 +220,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         removeCallbacks(labelFadeRunnable)
         clearActivePointers()
+        releaseArtworkCaches()
         super.onDetachedFromWindow()
     }
 
@@ -285,6 +283,13 @@ class DrumSurfaceView @JvmOverloads constructor(
         postInvalidateOnAnimation()
     }
 
+    private fun releaseArtworkCaches() {
+        for (state in renderStates) {
+            state.artwork?.release()
+            state.artwork = null
+        }
+    }
+
     private fun estimateVelocity(pressure: Float, contactSize: Float, eventTime: Long): Float {
         val pressureVelocity = if (pressure > 0.02f && pressure != 0.5f) {
             0.24f + pressure.coerceIn(0f, 1.2f) * 0.72f
@@ -327,14 +332,6 @@ class DrumSurfaceView @JvmOverloads constructor(
                     state.primaryRect.right - state.primaryRect.width() * 0.10f,
                     state.primaryRect.bottom + bounds.height() * 0.10f,
                 )
-                state.primaryShader = RadialGradient(
-                    state.primaryRect.centerX() - state.primaryRect.width() * 0.16f,
-                    state.primaryRect.centerY() - state.primaryRect.height() * 0.28f,
-                    state.primaryRect.width() * 0.62f,
-                    intArrayOf(0xffffe3a0.toInt(), 0xffc58a35.toInt(), 0xff704213.toInt()),
-                    floatArrayOf(0f, 0.56f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
             }
 
             InstrumentRendererKey.DRUM,
@@ -353,27 +350,6 @@ class DrumSurfaceView @JvmOverloads constructor(
                     state.primaryRect.right - state.primaryRect.width() * 0.05f,
                     state.primaryRect.bottom + bounds.height() * 0.10f,
                 )
-                state.primaryShader = LinearGradient(
-                    state.primaryRect.left,
-                    state.primaryRect.top,
-                    state.primaryRect.right,
-                    state.primaryRect.bottom,
-                    if (state.definition.layout.rendererKey == InstrumentRendererKey.SNARE) {
-                        intArrayOf(0xff292d31.toInt(), 0xffe1e4e6.toInt(), 0xff555b60.toInt())
-                    } else {
-                        intArrayOf(0xff26070b.toInt(), 0xff7d202c.toInt(), 0xff170408.toInt())
-                    },
-                    null,
-                    Shader.TileMode.CLAMP,
-                )
-                state.secondaryShader = RadialGradient(
-                    state.secondaryRect.centerX() - state.secondaryRect.width() * 0.12f,
-                    state.secondaryRect.centerY() - state.secondaryRect.height() * 0.25f,
-                    state.secondaryRect.width() * 0.58f,
-                    intArrayOf(0xfffaf7ef.toInt(), 0xffd5d0c5.toInt(), 0xff6a6a67.toInt()),
-                    floatArrayOf(0f, 0.68f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
             }
 
             InstrumentRendererKey.KICK -> {
@@ -390,26 +366,15 @@ class DrumSurfaceView @JvmOverloads constructor(
                     state.primaryRect.right - state.primaryRect.width() * 0.04f,
                     state.primaryRect.bottom + bounds.height() * 0.08f,
                 )
-                state.primaryShader = RadialGradient(
-                    state.primaryRect.centerX() - state.primaryRect.width() * 0.18f,
-                    state.primaryRect.centerY() - state.primaryRect.height() * 0.22f,
-                    state.primaryRect.width() * 0.62f,
-                    intArrayOf(0xff8c2731.toInt(), 0xff35070d.toInt(), 0xff090a0c.toInt()),
-                    floatArrayOf(0f, 0.58f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
-                state.secondaryShader = RadialGradient(
-                    state.secondaryRect.centerX() - state.secondaryRect.width() * 0.18f,
-                    state.secondaryRect.centerY() - state.secondaryRect.height() * 0.18f,
-                    state.secondaryRect.width() * 0.58f,
-                    intArrayOf(0xff373b40.toInt(), 0xff14171b.toInt(), 0xff050607.toInt()),
-                    floatArrayOf(0f, 0.62f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
             }
         }
         configureGroundedShadow(state, viewHeight)
         configureSurfaceOcclusionPath(state)
+        state.artwork = artworkFactory.create(
+            definition = state.definition,
+            bodyRect = state.primaryRect,
+            playableRect = state.secondaryRect.takeUnless { it.isEmpty } ?: state.primaryRect,
+        )
     }
 
     private fun configureGroundedShadow(state: InstrumentRenderState, viewHeight: Float) {
@@ -611,19 +576,9 @@ class DrumSurfaceView @JvmOverloads constructor(
         animation: InstrumentAnimationState,
         snare: Boolean,
     ) {
-        val shell = state.primaryRect
+        val artwork = state.artwork ?: return
         val head = state.secondaryRect
-
-        shellPaint.shader = state.primaryShader
-        canvas.drawRoundRect(shell, shell.width() * 0.16f, shell.height() * 0.12f, shellPaint)
-        canvas.drawLine(shell.left, shell.bottom - density * 2f, shell.right, shell.bottom - density * 2f, hardwarePaint)
-
-        val lugTop = shell.top + shell.height() * 0.10f
-        val lugBottom = shell.bottom - shell.height() * 0.10f
-        canvas.drawLine(shell.left + shell.width() * 0.15f, lugTop, shell.left + shell.width() * 0.15f, lugBottom, hardwarePaint)
-        canvas.drawLine(shell.left + shell.width() * 0.38f, lugTop, shell.left + shell.width() * 0.38f, lugBottom, hardwarePaint)
-        canvas.drawLine(shell.right - shell.width() * 0.38f, lugTop, shell.right - shell.width() * 0.38f, lugBottom, hardwarePaint)
-        canvas.drawLine(shell.right - shell.width() * 0.15f, lugTop, shell.right - shell.width() * 0.15f, lugBottom, hardwarePaint)
+        artwork.drawBody(canvas, artworkPaint)
 
         val impactX = head.left + animation.strikeX * head.width()
         val impactY = head.top + animation.strikeY * head.height()
@@ -636,11 +591,7 @@ class DrumSurfaceView @JvmOverloads constructor(
                 impactY,
             )
         }
-        headPaint.shader = state.secondaryShader
-        canvas.drawOval(head, headPaint)
-        rimPaint.color = 0xffd4d7d9.toInt()
-        rimPaint.alpha = 255
-        canvas.drawOval(head, rimPaint)
+        artwork.drawPlayable(canvas, artworkPaint)
         canvas.restoreToCount(headSaveCount)
 
         if (animation.currentDeformation > 0f) {
@@ -658,14 +609,9 @@ class DrumSurfaceView @JvmOverloads constructor(
         state: InstrumentRenderState,
         animation: InstrumentAnimationState,
     ) {
-        val shell = state.primaryRect
+        val artwork = state.artwork ?: return
         val head = state.secondaryRect
-
-        shellPaint.shader = state.primaryShader
-        canvas.drawOval(shell, shellPaint)
-        rimPaint.color = 0xffc7ccd0.toInt()
-        rimPaint.alpha = 255
-        canvas.drawOval(shell, rimPaint)
+        artwork.drawBody(canvas, artworkPaint)
 
         val impactX = head.left + animation.strikeX * head.width()
         val impactY = head.top + animation.strikeY * head.height()
@@ -674,8 +620,7 @@ class DrumSurfaceView @JvmOverloads constructor(
             val scale = 1f - animation.currentDeformation * 0.045f
             canvas.scale(scale, scale, impactX, impactY)
         }
-        headPaint.shader = state.secondaryShader
-        canvas.drawOval(head, headPaint)
+        artwork.drawPlayable(canvas, artworkPaint)
         canvas.restoreToCount(headSaveCount)
         drawFlash(canvas, head, animation)
     }
@@ -686,45 +631,19 @@ class DrumSurfaceView @JvmOverloads constructor(
         animation: InstrumentAnimationState,
         hiHat: Boolean,
     ) {
+        val artwork = state.artwork ?: return
         val disc = state.primaryRect
         val bounds = state.drawBounds
-        val centerX = disc.centerX()
-        val centerY = disc.centerY()
         val impactX = disc.left + animation.strikeX * disc.width()
         val impactY = disc.top + animation.strikeY * disc.height()
 
-        cymbalPaint.shader = state.primaryShader
-        if (hiHat) {
-            cymbalPaint.alpha = 150
-            canvas.drawOval(disc, cymbalPaint)
-        }
-
+        artwork.drawBody(canvas, artworkPaint)
         val discSaveCount = canvas.save()
         canvas.rotate(animation.currentRotation, impactX, impactY)
         if (hiHat) {
             canvas.translate(0f, -animation.currentDeformation * bounds.height() * 0.07f)
         }
-        cymbalPaint.alpha = 255
-        canvas.drawOval(disc, cymbalPaint)
-        rimPaint.color = 0xffe1b563.toInt()
-        rimPaint.alpha = 255
-        canvas.drawOval(disc, rimPaint)
-
-        hardwarePaint.color = 0x66f8d58f
-        hardwarePaint.alpha = 115
-        var ringIndex = 1
-        while (ringIndex <= 3) {
-            val insetX = disc.width() * ringIndex * 0.09f
-            val insetY = disc.height() * ringIndex * 0.09f
-            scratchRect.set(disc.left + insetX, disc.top + insetY, disc.right - insetX, disc.bottom - insetY)
-            canvas.drawOval(scratchRect, hardwarePaint)
-            ringIndex += 1
-        }
-        hardwarePaint.color = 0xffc4c9cd.toInt()
-        hardwarePaint.alpha = 255
-
-        canvas.drawCircle(centerX, centerY, disc.width() * 0.07f, rimPaint)
-        canvas.drawCircle(centerX, centerY, density * 3.2f, hardwarePaint)
+        artwork.drawPlayable(canvas, artworkPaint)
         drawFlash(canvas, disc, animation)
         canvas.restoreToCount(discSaveCount)
     }
@@ -843,8 +762,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         val label: String = definition.id.label.uppercase()
         var labelX: Float = 0f
         var labelY: Float = 0f
-        var primaryShader: Shader? = null
-        var secondaryShader: Shader? = null
+        var artwork: InstrumentArtworkCache? = null
     }
 
     private class InstrumentAnimationState {

@@ -21,7 +21,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Compact kit, recording, and mixer controls with an expandable settings panel
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
-- Cached Canvas geometry and shaders created during size changes
+- Cached layered Canvas artwork, geometry, and masks created during size changes
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
 - System-respecting, restrained instrument haptics
 - GitHub Actions tests, build, lint, and downloadable debug APK artifact
@@ -59,15 +59,15 @@ GitHub Actions is the authoritative validation path. It runs unit tests, Kotlin 
 
 ## Current scope
 
-This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion, and the renderer still uses procedural Canvas layers rather than final pre-rendered or fully RenderNode-cached instrument artwork.
+This is a production-oriented foundation, not the finished instrument. The native engine still synthesizes placeholder percussion. The renderer now uses reusable material profiles and cached layered Canvas artwork, while complete RenderNode caching and externally authored texture packs remain deferred.
 
-The current redesign implementation separates drawing from touch geometry, resolves overlaps explicitly, applies one fixed camera, merges independently modeled support and surface layers by drummer-view depth, clips grounded shadows around cached canonical instrument masks, anchors supported instruments to one normalized floor plane, removes the permanent HUD, restricts diagnostics to debuggable builds, fades labels, caches renderer objects outside steady-state drawing, and drives local instrument-specific feedback rather than lifting the whole instrument.
+The current redesign implementation separates drawing from touch geometry, resolves overlaps explicitly, applies one fixed camera, merges independently modeled support and surface layers by drummer-view depth, clips grounded shadows around cached canonical instrument masks, renders wine-shell drums, a brushed-steel snare, a detailed dark kick, bronze cymbals, and paired hi-hat discs from cached body/playable artwork layers, anchors supported instruments to one normalized floor plane, removes the permanent HUD, restricts diagnostics to debuggable builds, fades labels, caches renderer objects outside steady-state drawing, and drives local instrument-specific feedback rather than lifting the whole instrument.
 
 The recording control now captures an expressive strike-event take using fixed-capacity primitive buffers. Audio dispatch remains first; recording copies timing, instrument, velocity, normalized position, pressure, and contact size afterward. The take is materialized only when recording stops. PCM/WAV export remains deferred.
 
 ## Next milestone
 
-1. Replace transitional procedural surfaces with cached layered assets or RenderNodes.
+1. Move complete static instrument layers to RenderNode caching where profiling justifies it.
 2. Profile rapid multi-touch rendering on representative phones and tablets.
 3. Tune hit regions and overlap priority using physical-device play tests.
 4. Add the expressive snare zones, sample layers, round robins, damping, and pitch gestures.

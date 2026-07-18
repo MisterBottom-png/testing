@@ -60,6 +60,10 @@ Phase 2 Step 2.3 separates the renderer into background-shadow, support-hardware
 
 Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of drawing every stand behind every drum. Rack-tom mounts remain behind the kick, while foreground snare, floor-tom, and hi-hat supports remain in front of background drums and behind their own surfaces. Canonical rotated surface masks are cached during `onSizeChanged()` and reused to clip grounded shadows out of shells, heads, kicks, and cymbals without steady-state allocation. Animated deformation does not alter the canonical occlusion mask or playable hit region.
 
+## Cached layered instrument artwork
+
+Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymbal primitives with renderer-key artwork profiles and cached Canvas layers built during `onSizeChanged()`. Drum caches separate shell, bottom hoop, lugs, reflections, and wear from the animated batter head and top hoop. The snare uses a brushed-steel material profile. The kick separates its wine shell and rear hoop from the animated dark front head, port, badge, and front hoop. Cymbal caches include bronze edge shading, six lathe rings, deterministic hammering marks, raised bells, highlights, felt/bolt hardware, and a darker lower hi-hat disc. Body and playable layers remain separate so existing position- and velocity-driven deformation continues without rebuilding static detail. Cached bitmaps are released on resize and view detachment.
+
 ## Prototype behavior represented in the base
 
 - Multi-touch strike input
@@ -90,20 +94,19 @@ Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of 
 - Per-instrument strike position, velocity, start time, active-pointer count, deformation, and rotation state
 - Faster snare rebound and progressively slower tom rebound
 - Kick-head compression, cymbal flex, and hi-hat upper-disc movement
-- Cached static rectangles, gradients, labels, and shaders created in `onSizeChanged()`
+- Cached static rectangles, labels, occlusion paths, and layered instrument artwork created in `onSizeChanged()`
 - Animation-only redraw through `postInvalidateOnAnimation()`
 - System-respecting haptic feedback with restrained velocity thresholds
 - Audio dispatch before recording, haptic, and visual state updates
 - Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
 - Camera-aligned instrument positions, scale relationships, and control-safe placement
-- Explicit drummer-view surface depth, independently layered support hardware, cached occlusion masks, and one shared floor plane
+- Explicit drummer-view surface depth, independently layered support hardware, cached occlusion masks, layered material profiles, and one shared floor plane
 - CI unit tests, Android build, lint, and downloadable debug APK artifact
 
 The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP or lifecycle finalization, keeping the touch-to-audio path ahead of recording work.
 
 ## Redesign behavior remaining
 
-- Production layered drum and cymbal assets
 - RenderNode caching for complete static instrument layers
 - Device-profiled hit-region tuning and render performance
 - Strike-take playback and PCM/WAV export
@@ -135,4 +138,4 @@ The following behaviors require later expressive-engine phases and are not faked
 
 ## Foundation completion
 
-The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, cached surface masks, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.
+The repository now covers the practical core of Phase 0, the audio-stream portion of Phase 1, the raw multi-touch path from Phase 2, a synthesized placeholder version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, the camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, Step 2.5 cached layered artwork, cached surface masks, a shared floor plane, shared viewport-aware input geometry, and lifecycle-hardened audio operation.

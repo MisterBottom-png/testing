@@ -116,7 +116,7 @@ replacement = '''    private fun drawDrum(
     }
 
 '''
-replace_between(surface, "    private fun drawDrum(\n", "    private fun drawFlash(\n", replacement)
+replace_between(surface, "    private fun drawDrum(\n", "    private fun drawFlash(canvas:", replacement)
 edit(surface, "        var primaryShader: Shader? = null\n        var secondaryShader: Shader? = null\n", "        var artwork: InstrumentArtworkCache? = null\n")
 
 mapping = ROOT / "docs/source-mapping.md"
