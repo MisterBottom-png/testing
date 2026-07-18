@@ -1,0 +1,14 @@
+Sample attribution
+
+The Aasimonster 2.1 DrumGizmo kit
+Creator and recording engineer: Jes Eiler
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+Source: https://drumgizmo.org/kits/Aasimonster/aasimonster2_1.zip
+Used for centre, off-centre, edge-expression, and rimshot snare samples.
+
+Free Wave Samples
+Recorder and site owner: Jason Champion
+Source: https://freewavesamples.com/
+Used for cross-stick round robins under the site's freeware and royalty-free reuse terms.
+
+The source recordings are preprocessed into a 48 kHz stereo PCM bank. No endorsement by the original creators is implied.
