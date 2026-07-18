@@ -56,11 +56,11 @@ From this directory:
 gradle --no-daemon --warning-mode=fail :core-model:check testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-The GitHub Actions workflows pin the required tool versions and treat Gradle warnings as failures. `Drum Kit Quick Check` runs only the pure JVM `core-model` checks and does not install Android tooling. `Drum Kit Android Validation` independently installs only the compile SDK and Build Tools needed for Android unit tests and Kotlin compilation. On-demand APK and release workflows install the NDK and CMake as required. Successful APK runs publish `app-debug.apk` as the `drum-kit-debug-apk` artifact.
+The GitHub Actions workflows pin the required tool versions and treat Gradle warnings as failures. `Drum Kit Quick Check` runs only the pure JVM `core-model` checks. `Drum Kit Android Validation` covers Android unit tests and application Kotlin compilation. `Drum Kit Android Lint` runs independently so lint does not delay APK delivery. The on-demand APK workflow uses the preinstalled Ubuntu 24.04 Android toolchain, builds an arm64-only debug APK, and publishes `app-debug.apk` as the `drum-kit-debug-apk` artifact. Release builds retain the full configured ABI set.
 
 ## Validation status
 
-GitHub Actions is the authoritative validation path. The JVM quick check and Android validation run concurrently on pull requests. Together they cover core-model tests, Android module unit tests, and application Kotlin compilation. On-demand APK and release workflows provide native C++ compilation, Android lint, and packaging validation. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
+GitHub Actions is the authoritative validation path. The JVM quick check, Android validation, and Android lint run independently on pull requests. Together they cover core-model tests, Android module unit tests, application Kotlin compilation, and dependency-inclusive Android lint. The on-demand APK workflow provides focused arm64 native C++ compilation and debug packaging without rerunning those checks. Release workflows provide full-ABI native compilation, shrinking, lint, APK assembly, and bundle packaging. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
 
 ## Current scope
 
