@@ -38,9 +38,10 @@ jobs:
 
       - name: Apply pending Step 2.5 integration
         shell: bash
+        working-directory: .
         run: |
           set -o pipefail
-          python ../tools/apply_step_2_5.py 2>&1 | tee ../step-2-5-patch.log
+          python tools/apply_step_2_5.py 2>&1 | tee step-2-5-patch.log
 
       - name: Upload Step 2.5 patch diagnostics
         if: always()
