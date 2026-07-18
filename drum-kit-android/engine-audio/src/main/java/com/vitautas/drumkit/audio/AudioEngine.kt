@@ -1,25 +1,44 @@
 package com.vitautas.drumkit.audio
 
+import android.content.Context
+import android.content.res.AssetManager
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
+import com.vitautas.drumkit.model.InstrumentId
+import com.vitautas.drumkit.model.SnareArticulation
+import com.vitautas.drumkit.model.SnareArticulationResolver
 
 object AudioEngine {
     init {
         System.loadLibrary("drumkit")
     }
 
-    fun start(): Boolean = nativeStart()
+    fun start(context: Context): Boolean = nativeStart(context.assets)
 
     fun stop() {
         nativeStop()
     }
 
     fun trigger(strike: DrumStrike) {
+        val velocity = AudioInputSanitizer.velocity(strike.velocity)
+        val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
+        val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
+        val articulation = if (strike.instrument == InstrumentId.SNARE) {
+            SnareArticulationResolver.resolve(
+                normalizedX = normalizedX,
+                normalizedY = normalizedY,
+                velocity = velocity,
+            )
+        } else {
+            SnareArticulation.CENTER
+        }
+
         nativeTrigger(
             instrument = strike.instrument.nativeCode,
-            velocity = AudioInputSanitizer.velocity(strike.velocity),
-            normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX),
-            normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY),
+            articulation = articulation.nativeCode,
+            velocity = velocity,
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
         )
     }
 
@@ -38,10 +57,11 @@ object AudioEngine {
         underruns = nativeGetUnderrunCount(),
     )
 
-    private external fun nativeStart(): Boolean
+    private external fun nativeStart(assetManager: AssetManager): Boolean
     private external fun nativeStop()
     private external fun nativeTrigger(
         instrument: Int,
+        articulation: Int,
         velocity: Float,
         normalizedX: Float,
         normalizedY: Float,
