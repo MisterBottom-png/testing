@@ -14,7 +14,8 @@ internal class AudioSessionController(
     context: Context,
     private val onAvailabilityChanged: (Boolean) -> Unit,
 ) {
-    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private val appContext = context.applicationContext
+    private val audioManager = appContext.getSystemService(AudioManager::class.java)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val retryRunnable = Runnable {
         if (!started) return@Runnable
@@ -105,7 +106,7 @@ internal class AudioSessionController(
     private fun startEngineOrRetry() {
         if (!started || !focusGranted) return
         mainHandler.removeCallbacks(retryRunnable)
-        val available = AudioEngine.start()
+        val available = AudioEngine.start(appContext)
         onAvailabilityChanged(available)
         scheduleRetry()
     }
