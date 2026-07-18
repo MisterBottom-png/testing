@@ -8,10 +8,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -82,6 +87,8 @@ fun DrumKitScreen(
     var showHitRegions by remember { mutableStateOf(false) }
     var lastDebugStrike by remember { mutableStateOf<DrumStrike?>(null) }
     val recorder = remember { PerformanceRecorder() }
+    val topSafeInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+    val bottomSafeInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
     val strikeDispatcher = remember(onStrike, recorder, showHitRegions) {
         { strike: DrumStrike ->
             onStrike(strike)
@@ -145,6 +152,7 @@ fun DrumKitScreen(
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
+                .windowInsetsPadding(topSafeInsets)
                 .padding(start = 8.dp, top = 6.dp),
         ) {
             FilledTonalButton(
@@ -169,6 +177,7 @@ fun DrumKitScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .align(Alignment.TopEnd)
+                .windowInsetsPadding(topSafeInsets)
                 .padding(end = 8.dp, top = 6.dp),
         ) {
             FilledTonalButton(
@@ -206,6 +215,7 @@ fun DrumKitScreen(
                 tonalElevation = 8.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .windowInsetsPadding(topSafeInsets)
                     .padding(end = 8.dp, top = 64.dp)
                     .widthIn(min = 270.dp, max = 330.dp),
             ) {
@@ -296,6 +306,7 @@ fun DrumKitScreen(
                 color = Color(0xffffa08d),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(bottomSafeInsets)
                     .background(Color(0xcc000000), MaterialTheme.shapes.small)
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )
@@ -306,6 +317,7 @@ fun DrumKitScreen(
                 color = Color(0xffaab2bf),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(bottomSafeInsets)
                     .background(Color(0x99000000), MaterialTheme.shapes.small)
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )

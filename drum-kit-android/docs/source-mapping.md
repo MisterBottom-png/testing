@@ -80,13 +80,13 @@ The corrective audit separates complete artwork bounds, rendered playable-surfac
 - Instrument-specific stereo panning
 - Master volume and room controls
 - Haptic toggle
-- Fullscreen landscape presentation
+- Immersive resizable presentation optimized for landscape
 - Kick, snare, three toms, hi-hat, crash, and ride
 
 ## Redesign behavior implemented
 
-- Compact kit selector in the upper-left corner
-- Compact recording and mixer controls in the upper-right corner
+- Compact kit selector in the upper-left safe drawing area
+- Compact recording and mixer controls in the upper-right safe drawing area
 - Expandable Room, Volume, and Haptics controls
 - Fixed-capacity strike-performance recording with relative timing and expressive input values
 - Recording finalization when the activity stops or audio becomes unavailable

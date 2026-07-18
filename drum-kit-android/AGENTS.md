@@ -36,7 +36,7 @@ The repository contains a production-oriented foundation, not the finished drum 
 Implemented:
 
 - Kotlin and Jetpack Compose application shell
-- Landscape-only immersive activity
+- Immersive, resizable activity optimized for landscape and adaptive to current orientation and window size
 - Raw multi-touch input through a custom Android `View`
 - Independent draw bounds, visual playable-surface bounds, and typed hit regions
 - Viewport-aware rotation shared by rendering, hit testing, strike coordinates, and diagnostics
@@ -94,13 +94,13 @@ Build from the `drum-kit-android/` directory.
 Required versions:
 
 - JDK 17
-- Android SDK 37
+- Android SDK 37 from the Android 17 preview channel
 - Android SDK Build Tools 37.0.0
 - Android Gradle Plugin 9.3.x
 - Gradle 9.5.0
 - NDK 29.0.14206865
 - CMake 3.22.1
-- Kotlin 2.4.x through Android Gradle Plugin built-in Kotlin support
+- Kotlin 2.4.10 through Android Gradle Plugin built-in Kotlin support
 - C++20
 - Oboe 1.10.x
 
@@ -238,7 +238,7 @@ Additional native conventions:
 
 ## Playing-screen layout
 
-The instrument surface should occupy approximately 90% of the usable landscape screen. Controls must not cover playable instruments.
+The instrument surface should occupy approximately 90% of the usable window and remain optimized for landscape. Controls must not cover playable instruments.
 
 Required direction:
 
@@ -251,7 +251,7 @@ Required direction:
 - Labels outside playable drumheads and cymbal strike areas
 - Labels allowed to fade out during normal playing
 - Consistent dark surfaces for controls and overlays
-- Safe-area and display-cutout handling in immersive landscape mode
+- Safe-area and display-cutout handling in immersive edge-to-edge mode
 
 Do not shrink the kit merely to make room for controls. Place compact overlays in non-playable safe zones and keep their interaction bounds explicit.
 
