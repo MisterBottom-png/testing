@@ -19,6 +19,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -44,10 +45,11 @@ import java.io.File
 internal fun DiagnosticDrumKitScreen(
     sessionController: DrumKitSessionController,
     audioAvailable: Boolean,
+    onTouchObserverChanged: (DiagnosticTouchObserver?) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val recorder = remember { DiagnosticSessionRecorder() }
+    val recorder = remember { DiagnosticSessionBundleRecorder() }
     var isRecording by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var markerMenuExpanded by remember { mutableStateOf(false) }
@@ -55,6 +57,14 @@ internal fun DiagnosticDrumKitScreen(
     var roomLevel by remember { mutableFloatStateOf(0.32f) }
     var status by remember { mutableStateOf("Diagnostic session idle") }
     val bottomInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+
+    DisposableEffect(recorder, onTouchObserverChanged) {
+        val observer: DiagnosticTouchObserver = { event, viewportWidth, viewportHeight ->
+            recorder.recordTouchEvent(event, viewportWidth, viewportHeight)
+        }
+        onTouchObserverChanged(observer)
+        onDispose { onTouchObserverChanged(null) }
+    }
 
     LaunchedEffect(isRecording) {
         while (isRecording) {
@@ -106,7 +116,7 @@ internal fun DiagnosticDrumKitScreen(
                                     recorder.export(capture, File(context.cacheDir, "diagnostics"))
                                 }
                             }.onSuccess { result ->
-                                status = "${result.strikeCount} strikes · ${result.file.name}"
+                                status = "${result.touchEventCount} touches · ${result.strikeCount} strikes · ${result.file.name}"
                             }.onFailure { failure ->
                                 status = "Export failed: ${failure.message ?: failure::class.java.simpleName}"
                             }
