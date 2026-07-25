@@ -3,7 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val gitCommitSha = providers.environmentVariable("GITHUB_SHA").orElse("unknown")
+val gitCommitSha = providers.environmentVariable("DRUM_KIT_GIT_SHA")
+    .orElse(providers.environmentVariable("GITHUB_SHA"))
+    .orElse("unknown")
 
 android {
     namespace = "com.vitautas.drumkit"
