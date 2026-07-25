@@ -4,9 +4,7 @@ import android.content.Context
 import android.content.res.AssetManager
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
-import com.vitautas.drumkit.model.InstrumentId
 import com.vitautas.drumkit.model.SnareArticulation
-import com.vitautas.drumkit.model.SnareArticulationResolver
 
 object AudioEngine {
     init {
@@ -20,26 +18,23 @@ object AudioEngine {
     }
 
     fun trigger(strike: DrumStrike) {
-        val velocity = AudioInputSanitizer.velocity(strike.velocity)
-        val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
-        val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
-        val articulation = if (strike.instrument == InstrumentId.SNARE) {
-            SnareArticulationResolver.resolve(
-                normalizedX = normalizedX,
-                normalizedY = normalizedY,
-                velocity = velocity,
-            )
-        } else {
-            SnareArticulation.CENTER
-        }
+        triggerWithDiagnostics(strike)
+    }
 
+    /**
+     * Dispatches audio first, then returns the request-side decision for debug recording.
+     * Native callback outcomes are intentionally not inferred here.
+     */
+    fun triggerWithDiagnostics(strike: DrumStrike): AudioDispatchDecision {
+        val decision = AudioDispatchDecisionFactory.create(strike)
         nativeTrigger(
-            instrument = strike.instrument.nativeCode,
-            articulation = articulation.nativeCode,
-            velocity = velocity,
-            normalizedX = normalizedX,
-            normalizedY = normalizedY,
+            instrument = decision.instrument.nativeCode,
+            articulation = decision.articulation?.nativeCode ?: SnareArticulation.CENTER.nativeCode,
+            velocity = decision.sanitizedVelocity,
+            normalizedX = decision.sanitizedNormalizedX,
+            normalizedY = decision.sanitizedNormalizedY,
         )
+        return decision
     }
 
     fun setMasterVolume(value: Float) {
