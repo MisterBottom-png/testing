@@ -24,6 +24,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Safe-drawing inset handling for compact overlays while the instrument canvas retains the full edge-to-edge window
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
+- Debug-only diagnostic-session foundation with accepted-strike capture, periodic audio diagnostics, user markers, bounded buffers, and ZIP/checksum export
 - Cached layered Canvas artwork, geometry, and masks created during size changes
 - Stable bitmap artwork caching on all supported devices; the experimental RenderNode backend remains disabled pending device validation
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
@@ -32,7 +33,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 
 ## Modules
 
-- `app`: activity lifecycle, immersive mode, debug configuration, audio-focus coordination, and dependency wiring
+- `app`: activity lifecycle, immersive mode, debug configuration, diagnostic-session coordination and export, audio-focus coordination, and dependency wiring
 - `core-model`: pure Kotlin/JVM instrument IDs, normalized draw geometry, typed hit regions, render metadata, strike data, snare articulation mapping, and diagnostics models
 - `engine-input`: raw multi-touch, priority hit testing, strike extraction, haptics, animation state, and Canvas rendering
 - `engine-audio`: JNI bridge, preloaded snare sample bank, and Oboe real-time audio callback
@@ -63,11 +64,11 @@ gradle --no-daemon --warning-mode=fail :core-model:check testDebugUnitTest :app:
 
 The generated PCM bank is intentionally not committed. GitHub Actions downloads the licensed source recordings, builds and verifies the 120-sample bank, packages it without compression, and publishes the bank manifest beside the APK. Source attribution is recorded in `THIRD_PARTY_NOTICES.md` and packaged with the audio assets.
 
-The GitHub Actions workflows pin the required tool versions and treat Gradle warnings as failures. `Drum Kit Quick Check` runs only the pure JVM `core-model` checks. `Drum Kit Android Validation` covers Android unit tests and application Kotlin compilation. `Drum Kit Android Lint` runs independently so lint does not delay APK delivery. The on-demand APK workflow uses the preinstalled Ubuntu 24.04 Android toolchain, builds an arm64-only debug APK, and publishes `app-debug.apk` as the `drum-kit-debug-apk` artifact. Release builds retain the full configured ABI set.
+The GitHub Actions workflows pin the required tool versions and treat Gradle warnings as failures. `Drum Kit Quick Check` runs only the pure JVM `core-model` checks. `Drum Kit Android Validation` covers Android module and application unit tests plus application Kotlin compilation. `Drum Kit Android Lint` runs independently so lint does not delay APK delivery. The on-demand APK workflow uses the preinstalled Ubuntu 24.04 Android toolchain, builds an arm64-only debug APK, and publishes `app-debug.apk` as the `drum-kit-debug-apk` artifact. Release builds retain the full configured ABI set.
 
 ## Validation status
 
-GitHub Actions is the authoritative validation path. The JVM quick check, Android validation, and Android lint run independently on pull requests. Together they cover articulation mapping, core-model tests, Android module unit tests, application Kotlin compilation, and dependency-inclusive Android lint. The on-demand APK workflow generates and verifies the acoustic bank, performs focused arm64 native C++ compilation, and packages the combined application. Release workflows generate the same bank before full-ABI native compilation, shrinking, lint, APK assembly, and bundle packaging. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
+GitHub Actions is the authoritative validation path. The JVM quick check, Android validation, and Android lint run independently on pull requests. Together they cover articulation mapping, core-model tests, Android module and application unit tests, application Kotlin compilation, and dependency-inclusive Android lint. The on-demand APK workflow generates and verifies the acoustic bank, performs focused arm64 native C++ compilation, and packages the combined application. Release workflows generate the same bank before full-ABI native compilation, shrinking, lint, APK assembly, and bundle packaging. Native C++ compilation continues to use C++20 with `-Wall`, `-Wextra`, and `-Werror`.
 
 ## Current scope
 
@@ -79,8 +80,10 @@ The audio layer preserves Android audio-focus handling, startup retry, exclusive
 
 The recording control captures an expressive strike-event take using fixed-capacity primitive buffers. Audio dispatch remains first; recording copies timing, instrument, velocity, normalized position, pressure, and contact size afterward. The take is materialized only when recording stops. PCM/WAV export remains deferred.
 
+The Step 1.2 diagnostic foundation is debug-only. One control starts a free-play diagnostic session and one control stops and exports it. The current ZIP records session/device/build metadata, accepted strikes, periodic audio diagnostics, markers, dropped-data counts, a summary, and SHA-256 checksums. Raw rejected touches, articulation and sample-selection traces, rendering telemetry, generated-output WAV capture, guided tests, lifecycle recovery, sharing, and deletion remain within the unfinished portion of Step 1.2.
+
 ## Next milestone
 
-Follow `docs/Drum_Kit_Recovery_and_Development_Roadmap.md` sequentially. Step 1.1 remains partially complete until the consolidated head passes CI and physical-device acceptance. Step 1.2 is the next implementation step and must add the in-app diagnostic session recorder without delaying audio dispatch.
+Continue `docs/Drum_Kit_Recovery_and_Development_Roadmap.md` sequentially. Step 1.1 is complete. Step 1.2 remains partially complete and should continue with raw accepted/rejected touch logging and reconstruction data before native generated-output capture or later tuning work.
 
 The raw `MotionEvent` input path, custom playable `View`, playable-surface-local strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.
