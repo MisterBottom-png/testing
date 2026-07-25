@@ -4,16 +4,17 @@
 
 These instructions apply to the entire `drum-kit-android/` project.
 
-The project is a native, offline Android musical instrument derived from the supplied `hyper_realistic_android_drum_kit.html` prototype, the native implementation plan, and the 2.5D studio-instrument redesign brief. The HTML prototype is a reference for layout, instrument mapping, interaction ideas, and sound behavior. It is not a runtime dependency and must not be embedded in a `WebView`.
+The project is a native, offline Android musical instrument derived from the supplied `hyper_realistic_android_drum_kit.html` prototype, the native implementation plan, `docs/Drum_Kit_Recovery_and_Development_Roadmap.md`, and the 2.5D studio-instrument redesign brief. The HTML prototype is a reference for layout, instrument mapping, interaction ideas, and sound behavior. It is not a runtime dependency and must not be embedded in a `WebView`.
 
 When instructions conflict, use this priority:
 
 1. User or task-specific requirements
 2. This file
-3. `docs/source-mapping.md`
-4. `README.md`
-5. The implementation plan, redesign brief, and HTML prototype
-6. Existing local conventions
+3. `docs/Drum_Kit_Recovery_and_Development_Roadmap.md`
+4. `docs/source-mapping.md`
+5. `README.md`
+6. The implementation plan, redesign brief, and HTML prototype
+7. Existing local conventions
 
 ## Product invariant
 
@@ -42,7 +43,7 @@ Implemented:
 - Viewport-aware rotation shared by rendering, hit testing, strike coordinates, and diagnostics
 - Independent render depth and hit-test priority
 - Cached layered Canvas artwork, support hardware, occlusion masks, and grounded shadows
-- RenderNode display-list caching on API 29+ hardware canvases with bitmap fallback on API 26–28 and software canvases
+- Bitmap artwork caching as the production backend on all supported devices; the RenderNode implementation remains disabled pending device revalidation
 - Position-, velocity-, and instrument-specific deformation and rebound
 - Pressure, contact-size, position, and velocity data capture
 - Kotlin-to-C++ JNI bridge and native C++20 Oboe audio engine
@@ -53,13 +54,13 @@ Known remaining redesign targets:
 
 - Representative-device frame-time and bitmap-memory profiling
 - Physical-device hit-region refinement and accessibility play testing
-- Production samples, velocity layers, round robins, and expressive zones
+- Production sample banks and expressive zones for kick, toms, hi-hat, crash, and ride
 - Continuous hi-hat, damping, pitch, choke, and recording-export behavior
 
 Deliberately deferred unless a task explicitly includes them:
 
-- Production samples, velocity layers, and round robins
-- Five-zone snare behavior
+- Production sample banks, velocity layers, and round robins for kick, toms, hi-hat, crash, and ride
+- Deliberate snare articulation gesture refinement, including cross-stick and rimshot selection
 - Continuous pressure damping and pitch bend
 - Continuous hi-hat openness and pedal events
 - Cymbal bell, bow, edge, choke, and mute behavior
@@ -75,6 +76,7 @@ Do not disguise deferred behavior with brittle UI-only approximations. Implement
 - `engine-input/`: raw `MotionEvent` handling, multi-touch tracking, hit testing, haptics, animation state, and custom View rendering
 - `engine-audio/`: Kotlin JNI facade, CMake configuration, Oboe stream, event queue, voice rendering, mixing, and diagnostics
 - `feature-kit/`: Compose play screen, compact controls, settings overlays, and embedding of the playable surface
+- `docs/Drum_Kit_Recovery_and_Development_Roadmap.md`: authoritative recovery and development sequence with implementation status
 - `docs/source-mapping.md`: retained mapping from prototype IDs to native codes, panning, behavior, and deferred scope
 
 Keep dependency direction simple:
@@ -350,8 +352,8 @@ The playable surface remains a hardware-accelerated custom `View` unless a task 
 - Use `postInvalidateOnAnimation()` for animation frames.
 - Stop scheduling frames when all animations have decayed.
 - Reduce unnecessary transparent overlays and full-screen gradients.
-- Use `RenderNode` caching on supported Android versions.
-- Keep a Canvas fallback for older devices.
+- Keep bitmap caching as the production backend until representative-device validation supports a change.
+- Retain the RenderNode implementation only as an explicitly profiled, disabled alternative.
 - AGSL effects are optional enhancements and require a non-shader fallback.
 - Keep rendering technology independent from input and audio contracts.
 - Consider OpenGL only after profiling proves the 2.5D Canvas/RenderNode renderer insufficient.
