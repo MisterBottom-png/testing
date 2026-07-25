@@ -50,6 +50,7 @@ import kotlinx.coroutines.withContext
 private const val NativeOutcomePollIntervalMillis = 50L
 private const val NativeOutcomeFinalPollIntervalMillis = 5L
 private const val NativeOutcomeFinalPollLimit = 20
+private const val AudioRoutePollIntervalMillis = 1_000L
 
 @Composable
 internal fun DiagnosticDrumKitScreen(
@@ -78,7 +79,9 @@ internal fun DiagnosticDrumKitScreen(
     var roomLevel by remember { mutableFloatStateOf(0.32f) }
     var status by remember { mutableStateOf("Diagnostic session idle") }
     var viewportSize by remember { mutableStateOf(Size.Zero) }
-    val bottomInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+    var audioRoute by remember { mutableStateOf(DiagnosticAudioRouteResolver.resolve(context)) }
+    var audioRouteWarning by remember { mutableStateOf<String?>(null) }
+    val topInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
 
     val saveBundleLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip"),
@@ -144,6 +147,20 @@ internal fun DiagnosticDrumKitScreen(
         onFrame = frameObserver,
     )
 
+    LaunchedEffect(context) {
+        while (true) {
+            val diagnostics = AudioEngine.diagnostics()
+            val resolvedRoute = DiagnosticAudioRouteResolver.resolve(context)
+            audioRoute = resolvedRoute
+            audioRouteWarning = DiagnosticAudioLatencyAssessment.warningText(
+                route = resolvedRoute,
+                sampleRate = diagnostics.sampleRate,
+                framesPerBurst = diagnostics.framesPerBurst,
+            )
+            delay(AudioRoutePollIntervalMillis)
+        }
+    }
+
     LaunchedEffect(isRecording) {
         if (!isRecording) return@LaunchedEffect
         while (isRecording) {
@@ -202,9 +219,9 @@ internal fun DiagnosticDrumKitScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .windowInsetsPadding(bottomInsets)
-                .padding(start = 8.dp, bottom = 8.dp)
+                .align(Alignment.TopCenter)
+                .windowInsetsPadding(topInsets)
+                .padding(top = 6.dp)
                 .background(Color(0xcc08090b), MaterialTheme.shapes.medium)
                 .padding(6.dp),
         ) {
@@ -259,11 +276,19 @@ internal fun DiagnosticDrumKitScreen(
                         }
                     } else {
                         val diagnostics = AudioEngine.diagnostics()
+                        val resolvedRoute = DiagnosticAudioRouteResolver.resolve(context)
+                        audioRoute = resolvedRoute
+                        audioRouteWarning = DiagnosticAudioLatencyAssessment.warningText(
+                            route = resolvedRoute,
+                            sampleRate = diagnostics.sampleRate,
+                            framesPerBurst = diagnostics.framesPerBurst,
+                        )
                         val metadata = DiagnosticMetadataFactory.create(
                             context = context,
                             diagnostics = diagnostics,
                             masterVolume = masterVolume,
                             roomLevel = roomLevel,
+                            audioRoute = resolvedRoute,
                         )
                         val staleOutcomes = AudioEngine.drainDiagnosticDispatchOutcomes()
                         val sessionId = recorder.start(metadata)
@@ -335,9 +360,9 @@ internal fun DiagnosticDrumKitScreen(
             }
 
             Text(
-                text = status,
+                text = audioRouteWarning?.let { "$status · $it" } ?: status,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xffaab2bf),
+                color = if (audioRouteWarning == null) Color(0xffaab2bf) else Color(0xffffbd66),
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
         }
