@@ -6,13 +6,28 @@ import com.vitautas.drumkit.model.SnareArticulation
 import com.vitautas.drumkit.model.SnareArticulationResolver
 import kotlin.math.floor
 
+enum class NativeQueueState(val code: Int, val wireName: String) {
+    UNOBSERVED(-1, "unobserved"),
+    ENGINE_STOPPED(0, "engine_stopped"),
+    INVALID_INPUT(1, "invalid_input"),
+    QUEUE_FULL(2, "queue_full"),
+    ENQUEUED(3, "enqueued"),
+    UNKNOWN(Int.MIN_VALUE, "unknown"),
+    ;
+
+    companion object {
+        fun fromCode(code: Int): NativeQueueState = entries.firstOrNull { it.code == code } ?: UNKNOWN
+    }
+}
+
 /**
  * Request-side diagnostic trace captured after JNI dispatch.
  *
- * Values that can only be known inside the native callback remain null and are
- * deliberately labelled as unobserved rather than predicted.
+ * Values that can only be known inside the native callback remain null until a
+ * matching [NativeDispatchOutcome] is drained outside the real-time callback.
  */
 data class AudioDispatchDecision(
+    val diagnosticToken: Long,
     val instrument: InstrumentId,
     val sanitizedVelocity: Float,
     val sanitizedNormalizedX: Float,
@@ -36,18 +51,22 @@ data class AudioDispatchDecision(
 
 internal inline fun <T> dispatchAudioFirst(
     strike: DrumStrike,
+    diagnosticToken: Long = 0L,
     nativeTrigger: (
         instrument: Int,
         articulation: Int,
         velocity: Float,
         normalizedX: Float,
         normalizedY: Float,
-    ) -> Unit,
+        diagnosticToken: Long,
+    ) -> Int,
     afterDispatch: (
         sanitizedVelocity: Float,
         sanitizedNormalizedX: Float,
         sanitizedNormalizedY: Float,
         articulation: SnareArticulation?,
+        queueState: NativeQueueState,
+        diagnosticToken: Long,
     ) -> T,
 ): T {
     val velocity = AudioInputSanitizer.velocity(strike.velocity)
@@ -63,15 +82,25 @@ internal inline fun <T> dispatchAudioFirst(
         null
     }
 
-    nativeTrigger(
-        strike.instrument.nativeCode,
-        articulation?.nativeCode ?: SnareArticulation.CENTER.nativeCode,
+    val queueState = NativeQueueState.fromCode(
+        nativeTrigger(
+            strike.instrument.nativeCode,
+            articulation?.nativeCode ?: SnareArticulation.CENTER.nativeCode,
+            velocity,
+            normalizedX,
+            normalizedY,
+            diagnosticToken,
+        ),
+    )
+
+    return afterDispatch(
         velocity,
         normalizedX,
         normalizedY,
+        articulation,
+        queueState,
+        diagnosticToken,
     )
-
-    return afterDispatch(velocity, normalizedX, normalizedY, articulation)
 }
 
 object AudioDispatchDecisionFactory {
@@ -96,6 +125,8 @@ object AudioDispatchDecisionFactory {
             sanitizedNormalizedX = normalizedX,
             sanitizedNormalizedY = normalizedY,
             articulation = articulation,
+            diagnosticToken = 0L,
+            queueState = NativeQueueState.UNOBSERVED,
         )
     }
 
@@ -105,6 +136,8 @@ object AudioDispatchDecisionFactory {
         sanitizedNormalizedX: Float,
         sanitizedNormalizedY: Float,
         articulation: SnareArticulation?,
+        diagnosticToken: Long,
+        queueState: NativeQueueState,
     ): AudioDispatchDecision {
         val layerPosition = if (articulation != null) sanitizedVelocity * (SnareLayerCount - 1) else null
         val lowerLayer = layerPosition?.let { floor(it).toInt().coerceIn(0, SnareLayerCount - 1) }
@@ -116,6 +149,7 @@ object AudioDispatchDecisionFactory {
         }
 
         return AudioDispatchDecision(
+            diagnosticToken = diagnosticToken.coerceAtLeast(0L),
             instrument = strike.instrument,
             sanitizedVelocity = sanitizedVelocity,
             sanitizedNormalizedX = sanitizedNormalizedX,
@@ -131,7 +165,7 @@ object AudioDispatchDecisionFactory {
             gainVariation = null,
             filterVariation = null,
             stereoPan = actualNativePan(strike.instrument),
-            nativeQueueState = "native_trigger_invoked_unobserved",
+            nativeQueueState = queueState.wireName,
             activeVoiceCount = null,
             voiceStealOccurred = null,
             nativeSelectionTraceAvailable = false,
