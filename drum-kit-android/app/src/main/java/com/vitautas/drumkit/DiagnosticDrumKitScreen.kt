@@ -1,5 +1,7 @@
 package com.vitautas.drumkit
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,11 +37,11 @@ import androidx.compose.ui.unit.dp
 import com.vitautas.drumkit.audio.AudioEngine
 import com.vitautas.drumkit.feature.kit.DrumKitScreen
 import com.vitautas.drumkit.feature.kit.DrumKitSessionController
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 private const val NativeOutcomePollIntervalMillis = 50L
 private const val NativeOutcomeFinalPollIntervalMillis = 5L
@@ -57,11 +59,60 @@ internal fun DiagnosticDrumKitScreen(
     val dispatchTraceRecorder = remember { DiagnosticDispatchTraceRecorder() }
     var isRecording by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
+    var isChoosingSaveLocation by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var latestBundle by remember { mutableStateOf<File?>(null) }
+    var pendingSaveBundle by remember { mutableStateOf<File?>(null) }
     var markerMenuExpanded by remember { mutableStateOf(false) }
     var masterVolume by remember { mutableFloatStateOf(0.76f) }
     var roomLevel by remember { mutableFloatStateOf(0.32f) }
     var status by remember { mutableStateOf("Diagnostic session idle") }
     val bottomInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+
+    val saveBundleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip"),
+    ) { destination ->
+        isChoosingSaveLocation = false
+        val source = pendingSaveBundle
+        pendingSaveBundle = null
+        if (destination == null) {
+            status = source?.let { "Save cancelled · ${it.name}" } ?: "Save cancelled"
+            return@rememberLauncherForActivityResult
+        }
+        if (source == null || !source.isFile) {
+            status = "Save failed: diagnostic bundle unavailable"
+            return@rememberLauncherForActivityResult
+        }
+
+        isSaving = true
+        status = "Saving ${source.name}"
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val output = checkNotNull(context.contentResolver.openOutputStream(destination)) {
+                        "selected destination is unavailable"
+                    }
+                    DiagnosticBundleSaver.copyTo(source, output)
+                }
+            }.onSuccess { copiedBytes ->
+                status = "Saved ${source.name} · $copiedBytes bytes"
+            }.onFailure { failure ->
+                status = "Save failed: ${failure.message ?: failure::class.java.simpleName}"
+            }
+            isSaving = false
+        }
+    }
+
+    fun requestBundleSave(file: File) {
+        if (!file.isFile) {
+            status = "Save failed: diagnostic bundle unavailable"
+            return
+        }
+        pendingSaveBundle = file
+        isChoosingSaveLocation = true
+        status = "Choose save location · ${file.name}"
+        saveBundleLauncher.launch(file.name)
+    }
 
     DisposableEffect(recorder, onTouchObserverChanged) {
         val observer: DiagnosticTouchObserver = { event, viewportWidth, viewportHeight ->
@@ -156,7 +207,8 @@ internal fun DiagnosticDrumKitScreen(
                                     result
                                 }
                             }.onSuccess { result ->
-                                status = "${result.touchEventCount} touches · ${result.strikeCount} strikes · ${result.file.name}"
+                                latestBundle = result.file
+                                requestBundleSave(result.file)
                             }.onFailure { failure ->
                                 status = "Export failed: ${failure.message ?: failure::class.java.simpleName}"
                             }
@@ -178,7 +230,7 @@ internal fun DiagnosticDrumKitScreen(
                         status = "Recording ${sessionId.take(8)}"
                     }
                 },
-                enabled = audioAvailable && !isExporting,
+                enabled = audioAvailable && !isExporting && !isSaving && !isChoosingSaveLocation,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = if (isRecording) Color(0xffa93232) else Color(0xff292d32),
                     contentColor = Color(0xfff7f4ee),
@@ -211,6 +263,18 @@ internal fun DiagnosticDrumKitScreen(
                         )
                     }
                 }
+            }
+
+            FilledTonalButton(
+                onClick = { latestBundle?.let(::requestBundleSave) },
+                enabled = latestBundle?.isFile == true &&
+                    !isRecording &&
+                    !isExporting &&
+                    !isSaving &&
+                    !isChoosingSaveLocation,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(if (isSaving) "SAVING" else "SAVE ZIP")
             }
 
             Text(
