@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.res.AssetManager
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
-import com.vitautas.drumkit.model.SnareArticulation
 
 object AudioEngine {
     init {
@@ -18,24 +17,34 @@ object AudioEngine {
     }
 
     fun trigger(strike: DrumStrike) {
-        triggerWithDiagnostics(strike)
+        dispatchAudioFirst(
+            strike = strike,
+            nativeTrigger = { instrument, articulation, velocity, normalizedX, normalizedY ->
+                nativeTrigger(instrument, articulation, velocity, normalizedX, normalizedY)
+            },
+            afterDispatch = { _, _, _, _ -> Unit },
+        )
     }
 
     /**
-     * Dispatches audio first, then returns the request-side decision for debug recording.
+     * Dispatches audio before constructing the request-side diagnostic decision.
      * Native callback outcomes are intentionally not inferred here.
      */
-    fun triggerWithDiagnostics(strike: DrumStrike): AudioDispatchDecision {
-        val decision = AudioDispatchDecisionFactory.create(strike)
-        nativeTrigger(
-            instrument = decision.instrument.nativeCode,
-            articulation = decision.articulation?.nativeCode ?: SnareArticulation.CENTER.nativeCode,
-            velocity = decision.sanitizedVelocity,
-            normalizedX = decision.sanitizedNormalizedX,
-            normalizedY = decision.sanitizedNormalizedY,
-        )
-        return decision
-    }
+    fun triggerWithDiagnostics(strike: DrumStrike): AudioDispatchDecision = dispatchAudioFirst(
+        strike = strike,
+        nativeTrigger = { instrument, articulation, velocity, normalizedX, normalizedY ->
+            nativeTrigger(instrument, articulation, velocity, normalizedX, normalizedY)
+        },
+        afterDispatch = { velocity, normalizedX, normalizedY, articulation ->
+            AudioDispatchDecisionFactory.createFromDispatchedValues(
+                strike = strike,
+                sanitizedVelocity = velocity,
+                sanitizedNormalizedX = normalizedX,
+                sanitizedNormalizedY = normalizedY,
+                articulation = articulation,
+            )
+        },
+    )
 
     fun setMasterVolume(value: Float) {
         AudioInputSanitizer.level(value)?.let(::nativeSetMasterVolume)
