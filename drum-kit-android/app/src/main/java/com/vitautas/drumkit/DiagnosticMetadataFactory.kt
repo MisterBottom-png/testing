@@ -17,9 +17,7 @@ internal object DiagnosticMetadataFactory {
         roomLevel: Float,
     ): DiagnosticSessionMetadata {
         val windowManager = context.getSystemService(WindowManager::class.java)
-        val bounds = windowManager.currentWindowMetrics.bounds
         val displayMetrics = context.resources.displayMetrics
-        val refreshRate = context.display.refreshRate
         val orientation = when (context.resources.configuration.orientation) {
             Configuration.ORIENTATION_LANDSCAPE -> "landscape"
             Configuration.ORIENTATION_PORTRAIT -> "portrait"
@@ -34,10 +32,10 @@ internal object DiagnosticMetadataFactory {
             deviceManufacturer = Build.MANUFACTURER,
             deviceModel = Build.MODEL,
             androidVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            screenWidthPx = bounds.width(),
-            screenHeightPx = bounds.height(),
+            screenWidthPx = displayMetrics.widthPixels,
+            screenHeightPx = displayMetrics.heightPixels,
             densityDpi = displayMetrics.densityDpi,
-            refreshRateHz = refreshRate,
+            refreshRateHz = refreshRate(context, windowManager),
             orientation = orientation,
             audioOutputRoute = describeOutputDevices(context.getSystemService(AudioManager::class.java)),
             audioSampleRate = diagnostics.sampleRate,
@@ -53,6 +51,14 @@ internal object DiagnosticMetadataFactory {
             sessionMode = "free_play",
         )
     }
+
+    @Suppress("DEPRECATION")
+    private fun refreshRate(context: Context, windowManager: WindowManager): Float =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display.refreshRate
+        } else {
+            windowManager.defaultDisplay.refreshRate
+        }
 
     private fun describeOutputDevices(audioManager: AudioManager): String {
         val deviceTypes = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
