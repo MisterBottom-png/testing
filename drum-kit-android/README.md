@@ -1,8 +1,8 @@
 # Native Android Drum Kit
 
-A native Android foundation derived from the supplied single-file HTML drum kit, implementation plan, and 2.5D studio-instrument redesign brief.
+A native Android foundation derived from the supplied single-file HTML drum kit, implementation plan, recovery and development roadmap, and 2.5D studio-instrument redesign brief.
 
-The source prototype is treated as a layout, instrument-mapping, and interaction reference only. The application does not use a WebView. The extracted mapping and foundation scope are documented in `docs/source-mapping.md`.
+The source prototype is treated as a layout, instrument-mapping, and interaction reference only. The application does not use a WebView. The execution order and status are tracked in `docs/Drum_Kit_Recovery_and_Development_Roadmap.md`; extracted mapping and foundation scope are documented in `docs/source-mapping.md`.
 
 ## Included foundation
 
@@ -81,10 +81,6 @@ The recording control captures an expressive strike-event take using fixed-capac
 
 ## Next milestone
 
-1. Device-listen to repeated centre, edge, rimshot, and cross-stick strokes and tune bank balance only from recorded evidence.
-2. Profile rapid multi-touch rendering and sample-bank memory on representative phones and tablets.
-3. Validate and refine the corrected hit regions and snare gesture zones using physical-device play tests.
-4. Replace the remaining synthesized instruments with licensed velocity-layered sample banks in measured batches.
-5. Add continuous hi-hat, damping, pitch, choke, strike-take playback, and later PCM/WAV recording export.
+Follow `docs/Drum_Kit_Recovery_and_Development_Roadmap.md` sequentially. Step 1.1 remains partially complete until the consolidated head passes CI and physical-device acceptance. Step 1.2 is the next implementation step and must add the in-app diagnostic session recorder without delaying audio dispatch.
 
 The raw `MotionEvent` input path, custom playable `View`, playable-surface-local strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.
