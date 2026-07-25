@@ -41,6 +41,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val NativeOutcomePollIntervalMillis = 50L
+private const val NativeOutcomeFinalPollIntervalMillis = 5L
+private const val NativeOutcomeFinalPollLimit = 20
+
 @Composable
 internal fun DiagnosticDrumKitScreen(
     sessionController: DrumKitSessionController,
@@ -68,18 +72,29 @@ internal fun DiagnosticDrumKitScreen(
     }
 
     LaunchedEffect(isRecording) {
+        if (!isRecording) return@LaunchedEffect
         while (isRecording) {
             recorder.recordAudioDiagnostics(AudioEngine.diagnostics())
-            delay(500)
+            repeat(10) {
+                if (!isRecording) return@LaunchedEffect
+                dispatchTraceRecorder.recordNativeOutcomes(
+                    AudioEngine.drainDiagnosticDispatchOutcomes(),
+                )
+                delay(NativeOutcomePollIntervalMillis)
+            }
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         DrumKitScreen(
             onStrike = { strike ->
-                val dispatchDecision = AudioEngine.triggerWithDiagnostics(strike)
-                recorder.recordStrike(strike)
-                dispatchTraceRecorder.record(strike, dispatchDecision)
+                if (isRecording) {
+                    val dispatchDecision = AudioEngine.triggerWithDiagnostics(strike)
+                    recorder.recordStrike(strike)
+                    dispatchTraceRecorder.record(strike, dispatchDecision)
+                } else {
+                    AudioEngine.trigger(strike)
+                }
             },
             onMasterVolumeChanged = { value ->
                 masterVolume = value
@@ -109,12 +124,28 @@ internal fun DiagnosticDrumKitScreen(
                 onClick = {
                     if (isRecording) {
                         val capture = recorder.stop()
-                        val dispatchTraceCapture = dispatchTraceRecorder.stop()
                         isRecording = false
                         isExporting = true
-                        status = "Exporting diagnostic bundle"
+                        status = "Finalising native trace"
                         scope.launch {
                             runCatching {
+                                var attempts = 0
+                                while (
+                                    attempts < NativeOutcomeFinalPollLimit &&
+                                    dispatchTraceRecorder.hasPendingNativeOutcomes()
+                                ) {
+                                    dispatchTraceRecorder.recordNativeOutcomes(
+                                        AudioEngine.drainDiagnosticDispatchOutcomes(),
+                                    )
+                                    if (!dispatchTraceRecorder.hasPendingNativeOutcomes()) break
+                                    attempts += 1
+                                    delay(NativeOutcomeFinalPollIntervalMillis)
+                                }
+                                dispatchTraceRecorder.recordNativeOutcomes(
+                                    AudioEngine.drainDiagnosticDispatchOutcomes(),
+                                )
+                                val dispatchTraceCapture = dispatchTraceRecorder.stop()
+                                status = "Exporting diagnostic bundle"
                                 withContext(Dispatchers.IO) {
                                     val result = recorder.export(capture, File(context.cacheDir, "diagnostics"))
                                     dispatchTraceRecorder.augmentBundle(
@@ -139,8 +170,9 @@ internal fun DiagnosticDrumKitScreen(
                             masterVolume = masterVolume,
                             roomLevel = roomLevel,
                         )
+                        val staleOutcomes = AudioEngine.drainDiagnosticDispatchOutcomes()
                         val sessionId = recorder.start(metadata)
-                        dispatchTraceRecorder.start()
+                        dispatchTraceRecorder.start(staleOutcomes.droppedOutcomeCount)
                         recorder.recordAudioDiagnostics(diagnostics)
                         isRecording = true
                         status = "Recording ${sessionId.take(8)}"
