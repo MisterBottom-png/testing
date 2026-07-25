@@ -30,7 +30,7 @@ The application is already functional. The remaining work is primarily repositor
 
 ## Implementation Status
 
-- **Step 1.1 — partially complete (2026-07-25):** PRs #7, #8, and #9 were audited. PR #8 is fully included in PR #9 by ancestry. PR #7 is not included by commit ancestry, but its required sample-first snare, tooling, attribution, tests, and workflow capabilities are present or superseded in PR #9. PR #9 now targets `main`. CI and build artefacts for the pre-documentation head were verified. Documentation alignment, CI validation of the updated head, physical-device acceptance, and closing superseded PRs remain.
+- **Step 1.1 — partially complete (2026-07-25):** PRs #7, #8, and #9 were audited. PR #9 now targets `main` as the authoritative implementation line. PR #8 is included by ancestry; PR #7's required sample-first snare, tooling, attribution, tests, and workflow capabilities are present or superseded in PR #9. The roadmap, `README.md`, `AGENTS.md`, and `docs/source-mapping.md` are aligned. The updated head passes JVM quick checks, Android unit/Kotlin validation, and Android lint. PRs #7 and #8 are closed as superseded. A fresh exact-head APK build is queued; physical-device installation, launch, audio-start diagnostics, and multi-touch acceptance have not been rerun after consolidation.
 - **Step 1.2 — not started:** no diagnostic-session recorder implementation has begun.
 
 ---
