@@ -7,7 +7,7 @@ import com.vitautas.drumkit.model.SnareArticulationResolver
 import kotlin.math.floor
 
 /**
- * Request-side diagnostic trace captured before JNI dispatch.
+ * Request-side diagnostic trace captured after JNI dispatch.
  *
  * Values that can only be known inside the native callback remain null and are
  * deliberately labelled as unobserved rather than predicted.
@@ -34,6 +34,46 @@ data class AudioDispatchDecision(
     val nativeSelectionTraceAvailable: Boolean,
 )
 
+internal inline fun <T> dispatchAudioFirst(
+    strike: DrumStrike,
+    nativeTrigger: (
+        instrument: Int,
+        articulation: Int,
+        velocity: Float,
+        normalizedX: Float,
+        normalizedY: Float,
+    ) -> Unit,
+    afterDispatch: (
+        sanitizedVelocity: Float,
+        sanitizedNormalizedX: Float,
+        sanitizedNormalizedY: Float,
+        articulation: SnareArticulation?,
+    ) -> T,
+): T {
+    val velocity = AudioInputSanitizer.velocity(strike.velocity)
+    val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
+    val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
+    val articulation = if (strike.instrument == InstrumentId.SNARE) {
+        SnareArticulationResolver.resolve(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            velocity = velocity,
+        )
+    } else {
+        null
+    }
+
+    nativeTrigger(
+        strike.instrument.nativeCode,
+        articulation?.nativeCode ?: SnareArticulation.CENTER.nativeCode,
+        velocity,
+        normalizedX,
+        normalizedY,
+    )
+
+    return afterDispatch(velocity, normalizedX, normalizedY, articulation)
+}
+
 object AudioDispatchDecisionFactory {
     private const val SnareLayerCount = 6
 
@@ -50,7 +90,23 @@ object AudioDispatchDecisionFactory {
         } else {
             null
         }
-        val layerPosition = if (articulation != null) velocity * (SnareLayerCount - 1) else null
+        return createFromDispatchedValues(
+            strike = strike,
+            sanitizedVelocity = velocity,
+            sanitizedNormalizedX = normalizedX,
+            sanitizedNormalizedY = normalizedY,
+            articulation = articulation,
+        )
+    }
+
+    internal fun createFromDispatchedValues(
+        strike: DrumStrike,
+        sanitizedVelocity: Float,
+        sanitizedNormalizedX: Float,
+        sanitizedNormalizedY: Float,
+        articulation: SnareArticulation?,
+    ): AudioDispatchDecision {
+        val layerPosition = if (articulation != null) sanitizedVelocity * (SnareLayerCount - 1) else null
         val lowerLayer = layerPosition?.let { floor(it).toInt().coerceIn(0, SnareLayerCount - 1) }
         val upperLayer = lowerLayer?.let { (it + 1).coerceAtMost(SnareLayerCount - 1) }
         val blend = if (layerPosition != null && lowerLayer != null) {
@@ -61,9 +117,9 @@ object AudioDispatchDecisionFactory {
 
         return AudioDispatchDecision(
             instrument = strike.instrument,
-            sanitizedVelocity = velocity,
-            sanitizedNormalizedX = normalizedX,
-            sanitizedNormalizedY = normalizedY,
+            sanitizedVelocity = sanitizedVelocity,
+            sanitizedNormalizedX = sanitizedNormalizedX,
+            sanitizedNormalizedY = sanitizedNormalizedY,
             velocityEstimatorInputMode = velocityEstimatorInputMode(strike),
             articulation = articulation,
             lowerVelocityLayer = lowerLayer,
