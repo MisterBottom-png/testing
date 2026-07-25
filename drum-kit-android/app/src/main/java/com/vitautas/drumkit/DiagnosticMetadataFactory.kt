@@ -3,8 +3,6 @@ package com.vitautas.drumkit
 import android.app.ActivityManager
 import android.content.Context
 import android.content.res.Configuration
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
 import android.os.Build
 import android.view.WindowManager
 import com.vitautas.drumkit.model.AudioDiagnostics
@@ -15,6 +13,7 @@ internal object DiagnosticMetadataFactory {
         diagnostics: AudioDiagnostics,
         masterVolume: Float,
         roomLevel: Float,
+        audioRoute: DiagnosticAudioRoute = DiagnosticAudioRouteResolver.resolve(context),
     ): DiagnosticSessionMetadata {
         val windowManager = context.getSystemService(WindowManager::class.java)
         val displayMetrics = context.resources.displayMetrics
@@ -37,7 +36,11 @@ internal object DiagnosticMetadataFactory {
             densityDpi = displayMetrics.densityDpi,
             refreshRateHz = refreshRate(context, windowManager),
             orientation = orientation,
-            audioOutputRoute = describeOutputDevices(context.getSystemService(AudioManager::class.java)),
+            audioOutputRoute = DiagnosticAudioLatencyAssessment.metadataDescription(
+                route = audioRoute,
+                sampleRate = diagnostics.sampleRate,
+                framesPerBurst = diagnostics.framesPerBurst,
+            ),
             audioSampleRate = diagnostics.sampleRate,
             framesPerBurst = diagnostics.framesPerBurst,
             oboeSharingMode = "not_exposed_by_current_diagnostics",
@@ -59,16 +62,4 @@ internal object DiagnosticMetadataFactory {
         } else {
             windowManager.defaultDisplay.refreshRate
         }
-
-    private fun describeOutputDevices(audioManager: AudioManager): String {
-        val deviceTypes = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            .map(AudioDeviceInfo::getType)
-            .distinct()
-            .sorted()
-        return if (deviceTypes.isEmpty()) {
-            "system_default"
-        } else {
-            "available_types:${deviceTypes.joinToString("|")}"
-        }
-    }
 }
