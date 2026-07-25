@@ -29,18 +29,24 @@ class MainActivity : ComponentActivity() {
         audioSessionController = AudioSessionController(this) { available ->
             audioAvailableState.value = available
         }
-        val showDiagnostics = BuildConfig.DEBUG
         setContent {
             NativeDrumKitTheme {
-                DrumKitScreen(
-                    onStrike = AudioEngine::trigger,
-                    onMasterVolumeChanged = AudioEngine::setMasterVolume,
-                    onRoomMixChanged = AudioEngine::setRoomMix,
-                    diagnosticsProvider = AudioEngine::diagnostics,
-                    sessionController = kitSessionController,
-                    audioAvailable = audioAvailableState.value,
-                    showDiagnostics = showDiagnostics,
-                )
+                if (BuildConfig.DEBUG) {
+                    DiagnosticDrumKitScreen(
+                        sessionController = kitSessionController,
+                        audioAvailable = audioAvailableState.value,
+                    )
+                } else {
+                    DrumKitScreen(
+                        onStrike = AudioEngine::trigger,
+                        onMasterVolumeChanged = AudioEngine::setMasterVolume,
+                        onRoomMixChanged = AudioEngine::setRoomMix,
+                        diagnosticsProvider = AudioEngine::diagnostics,
+                        sessionController = kitSessionController,
+                        audioAvailable = audioAvailableState.value,
+                        showDiagnostics = false,
+                    )
+                }
             }
         }
     }
