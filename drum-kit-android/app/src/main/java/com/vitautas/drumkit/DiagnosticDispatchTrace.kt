@@ -1,6 +1,9 @@
 package com.vitautas.drumkit
 
 import com.vitautas.drumkit.audio.AudioDispatchDecision
+import com.vitautas.drumkit.audio.NativeDispatchOutcome
+import com.vitautas.drumkit.audio.NativeDispatchOutcomeBatch
+import com.vitautas.drumkit.audio.NativeQueueState
 import com.vitautas.drumkit.model.DrumStrike
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -12,12 +15,19 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-private const val DiagnosticDispatchSchemaVersion = 1
+private const val DiagnosticDispatchSchemaVersion = 2
 private const val DefaultDispatchDecisionCapacity = 16_384
+private const val DefaultNativeOutcomeCapacity = 16_384
 
 private data class DispatchStrikeKey(
     val eventTimeNanos: Long,
     val pointerId: Int,
+)
+
+private data class NativeTraceStats(
+    val matchedOutcomeCount: Int,
+    val unmatchedEnqueuedDecisionCount: Int,
+    val unmatchedOutcomeCount: Int,
 )
 
 internal data class RecordedDiagnosticDispatchDecision(
@@ -29,36 +39,56 @@ internal data class RecordedDiagnosticDispatchDecision(
 
 internal data class DiagnosticDispatchTraceCapture(
     val decisions: List<RecordedDiagnosticDispatchDecision>,
+    val nativeOutcomes: List<NativeDispatchOutcome>,
     val droppedDecisionCount: Int,
+    val droppedNativeOutcomeCount: Int,
+    val droppedNativeOutcomeRecordCount: Int,
 )
 
 /**
- * Bounded request-side dispatch trace for Step 1.2.
+ * Bounded request-side and callback-outcome trace for Step 1.2.
  *
- * This recorder runs after AudioEngine has invoked JNI. It records only values
- * that are known on the Kotlin side and leaves native callback outcomes null.
+ * Request decisions are recorded only after JNI returns. Native callback
+ * outcomes arrive through a fixed-capacity native ring that Kotlin drains
+ * outside the real-time callback.
  */
 internal class DiagnosticDispatchTraceRecorder(
     decisionCapacity: Int = DefaultDispatchDecisionCapacity,
+    nativeOutcomeCapacity: Int = DefaultNativeOutcomeCapacity,
     private val monotonicClockNanos: () -> Long = System::nanoTime,
 ) {
-    private val capacity = decisionCapacity.positive("decisionCapacity")
-    private val decisions = ArrayList<RecordedDiagnosticDispatchDecision>(capacity.coerceAtMost(1_024))
+    private val validatedDecisionCapacity = decisionCapacity.positive("decisionCapacity")
+    private val validatedNativeOutcomeCapacity = nativeOutcomeCapacity.positive("nativeOutcomeCapacity")
+    private val decisions = ArrayList<RecordedDiagnosticDispatchDecision>(
+        validatedDecisionCapacity.coerceAtMost(1_024),
+    )
+    private val nativeOutcomes = ArrayList<NativeDispatchOutcome>(
+        validatedNativeOutcomeCapacity.coerceAtMost(1_024),
+    )
+    private val nativeOutcomeTokens = HashSet<Long>()
     private var sessionStartNanos = 0L
     private var recording = false
     private var droppedDecisionCount = 0
+    private var droppedNativeOutcomeBaseline = 0
+    private var latestDroppedNativeOutcomeCount = 0
+    private var droppedNativeOutcomeRecordCount = 0
 
-    fun start() {
+    fun start(droppedNativeOutcomeBaseline: Int = 0) {
         check(!recording) { "diagnostic dispatch trace already active" }
         decisions.clear()
+        nativeOutcomes.clear()
+        nativeOutcomeTokens.clear()
         droppedDecisionCount = 0
+        this.droppedNativeOutcomeBaseline = droppedNativeOutcomeBaseline.coerceAtLeast(0)
+        latestDroppedNativeOutcomeCount = this.droppedNativeOutcomeBaseline
+        droppedNativeOutcomeRecordCount = 0
         sessionStartNanos = monotonicClockNanos()
         recording = true
     }
 
     fun record(strike: DrumStrike, decision: AudioDispatchDecision) {
         if (!recording) return
-        if (decisions.size >= capacity) {
+        if (decisions.size >= validatedDecisionCapacity) {
             droppedDecisionCount += 1
             return
         }
@@ -70,21 +100,56 @@ internal class DiagnosticDispatchTraceRecorder(
         )
     }
 
+    fun recordNativeOutcomes(batch: NativeDispatchOutcomeBatch) {
+        if (!recording) return
+        latestDroppedNativeOutcomeCount = maxOf(
+            latestDroppedNativeOutcomeCount,
+            batch.droppedOutcomeCount.coerceAtLeast(0),
+        )
+        batch.outcomes.forEach { outcome ->
+            if (outcome.diagnosticToken <= 0L || !nativeOutcomeTokens.add(outcome.diagnosticToken)) {
+                return@forEach
+            }
+            if (nativeOutcomes.size >= validatedNativeOutcomeCapacity) {
+                droppedNativeOutcomeRecordCount += 1
+                return@forEach
+            }
+            nativeOutcomes += outcome
+        }
+    }
+
+    fun hasPendingNativeOutcomes(): Boolean {
+        if (!recording) return false
+        return decisions.any { recorded ->
+            recorded.decision.nativeQueueState == NativeQueueState.ENQUEUED.wireName &&
+                recorded.decision.diagnosticToken > 0L &&
+                recorded.decision.diagnosticToken !in nativeOutcomeTokens
+        }
+    }
+
     fun cancel() {
         recording = false
         decisions.clear()
+        nativeOutcomes.clear()
+        nativeOutcomeTokens.clear()
         droppedDecisionCount = 0
+        droppedNativeOutcomeBaseline = 0
+        latestDroppedNativeOutcomeCount = 0
+        droppedNativeOutcomeRecordCount = 0
     }
 
     fun stop(): DiagnosticDispatchTraceCapture {
         check(recording) { "diagnostic dispatch trace is not active" }
         val capture = DiagnosticDispatchTraceCapture(
             decisions = decisions.toList(),
+            nativeOutcomes = nativeOutcomes.toList(),
             droppedDecisionCount = droppedDecisionCount,
+            droppedNativeOutcomeCount = (
+                latestDroppedNativeOutcomeCount - droppedNativeOutcomeBaseline
+            ).coerceAtLeast(0),
+            droppedNativeOutcomeRecordCount = droppedNativeOutcomeRecordCount,
         )
-        recording = false
-        decisions.clear()
-        droppedDecisionCount = 0
+        cancel()
         return capture
     }
 
@@ -93,6 +158,7 @@ internal class DiagnosticDispatchTraceRecorder(
         sessionCapture: DiagnosticSessionBundleCapture,
         traceCapture: DiagnosticDispatchTraceCapture,
     ) {
+        val stats = nativeTraceStats(traceCapture)
         val retained = linkedMapOf<String, ByteArray>()
         ZipFile(bundle).use { zip ->
             val iterator = zip.entries()
@@ -105,16 +171,24 @@ internal class DiagnosticDispatchTraceRecorder(
             val manifest = zip.readUtf8("manifest.json")
                 .replace(
                     "\"bundleState\": \"step_1_2_partial\"",
-                    "\"bundleState\": \"step_1_2_dispatch_request_trace_partial\"",
+                    "\"bundleState\": \"step_1_2_native_dispatch_trace_partial\"",
                 )
                 .replace(
                     "  \"droppedData\": {",
                     buildString {
                         append("  \"dispatchTrace\": {\n")
+                        append("    \"schemaVersion\": ").append(DiagnosticDispatchSchemaVersion).append(",\n")
                         append("    \"requestSideDecisions\": ").append(traceCapture.decisions.size).append(",\n")
+                        append("    \"nativeSelectionOutcomes\": ").append(traceCapture.nativeOutcomes.size).append(",\n")
+                        append("    \"matchedNativeSelectionOutcomes\": ").append(stats.matchedOutcomeCount).append(",\n")
+                        append("    \"unmatchedEnqueuedDecisions\": ").append(stats.unmatchedEnqueuedDecisionCount).append(",\n")
+                        append("    \"unmatchedNativeSelectionOutcomes\": ").append(stats.unmatchedOutcomeCount).append(",\n")
                         append("    \"droppedRequestSideDecisions\": ").append(traceCapture.droppedDecisionCount).append(",\n")
-                        append("    \"nativeSelectionTraceAvailable\": false,\n")
-                        append("    \"unobservedNativeFields\": [\"queueAcceptance\", \"roundRobinIndices\", \"pitchVariation\", \"gainVariation\", \"filterVariation\", \"activeVoiceCount\", \"voiceSteal\"]\n")
+                        append("    \"droppedNativeOutcomeRingEntries\": ").append(traceCapture.droppedNativeOutcomeCount).append(",\n")
+                        append("    \"droppedNativeOutcomeRecords\": ").append(traceCapture.droppedNativeOutcomeRecordCount).append(",\n")
+                        append("    \"nativeQueueAcceptanceAvailable\": true,\n")
+                        append("    \"nativeSelectionTraceAvailable\": true,\n")
+                        append("    \"unobservedNativeFields\": []\n")
                         append("  },\n")
                         append("  \"droppedData\": {")
                     },
@@ -122,8 +196,13 @@ internal class DiagnosticDispatchTraceRecorder(
             retained["manifest.json"] = manifest.utf8()
             retained["summary.txt"] = (zip.readUtf8("summary.txt") + buildString {
                 append("\nRequest-side dispatch decisions: ").append(traceCapture.decisions.size).append('\n')
+                append("Native callback outcomes: ").append(traceCapture.nativeOutcomes.size).append('\n')
+                append("Matched native outcomes: ").append(stats.matchedOutcomeCount).append('\n')
+                append("Unmatched enqueued decisions: ").append(stats.unmatchedEnqueuedDecisionCount).append('\n')
+                append("Unmatched native outcomes: ").append(stats.unmatchedOutcomeCount).append('\n')
                 append("Dropped request-side dispatch decisions: ").append(traceCapture.droppedDecisionCount).append('\n')
-                append("Native queue, round-robin, variation, and voice-allocation outcomes are not yet traced.\n")
+                append("Dropped native outcome ring entries: ").append(traceCapture.droppedNativeOutcomeCount).append('\n')
+                append("Dropped native outcome records: ").append(traceCapture.droppedNativeOutcomeRecordCount).append('\n')
             }).utf8()
         }
 
@@ -163,6 +242,24 @@ internal class DiagnosticDispatchTraceRecorder(
     }
 }
 
+private fun nativeTraceStats(traceCapture: DiagnosticDispatchTraceCapture): NativeTraceStats {
+    val enqueuedTokens = traceCapture.decisions.asSequence()
+        .map { it.decision }
+        .filter { it.nativeQueueState == NativeQueueState.ENQUEUED.wireName }
+        .map { it.diagnosticToken }
+        .filter { it > 0L }
+        .toSet()
+    val outcomeTokens = traceCapture.nativeOutcomes.asSequence()
+        .map { it.diagnosticToken }
+        .filter { it > 0L }
+        .toSet()
+    return NativeTraceStats(
+        matchedOutcomeCount = enqueuedTokens.intersect(outcomeTokens).size,
+        unmatchedEnqueuedDecisionCount = (enqueuedTokens - outcomeTokens).size,
+        unmatchedOutcomeCount = (outcomeTokens - enqueuedTokens).size,
+    )
+}
+
 private fun enrichedStrikesJsonLines(
     sessionCapture: DiagnosticSessionBundleCapture,
     traceCapture: DiagnosticDispatchTraceCapture,
@@ -172,11 +269,14 @@ private fun enrichedStrikesJsonLines(
         tracesByStrike.getOrPut(DispatchStrikeKey(recorded.eventTimeNanos, recorded.pointerId), ::ArrayDeque)
             .addLast(recorded)
     }
+    val outcomesByToken = traceCapture.nativeOutcomes.associateBy { it.diagnosticToken }
     return buildString {
         sessionCapture.baseCapture.strikes.forEach { recordedStrike ->
             val strike = recordedStrike.strike
             val trace = tracesByStrike[DispatchStrikeKey(strike.eventTimeNanos, strike.pointerId)]?.pollFirst()
             val decision = trace?.decision
+            val outcome = decision?.diagnosticToken?.let(outcomesByToken::get)
+            val expectedNativeOutcome = decision?.nativeQueueState == NativeQueueState.ENQUEUED.wireName
             append('{')
             append("\"schemaVersion\":$DiagnosticDispatchSchemaVersion,")
             append("\"offsetNanos\":${recordedStrike.offsetNanos},")
@@ -187,6 +287,7 @@ private fun enrichedStrikesJsonLines(
             append("\"normalizedX\":${strike.normalizedX},\"normalizedY\":${strike.normalizedY},")
             append("\"pressure\":${strike.pressure},\"contactSize\":${strike.contactSize},")
             append("\"dispatchDecisionOffsetNanos\":").appendNullable(trace?.offsetNanos).append(',')
+            append("\"diagnosticToken\":").appendNullable(decision?.diagnosticToken).append(',')
             append("\"velocityEstimatorInputMode\":").appendNullableJson(decision?.velocityEstimatorInputMode).append(',')
             append("\"sanitizedVelocity\":").appendNullable(decision?.sanitizedVelocity).append(',')
             append("\"sanitizedNormalizedX\":").appendNullable(decision?.sanitizedNormalizedX).append(',')
@@ -201,16 +302,18 @@ private fun enrichedStrikesJsonLines(
             append("\"lowerVelocityLayer\":").appendNullable(decision?.lowerVelocityLayer).append(',')
             append("\"upperVelocityLayer\":").appendNullable(decision?.upperVelocityLayer).append(',')
             append("\"velocityLayerBlend\":").appendNullable(decision?.velocityLayerBlend).append(',')
-            append("\"lowerRoundRobinIndex\":").appendNullable(decision?.lowerRoundRobinIndex).append(',')
-            append("\"upperRoundRobinIndex\":").appendNullable(decision?.upperRoundRobinIndex).append(',')
-            append("\"pitchVariation\":").appendNullable(decision?.pitchVariation).append(',')
-            append("\"gainVariation\":").appendNullable(decision?.gainVariation).append(',')
-            append("\"filterVariation\":").appendNullable(decision?.filterVariation).append(',')
+            append("\"lowerRoundRobinIndex\":").appendNullable(outcome?.lowerRoundRobinIndex).append(',')
+            append("\"upperRoundRobinIndex\":").appendNullable(outcome?.upperRoundRobinIndex).append(',')
+            append("\"pitchVariation\":").appendNullable(outcome?.pitchVariation).append(',')
+            append("\"gainVariation\":").appendNullable(outcome?.gainVariation).append(',')
+            append("\"filterVariation\":").appendNullable(outcome?.filterVariation).append(',')
             append("\"stereoPan\":").appendNullable(decision?.stereoPan).append(',')
             append("\"nativeQueueState\":").appendNullableJson(decision?.nativeQueueState).append(',')
-            append("\"activeVoiceCount\":").appendNullable(decision?.activeVoiceCount).append(',')
-            append("\"voiceStealOccurred\":").appendNullable(decision?.voiceStealOccurred).append(',')
-            append("\"nativeSelectionTraceAvailable\":${decision?.nativeSelectionTraceAvailable ?: false},")
+            append("\"activeVoiceCount\":").appendNullable(outcome?.activeVoiceCount).append(',')
+            append("\"voiceStealOccurred\":").appendNullable(outcome?.voiceStealOccurred).append(',')
+            append("\"sampledVoice\":").appendNullable(outcome?.sampledVoice).append(',')
+            append("\"nativeSelectionTraceAvailable\":${outcome != null},")
+            append("\"nativeOutcomeMissing\":${expectedNativeOutcome && outcome == null},")
             append("\"dispatchDecisionMissing\":${decision == null}")
             append("}\n")
         }
