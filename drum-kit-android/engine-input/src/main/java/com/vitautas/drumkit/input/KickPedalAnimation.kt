@@ -6,6 +6,7 @@ private const val DefaultBeaterForwardDurationNanos = 42_000_000L
 private const val DefaultBeaterReturnDurationNanos = 110_000_000L
 private const val DefaultBeaterReleaseDurationNanos = 95_000_000L
 private const val DefaultFlashDurationNanos = 90_000_000L
+private const val NoAnimationTime = Long.MIN_VALUE
 
 internal class KickPedalAnimationState(
     private val pressDurationNanos: Long = DefaultPressDurationNanos,
@@ -35,12 +36,12 @@ internal class KickPedalAnimationState(
     var currentImpactFlash: Float = 0f
         private set
 
-    private var pressStartedAtNanos: Long = 0L
+    private var pressStartedAtNanos: Long = NoAnimationTime
     private var pressFromDepression: Float = 0f
-    private var releaseStartedAtNanos: Long = 0L
+    private var releaseStartedAtNanos: Long = NoAnimationTime
     private var releaseFromDepression: Float = 0f
-    private var lastStrikeAtNanos: Long = 0L
-    private var beaterReleaseStartedAtNanos: Long = 0L
+    private var lastStrikeAtNanos: Long = NoAnimationTime
+    private var beaterReleaseStartedAtNanos: Long = NoAnimationTime
     private var beaterReleaseFrom: Float = 0f
 
     fun press(nowNanos: Long, strikeVelocity: Float) {
@@ -51,10 +52,10 @@ internal class KickPedalAnimationState(
         if (firstActivePointer) {
             pressFromDepression = currentFootboardDepression
             pressStartedAtNanos = nowNanos
-            releaseStartedAtNanos = 0L
+            releaseStartedAtNanos = NoAnimationTime
         }
         lastStrikeAtNanos = nowNanos
-        beaterReleaseStartedAtNanos = 0L
+        beaterReleaseStartedAtNanos = NoAnimationTime
     }
 
     fun release(nowNanos: Long) {
@@ -75,12 +76,12 @@ internal class KickPedalAnimationState(
         currentFootboardDepression = 0f
         currentBeaterTravel = 0f
         currentImpactFlash = 0f
-        pressStartedAtNanos = 0L
+        pressStartedAtNanos = NoAnimationTime
         pressFromDepression = 0f
-        releaseStartedAtNanos = 0L
+        releaseStartedAtNanos = NoAnimationTime
         releaseFromDepression = 0f
-        lastStrikeAtNanos = 0L
-        beaterReleaseStartedAtNanos = 0L
+        lastStrikeAtNanos = NoAnimationTime
+        beaterReleaseStartedAtNanos = NoAnimationTime
         beaterReleaseFrom = 0f
     }
 
@@ -97,10 +98,10 @@ internal class KickPedalAnimationState(
     private fun footboardDepression(nowNanos: Long): Float = if (activePointerCount > 0) {
         val progress = progress(nowNanos - pressStartedAtNanos, pressDurationNanos)
         lerp(pressFromDepression, 1f, easeOutCubic(progress))
-    } else if (releaseStartedAtNanos > 0L) {
+    } else if (releaseStartedAtNanos != NoAnimationTime) {
         val progress = progress(nowNanos - releaseStartedAtNanos, releaseDurationNanos)
         if (progress >= 1f) {
-            releaseStartedAtNanos = 0L
+            releaseStartedAtNanos = NoAnimationTime
             releaseFromDepression = 0f
             0f
         } else {
@@ -111,16 +112,16 @@ internal class KickPedalAnimationState(
     }
 
     private fun beaterTravel(nowNanos: Long): Float {
-        if (activePointerCount == 0 && beaterReleaseStartedAtNanos > 0L) {
+        if (activePointerCount == 0 && beaterReleaseStartedAtNanos != NoAnimationTime) {
             val progress = progress(nowNanos - beaterReleaseStartedAtNanos, beaterReleaseDurationNanos)
             if (progress >= 1f) {
-                beaterReleaseStartedAtNanos = 0L
+                beaterReleaseStartedAtNanos = NoAnimationTime
                 beaterReleaseFrom = 0f
                 return 0f
             }
             return beaterReleaseFrom * (1f - easeOutCubic(progress))
         }
-        if (lastStrikeAtNanos == 0L) return 0f
+        if (lastStrikeAtNanos == NoAnimationTime) return 0f
 
         val elapsed = (nowNanos - lastStrikeAtNanos).coerceAtLeast(0L)
         if (elapsed <= beaterForwardDurationNanos) {
@@ -140,7 +141,7 @@ internal class KickPedalAnimationState(
     }
 
     private fun impactFlash(nowNanos: Long): Float {
-        if (lastStrikeAtNanos == 0L) return 0f
+        if (lastStrikeAtNanos == NoAnimationTime) return 0f
         val progress = progress(nowNanos - lastStrikeAtNanos, flashDurationNanos)
         return velocity * (1f - progress)
     }
