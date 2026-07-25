@@ -3,6 +3,7 @@ package com.vitautas.drumkit
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentId
+import com.vitautas.drumkit.model.StrikeInputTarget
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.zip.ZipFile
@@ -44,12 +45,15 @@ class DiagnosticSessionBundleRecorderTest {
             assertTrue("checksums.sha256" in names)
             val manifest = zip.readText("manifest.json")
             assertTrue(manifest.contains("step_1_2_partial"))
+            assertTrue(manifest.contains("\"schemaVersion\": 2"))
             assertTrue(manifest.contains("touch-events.jsonl"))
             assertFalse(manifest.contains("\"plannedFilesNotYetImplemented\": [\"touch-events.jsonl\""))
             val touches = zip.readText("touch-events.jsonl")
             assertTrue(touches.contains("\"action\":\"down\""))
             assertTrue(touches.contains("\"acceptedStrike\":true"))
             assertTrue(touches.contains("\"candidateInstruments\":[\"snare\",\"kick\"]"))
+            assertTrue(touches.contains("\"candidateTargets\":[\"instrument_surface\",\"instrument_surface\"]"))
+            assertTrue(touches.contains("\"selectedTarget\":\"instrument_surface\""))
             assertTrue(touches.contains("\"historicalSamples\":[{"))
             val summary = zip.readText("summary.txt")
             assertTrue(summary.contains("Touch events: 1"))
@@ -58,6 +62,28 @@ class DiagnosticSessionBundleRecorderTest {
             val checksums = zip.readText("checksums.sha256")
             assertTrue(checksums.contains("touch-events.jsonl"))
             assertTrue(checksums.contains("manifest.json"))
+        }
+    }
+
+    @Test
+    fun exportsKickPedalAsDistinctInputTarget() {
+        val recorder = DiagnosticSessionBundleRecorder(
+            monotonicClockNanos = { 1_000L },
+            wallClockMillis = { 1_700_000_000_000L },
+            sessionIdFactory = { "pedal-session" },
+        )
+        recorder.start(metadata())
+        recorder.recordTouchSample(pedalTouchSample())
+
+        val outputDirectory = Files.createTempDirectory("drum-pedal-diagnostics").toFile()
+        val result = recorder.stopAndExport(outputDirectory)
+
+        ZipFile(result.file).use { zip ->
+            val touches = zip.readText("touch-events.jsonl")
+            assertTrue(touches.contains("\"candidateInstruments\":[\"kick\"]"))
+            assertTrue(touches.contains("\"candidateTargets\":[\"kick_pedal\",\"instrument_surface\"]"))
+            assertTrue(touches.contains("\"selectedInstrument\":\"kick\""))
+            assertTrue(touches.contains("\"selectedTarget\":\"kick_pedal\""))
         }
     }
 
@@ -118,6 +144,26 @@ class DiagnosticSessionBundleRecorderTest {
                 orientationRadians = 0f,
             ),
         ),
+        candidateTargets = listOf(
+            StrikeInputTarget.INSTRUMENT_SURFACE,
+            StrikeInputTarget.INSTRUMENT_SURFACE,
+        ),
+        selectedTarget = StrikeInputTarget.INSTRUMENT_SURFACE,
+    )
+
+    private fun pedalTouchSample(): DiagnosticTouchSample = touchSample().copy(
+        rawX = 1_200f,
+        rawY = 950f,
+        normalizedX = 0.51f,
+        normalizedY = 0.88f,
+        hitRegionCount = 2,
+        candidateInstruments = listOf(InstrumentId.KICK),
+        selectedInstrument = InstrumentId.KICK,
+        candidateTargets = listOf(
+            StrikeInputTarget.KICK_PEDAL,
+            StrikeInputTarget.INSTRUMENT_SURFACE,
+        ),
+        selectedTarget = StrikeInputTarget.KICK_PEDAL,
     )
 
     private fun metadata(): DiagnosticSessionMetadata = DiagnosticSessionMetadata(
