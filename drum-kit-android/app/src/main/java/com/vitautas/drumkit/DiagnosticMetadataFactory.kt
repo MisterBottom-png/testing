@@ -19,7 +19,7 @@ internal object DiagnosticMetadataFactory {
         val windowManager = context.getSystemService(WindowManager::class.java)
         val bounds = windowManager.currentWindowMetrics.bounds
         val displayMetrics = context.resources.displayMetrics
-        val refreshRate = context.display?.refreshRate ?: 0f
+        val refreshRate = context.display.refreshRate
         val orientation = when (context.resources.configuration.orientation) {
             Configuration.ORIENTATION_LANDSCAPE -> "landscape"
             Configuration.ORIENTATION_PORTRAIT -> "portrait"
