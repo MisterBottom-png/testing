@@ -32,14 +32,14 @@ internal object DiagnosticAudioRouteResolver {
             }.getOrDefault(emptyList())
             if (selectedDevices.isNotEmpty()) {
                 return describeDevices(
-                    devices = selectedDevices.map(AudioDeviceInfo::toDiagnosticDevice),
+                    devices = selectedDevices.map { device -> device.toDiagnosticDevice() },
                     selected = true,
                 )
             }
         }
 
         val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            .map(AudioDeviceInfo::toDiagnosticDevice)
+            .map { device -> device.toDiagnosticDevice() }
         return describeDevices(devices = availableDevices, selected = false)
     }
 
@@ -81,7 +81,7 @@ internal object DiagnosticAudioRouteResolver {
     private fun AudioDeviceInfo.toDiagnosticDevice(): DiagnosticAudioRouteDevice = DiagnosticAudioRouteDevice(
         id = id,
         type = type,
-        productName = productName?.toString().orEmpty(),
+        productName = productName.toString(),
     )
 
     private fun String.cleanProductName(): String = trim()
