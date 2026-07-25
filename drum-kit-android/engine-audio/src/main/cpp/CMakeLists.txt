@@ -6,7 +6,7 @@ find_package(oboe REQUIRED CONFIG)
 add_library(
     drumkit
     SHARED
-    native-audio.cpp
+    sampled-audio-engine.cpp
 )
 
 target_compile_features(drumkit PRIVATE cxx_std_20)

@@ -1,0 +1,180 @@
+name: Drum Kit APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - labeled
+
+concurrency:
+  group: drum-kit-apk-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-apk:
+    if: github.event_name != 'pull_request' || github.event.label.name == 'build-apk'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install snare bank tooling
+        run: python -m pip install numpy==2.2.6 remotezip==0.12.3 soundfile==0.13.1
+
+      - name: Validate snare bank tooling
+        run: python -m py_compile tools/prepare_snare_bank.py tools/build_snare_bank.py
+
+      - name: Cache downloaded acoustic samples
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/native-drum-kit
+          key: snare-sources-v1
+
+      - name: Restore generated snare bank
+        id: snare-bank-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            drum-kit-android/engine-audio/src/main/assets/snare/snare-bank.pcm
+            drum-kit-android/build/snare-bank-manifest.json
+          key: snare-bank-v2-${{ runner.os }}-${{ hashFiles('drum-kit-android/tools/prepare_snare_bank.py', 'drum-kit-android/tools/build_snare_bank.py') }}
+
+      - name: Build predecoded snare PCM bank
+        if: steps.snare-bank-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python tools/build_snare_bank.py \
+            --output engine-audio/src/main/assets/snare/snare-bank.pcm \
+            --manifest build/snare-bank-manifest.json \
+            --cache-dir ~/.cache/native-drum-kit \
+            2>&1 | tee build/snare-bank-build.log
+
+      - name: Verify snare bank structure
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import struct
+          from pathlib import Path
+
+          bank = Path("engine-audio/src/main/assets/snare/snare-bank.pcm")
+          manifest_path = Path("build/snare-bank-manifest.json")
+          manifest = json.loads(manifest_path.read_text())
+          raw = bank.read_bytes()
+          header = struct.unpack_from("<8sIIIIII", raw)
+          assert header == (b"SNAREPCM", 1, 48000, 5, 6, 4, 120), header
+          assert len(manifest["samples"]) == 120
+          assert manifest["bank_sha256"] == hashlib.sha256(raw).hexdigest()
+          assert set(manifest["articulations"]) == {
+              "center", "off_center", "edge", "rimshot", "cross_stick"
+          }
+          print(f"Verified {len(raw) / 1048576:.1f} MiB PCM bank with 120 samples")
+          PY
+
+      - name: Save generated snare bank
+        if: steps.snare-bank-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            drum-kit-android/engine-audio/src/main/assets/snare/snare-bank.pcm
+            drum-kit-android/build/snare-bank-manifest.json
+          key: ${{ steps.snare-bank-cache.outputs.cache-primary-key }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Verify preinstalled Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          test -d "$sdk_root/platforms/android-37.0"
+          test -d "$sdk_root/build-tools/37.0.0"
+          test -d "$sdk_root/ndk/29.0.14206865"
+          test -x "$sdk_root/cmake/3.31.5/bin/cmake"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-cleanup: on-success
+
+      - name: Build arm64 debug APK
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain --warning-mode=fail \
+            -PdrumKitAbis=arm64-v8a \
+            -PdrumKitCmakeVersion=3.31.5 \
+            :app:assembleDebug 2>&1 | tee apk-build.log
+
+      - name: Upload snare bank diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: snare-bank-build-diagnostics
+          path: drum-kit-android/build/snare-bank-build.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload APK build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-apk-build-log
+          path: drum-kit-android/apk-build.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-debug-apk
+          path: drum-kit-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload snare bank manifest
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: snare-bank-manifest
+          path: drum-kit-android/build/snare-bank-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove APK request label
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'build-apk',
+              })
+            } catch (error) {
+              if (error.status !== 404) throw error
+            }

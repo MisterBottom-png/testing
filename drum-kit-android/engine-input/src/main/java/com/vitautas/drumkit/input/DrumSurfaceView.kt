@@ -4,21 +4,33 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
-import android.os.VibrationEffect
-import android.os.Vibrator
+import android.os.Build
 import android.util.AttributeSet
 import android.util.SparseArray
+import android.util.TypedValue
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentId
-import com.vitautas.drumkit.model.InstrumentShape
+import com.vitautas.drumkit.model.InstrumentRenderLayerKind
+import com.vitautas.drumkit.model.InstrumentRendererKey
+import com.vitautas.drumkit.model.StudioKitCamera
 import com.vitautas.drumkit.model.StudioKitDefinition
+import com.vitautas.drumkit.model.StudioKitGeometry
+import kotlin.math.PI
+import kotlin.math.sin
+
+private const val LabelHoldMillis = 2_000L
+private const val LabelFadeMillis = 900L
+private const val NanosPerMillisecond = 1_000_000L
 
 class DrumSurfaceView @JvmOverloads constructor(
     context: Context,
@@ -28,30 +40,63 @@ class DrumSurfaceView @JvmOverloads constructor(
     var onStrike: ((DrumStrike) -> Unit)? = null
     var hapticsEnabled: Boolean = true
 
+    private val density = resources.displayMetrics.density
+    private val artworkFactory = LayeredInstrumentArtworkFactory(density)
     private val activePointers = SparseArray<InstrumentId>()
+    private val renderStates = ArrayList<InstrumentRenderState>(StudioKitDefinition.instruments.size)
+    private val renderStatesByInstrument = arrayOfNulls<InstrumentRenderState>(InstrumentId.entries.size)
+    private val animationStates = Array(InstrumentId.entries.size) { InstrumentAnimationState() }
+    private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
+    private var rackMountX = 0f
+    private var rackMountY = 0f
+    private var artworkBackend = ArtworkCacheBackend.BITMAP
+
     private val stagePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x66000000 }
-    private val shellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val spotlightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x70000000 }
+    private val artworkPaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
+    )
+    private val standPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xff858b91.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = resources.displayMetrics.density * 3f
-        color = 0xffb9c1c9.toInt()
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = density * 2.2f
     }
-    private val cymbalPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val hardwarePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xffc4c9cd.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = resources.displayMetrics.density * 5f
-        color = 0xffffb44a.toInt()
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = density * 1.5f
+    }
+    private val impactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xff17191c.toInt()
+        style = Paint.Style.FILL
+    }
+    private val flashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xffffa13a.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = density * 4f
     }
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        textSize = resources.displayMetrics.scaledDensity * 12f
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            11f,
+            resources.displayMetrics,
+        )
         isFakeBoldText = true
-        setShadowLayer(4f, 0f, 2f, Color.BLACK)
+        setShadowLayer(density * 3f, 0f, density, Color.BLACK)
     }
-    private val reusableRect = RectF()
+
+    private val spotlightRect = RectF()
+    private val floorClipRect = RectF()
+    private val scratchRect = RectF()
+    private val instrumentOcclusionPath = Path()
+    private val surfaceRotationMatrix = Matrix()
+    private var labelsVisibleSinceNanos = System.nanoTime()
+    private val labelFadeRunnable = Runnable { postInvalidateOnAnimation() }
 
     init {
         isFocusable = true
@@ -59,10 +104,97 @@ class DrumSurfaceView @JvmOverloads constructor(
         contentDescription = "Playable acoustic drum kit"
     }
 
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        if (width <= 0 || height <= 0) return
+
+        artworkBackend = ArtworkCacheBackendPolicy.select(Build.VERSION.SDK_INT, isHardwareAccelerated)
+        stagePaint.shader = LinearGradient(
+            0f,
+            0f,
+            0f,
+            height.toFloat(),
+            intArrayOf(0xff232326.toInt(), 0xff111216.toInt(), 0xff07080a.toInt()),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        spotlightPaint.shader = RadialGradient(
+            width * 0.5f,
+            height * 0.15f,
+            width * 0.62f,
+            intArrayOf(0x2effd29a, 0x0affb464, 0x00000000),
+            floatArrayOf(0f, 0.48f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        spotlightRect.set(-width * 0.10f, -height * 0.25f, width * 1.10f, height * 0.95f)
+        floorClipRect.set(0f, StudioKitCamera.HORIZON_Y * height, width.toFloat(), height.toFloat())
+
+        val kickBounds = kickDefinition.layout.drawBounds
+        rackMountX = kickBounds.centerX * width.toFloat()
+        rackMountY = (kickBounds.top + kickBounds.height * 0.14f) * height.toFloat()
+
+        releaseArtworkCaches()
+        renderStates.clear()
+        renderStatesByInstrument.fill(null)
+        instrumentOcclusionPath.reset()
+        for (definition in StudioKitDefinition.renderOrder) {
+            val state = InstrumentRenderState(definition)
+            configureRenderState(state, width.toFloat(), height.toFloat())
+            renderStates += state
+            renderStatesByInstrument[definition.id.ordinal] = state
+            instrumentOcclusionPath.addPath(state.surfaceOcclusionPath)
+        }
+
+        labelsVisibleSinceNanos = System.nanoTime()
+        removeCallbacks(labelFadeRunnable)
+        postDelayed(labelFadeRunnable, LabelHoldMillis + 16L)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        drawStage(canvas)
-        StudioKitDefinition.instruments.forEach { drawInstrument(canvas, it) }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), stagePaint)
+        canvas.drawOval(spotlightRect, spotlightPaint)
+
+        val nowNanos = System.nanoTime()
+        var animationActive = false
+        for (renderState in renderStates) {
+            val animationState = animationStates[renderState.definition.id.ordinal]
+            if (updateAnimation(renderState.definition, animationState, nowNanos)) {
+                animationActive = true
+            }
+        }
+
+        for (renderState in renderStates) {
+            drawInstrumentShadow(canvas, renderState)
+        }
+        for (renderLayer in StudioKitDefinition.renderLayers) {
+            val renderState = renderStatesByInstrument[renderLayer.instrumentId.ordinal] ?: continue
+            when (renderLayer.kind) {
+                InstrumentRenderLayerKind.SUPPORT -> drawInstrumentSupport(canvas, renderState)
+                InstrumentRenderLayerKind.SURFACE -> drawInstrumentSurface(
+                    canvas,
+                    renderState,
+                    animationStates[renderState.definition.id.ordinal],
+                )
+            }
+        }
+
+        val labelAlpha = labelAlpha(nowNanos)
+        if (labelAlpha > 0) {
+            labelPaint.alpha = labelAlpha
+            for (renderState in renderStates) {
+                canvas.drawText(
+                    renderState.label,
+                    renderState.labelX,
+                    renderState.labelY,
+                    labelPaint,
+                )
+            }
+        }
+
+        if (animationActive || labelAlpha in 1..254) {
+            postInvalidateOnAnimation()
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -78,10 +210,7 @@ class DrumSurfaceView @JvmOverloads constructor(
 
             MotionEvent.ACTION_POINTER_UP -> handlePointerUp(event.getPointerId(event.actionIndex))
 
-            MotionEvent.ACTION_CANCEL -> {
-                activePointers.clear()
-                invalidate()
-            }
+            MotionEvent.ACTION_CANCEL -> clearActivePointers()
         }
         return true
     }
@@ -91,39 +220,115 @@ class DrumSurfaceView @JvmOverloads constructor(
         return true
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (width <= 0 || height <= 0) return
+
+        val desiredBackend = ArtworkCacheBackendPolicy.select(Build.VERSION.SDK_INT, isHardwareAccelerated)
+        if (desiredBackend != artworkBackend) {
+            rebuildArtworkCaches(desiredBackend)
+        }
+        labelsVisibleSinceNanos = System.nanoTime()
+        removeCallbacks(labelFadeRunnable)
+        postDelayed(labelFadeRunnable, LabelHoldMillis + 16L)
+        postInvalidateOnAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(labelFadeRunnable)
+        clearActivePointers()
+        super.onDetachedFromWindow()
+    }
+
+    fun releaseResources() {
+        removeCallbacks(labelFadeRunnable)
+        clearActivePointers()
+        releaseArtworkCaches()
+        renderStates.clear()
+        renderStatesByInstrument.fill(null)
+        instrumentOcclusionPath.reset()
+    }
+
     private fun handlePointerDown(event: MotionEvent, pointerIndex: Int) {
+        if (width <= 0 || height <= 0) return
+
         val x = event.getX(pointerIndex)
         val y = event.getY(pointerIndex)
-        val definition = hitTest(x, y) ?: return
+        val screenX = x / width.toFloat()
+        val screenY = y / height.toFloat()
+        val aspectRatio = width.toFloat() / height.toFloat()
+        val hit = StudioKitGeometry.hitTest(screenX, screenY, aspectRatio) ?: return
+        val definition = hit.definition
         val pointerId = event.getPointerId(pointerIndex)
-        val bounds = pixelBounds(definition)
-        val nx = ((x - bounds.left) / bounds.width()).coerceIn(0f, 1f)
-        val ny = ((y - bounds.top) / bounds.height()).coerceIn(0f, 1f)
         val pressure = event.getPressure(pointerIndex).coerceAtLeast(0f)
         val contactSize = event.getSize(pointerIndex).coerceAtLeast(0f)
         val velocity = estimateVelocity(pressure, contactSize, event.eventTime)
+        val eventTimeNanos = event.eventTime * NanosPerMillisecond
 
-        activePointers.put(pointerId, definition.id)
         onStrike?.invoke(
             DrumStrike(
                 pointerId = pointerId,
                 instrument = definition.id,
                 velocity = velocity,
-                normalizedX = nx,
-                normalizedY = ny,
+                normalizedX = hit.normalizedX,
+                normalizedY = hit.normalizedY,
                 pressure = pressure,
                 contactSize = contactSize,
-                eventTimeNanos = event.eventTime * 1_000_000L,
+                eventTimeNanos = eventTimeNanos,
             ),
         )
+
+        activePointers.put(pointerId, definition.id)
+        animationStates[definition.id.ordinal].apply {
+            strikeX = hit.normalizedX
+            strikeY = hit.normalizedY
+            this.velocity = velocity
+            startTimeNanos = System.nanoTime()
+            activePointerCount += 1
+        }
         performInstrumentHaptic(definition.id, velocity)
-        invalidate()
+        postInvalidateOnAnimation()
     }
 
     private fun handlePointerUp(pointerId: Int) {
+        val instrument = activePointers.get(pointerId)
+        if (instrument != null) {
+            val state = animationStates[instrument.ordinal]
+            state.activePointerCount = (state.activePointerCount - 1).coerceAtLeast(0)
+        }
         activePointers.remove(pointerId)
-        invalidate()
+        postInvalidateOnAnimation()
     }
+
+    private fun clearActivePointers() {
+        activePointers.clear()
+        for (state in animationStates) {
+            state.activePointerCount = 0
+        }
+        postInvalidateOnAnimation()
+    }
+
+    private fun releaseArtworkCaches() {
+        for (state in renderStates) {
+            state.artwork?.release()
+            state.artwork = null
+        }
+    }
+
+    private fun rebuildArtworkCaches(backend: ArtworkCacheBackend) {
+        releaseArtworkCaches()
+        artworkBackend = backend
+        for (state in renderStates) {
+            state.artwork = createArtwork(state)
+        }
+    }
+
+    private fun createArtwork(state: InstrumentRenderState): InstrumentArtworkCache = artworkFactory.create(
+        definition = state.definition,
+        bodyRect = state.primaryRect,
+        playableRect = state.secondaryRect.takeUnless { it.isEmpty } ?: state.primaryRect,
+        backend = artworkBackend,
+    )
 
     private fun estimateVelocity(pressure: Float, contactSize: Float, eventTime: Long): Float {
         val pressureVelocity = if (pressure > 0.02f && pressure != 0.5f) {
@@ -134,183 +339,473 @@ class DrumSurfaceView @JvmOverloads constructor(
         return (pressureVelocity + contactSize.coerceIn(0f, 1f) * 0.12f).coerceIn(0.22f, 1f)
     }
 
-    private fun hitTest(x: Float, y: Float): InstrumentDefinition? =
-        StudioKitDefinition.instruments.firstOrNull { pixelBounds(it).contains(x, y) }
+    private fun configureRenderState(state: InstrumentRenderState, viewWidth: Float, viewHeight: Float) {
+        val normalized = state.definition.layout.drawBounds
+        val playable = state.definition.layout.playableSurfaceBounds
+        val bounds = state.drawBounds
+        bounds.set(
+            normalized.left * viewWidth,
+            normalized.top * viewHeight,
+            normalized.right * viewWidth,
+            normalized.bottom * viewHeight,
+        )
+        state.playableRect.set(
+            playable.left * viewWidth,
+            playable.top * viewHeight,
+            playable.right * viewWidth,
+            playable.bottom * viewHeight,
+        )
+        state.labelX = state.definition.layout.labelPosition.x * viewWidth
+        state.labelY = state.definition.layout.labelPosition.y * viewHeight
 
-    private fun pixelBounds(definition: InstrumentDefinition): RectF {
-        val bounds = definition.bounds
-        return RectF(
-            bounds.left * width,
-            bounds.top * height,
-            bounds.right * width,
-            bounds.bottom * height,
+        when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL,
+            InstrumentRendererKey.HI_HAT,
+            -> {
+                state.primaryRect.set(state.playableRect)
+                state.shadowRect.set(
+                    state.primaryRect.left + state.primaryRect.width() * 0.10f,
+                    state.primaryRect.bottom - bounds.height() * 0.02f,
+                    state.primaryRect.right - state.primaryRect.width() * 0.10f,
+                    state.primaryRect.bottom + bounds.height() * 0.10f,
+                )
+            }
+
+            InstrumentRendererKey.DRUM,
+            InstrumentRendererKey.SNARE,
+            -> {
+                state.primaryRect.set(
+                    bounds.left + bounds.width() * 0.10f,
+                    bounds.top + bounds.height() * 0.23f,
+                    bounds.right - bounds.width() * 0.10f,
+                    bounds.bottom - bounds.height() * 0.10f,
+                )
+                state.secondaryRect.set(state.playableRect)
+                state.shadowRect.set(
+                    state.primaryRect.left + state.primaryRect.width() * 0.05f,
+                    state.primaryRect.bottom - bounds.height() * 0.02f,
+                    state.primaryRect.right - state.primaryRect.width() * 0.05f,
+                    state.primaryRect.bottom + bounds.height() * 0.10f,
+                )
+            }
+
+            InstrumentRendererKey.KICK -> {
+                state.primaryRect.set(
+                    bounds.left,
+                    bounds.top + bounds.height() * 0.06f,
+                    bounds.right,
+                    bounds.bottom - bounds.height() * 0.04f,
+                )
+                state.secondaryRect.set(state.playableRect)
+                state.shadowRect.set(
+                    state.primaryRect.left + state.primaryRect.width() * 0.04f,
+                    state.primaryRect.bottom - bounds.height() * 0.03f,
+                    state.primaryRect.right - state.primaryRect.width() * 0.04f,
+                    state.primaryRect.bottom + bounds.height() * 0.08f,
+                )
+            }
+        }
+        configureGroundedShadow(state, viewHeight)
+        configureSurfaceOcclusionPath(state)
+        state.artwork = createArtwork(state)
+    }
+
+    private fun configureGroundedShadow(state: InstrumentRenderState, viewHeight: Float) {
+        val source = state.primaryRect
+        val widthScale = when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL -> 0.62f
+            InstrumentRendererKey.HI_HAT -> 0.52f
+            InstrumentRendererKey.DRUM -> 0.78f
+            InstrumentRendererKey.SNARE -> 0.76f
+            InstrumentRendererKey.KICK -> 0.88f
+        }
+        val floorY = StudioKitCamera.FLOOR_PLANE_Y * viewHeight
+        val shadowWidth = source.width() * widthScale
+        val shadowHeight = maxOf(density * 5f, state.drawBounds.height() * 0.055f)
+        val centerX = source.centerX()
+        state.shadowRect.set(
+            centerX - shadowWidth * 0.5f,
+            floorY - shadowHeight * 0.72f,
+            centerX + shadowWidth * 0.5f,
+            floorY + shadowHeight * 0.28f,
         )
     }
 
-    private fun drawStage(canvas: Canvas) {
-        stagePaint.shader = LinearGradient(
-            0f,
-            0f,
-            0f,
-            height.toFloat(),
-            intArrayOf(0xff171d27.toInt(), 0xff090c11.toInt(), 0xff040506.toInt()),
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), stagePaint)
+    private fun configureSurfaceOcclusionPath(state: InstrumentRenderState) {
+        val path = state.surfaceOcclusionPath
+        path.reset()
+        when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL,
+            InstrumentRendererKey.HI_HAT,
+            -> path.addOval(state.primaryRect, Path.Direction.CW)
 
-        stagePaint.shader = RadialGradient(
-            width * 0.5f,
-            height * 0.92f,
-            width * 0.45f,
-            intArrayOf(0x33ee9841, 0x00000000),
-            floatArrayOf(0f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawOval(
-            width * 0.08f,
-            height * 0.72f,
-            width * 0.92f,
-            height * 1.08f,
-            stagePaint,
-        )
-    }
+            InstrumentRendererKey.DRUM,
+            InstrumentRendererKey.SNARE,
+            -> {
+                val shell = state.primaryRect
+                path.addRoundRect(
+                    shell,
+                    shell.width() * 0.16f,
+                    shell.height() * 0.12f,
+                    Path.Direction.CW,
+                )
+                path.addOval(state.secondaryRect, Path.Direction.CW)
+            }
 
-    private fun drawInstrument(canvas: Canvas, definition: InstrumentDefinition) {
-        reusableRect.set(pixelBounds(definition))
-        val active = isActive(definition.id)
-        val lift = if (active) height * 0.006f else 0f
-        reusableRect.offset(0f, -lift)
-
-        canvas.drawOval(
-            reusableRect.left + reusableRect.width() * 0.08f,
-            reusableRect.bottom - reusableRect.height() * 0.02f,
-            reusableRect.right - reusableRect.width() * 0.08f,
-            reusableRect.bottom + reusableRect.height() * 0.11f,
-            shadowPaint,
-        )
-
-        when (definition.shape) {
-            InstrumentShape.CYMBAL -> drawCymbal(canvas, reusableRect, active)
-            InstrumentShape.DRUM -> drawDrum(canvas, reusableRect, active, definition.id == InstrumentId.SNARE)
-            InstrumentShape.KICK -> drawKick(canvas, reusableRect, active)
+            InstrumentRendererKey.KICK -> {
+                path.addOval(state.primaryRect, Path.Direction.CW)
+                path.addOval(state.secondaryRect, Path.Direction.CW)
+            }
         }
 
-        canvas.drawText(
-            definition.id.label.uppercase(),
-            reusableRect.centerX(),
-            reusableRect.bottom - reusableRect.height() * 0.05f,
-            labelPaint,
-        )
-    }
-
-    private fun drawCymbal(canvas: Canvas, rect: RectF, active: Boolean) {
-        val disc = RectF(rect.left, rect.top + rect.height() * 0.20f, rect.right, rect.bottom - rect.height() * 0.27f)
-        cymbalPaint.shader = RadialGradient(
-            disc.centerX() - disc.width() * 0.16f,
-            disc.centerY() - disc.height() * 0.25f,
-            disc.width() * 0.64f,
-            intArrayOf(0xfff4dfa0.toInt(), 0xffc38a35.toInt(), 0xff744716.toInt()),
-            floatArrayOf(0f, 0.52f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawOval(disc, cymbalPaint)
-        rimPaint.color = 0xffe6bd6c.toInt()
-        canvas.drawOval(disc, rimPaint)
-        canvas.drawCircle(disc.centerX(), disc.centerY(), disc.width() * 0.07f, rimPaint)
-        if (active) canvas.drawOval(disc, glowPaint)
-    }
-
-    private fun drawDrum(canvas: Canvas, rect: RectF, active: Boolean, snare: Boolean) {
-        val shell = RectF(
-            rect.left + rect.width() * 0.10f,
-            rect.top + rect.height() * 0.23f,
-            rect.right - rect.width() * 0.10f,
-            rect.bottom - rect.height() * 0.10f,
-        )
-        shellPaint.shader = LinearGradient(
-            shell.left,
-            shell.top,
-            shell.right,
-            shell.bottom,
-            if (snare) {
-                intArrayOf(0xff24292e.toInt(), 0xffe5e9ec.toInt(), 0xff596169.toInt())
-            } else {
-                intArrayOf(0xff260507.toInt(), 0xffa52d35.toInt(), 0xff4e090d.toInt())
-            },
-            null,
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRoundRect(shell, shell.width() * 0.18f, shell.height() * 0.15f, shellPaint)
-
-        val head = RectF(rect.left, rect.top, rect.right, rect.top + rect.height() * 0.42f)
-        headPaint.shader = RadialGradient(
-            head.centerX() - head.width() * 0.12f,
-            head.centerY() - head.height() * 0.25f,
-            head.width() * 0.58f,
-            intArrayOf(0xffffffff.toInt(), 0xffd8d5cf.toInt(), 0xff686c70.toInt()),
-            floatArrayOf(0f, 0.67f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawOval(head, headPaint)
-        rimPaint.color = 0xffc8ced3.toInt()
-        canvas.drawOval(head, rimPaint)
-        if (active) canvas.drawOval(head, glowPaint)
-    }
-
-    private fun drawKick(canvas: Canvas, rect: RectF, active: Boolean) {
-        val shell = RectF(
-            rect.left + rect.width() * 0.04f,
-            rect.top + rect.height() * 0.12f,
-            rect.right - rect.width() * 0.04f,
-            rect.bottom - rect.height() * 0.10f,
-        )
-        shellPaint.shader = RadialGradient(
-            shell.centerX() - shell.width() * 0.18f,
-            shell.centerY() - shell.height() * 0.22f,
-            shell.width() * 0.62f,
-            intArrayOf(0xffad3239.toInt(), 0xff4f090d.toInt(), 0xff090b0e.toInt()),
-            floatArrayOf(0f, 0.58f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawOval(shell, shellPaint)
-        rimPaint.color = 0xffc4cbd0.toInt()
-        canvas.drawOval(shell, rimPaint)
-
-        val head = RectF(shell).apply { inset(shell.width() * 0.10f, shell.height() * 0.10f) }
-        headPaint.shader = RadialGradient(
-            head.centerX() - head.width() * 0.18f,
-            head.centerY() - head.height() * 0.18f,
-            head.width() * 0.58f,
-            intArrayOf(0xff39404a.toInt(), 0xff11151b.toInt(), 0xff050608.toInt()),
-            floatArrayOf(0f, 0.62f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawOval(head, headPaint)
-        if (active) canvas.drawOval(shell, glowPaint)
-    }
-
-    private fun isActive(id: InstrumentId): Boolean {
-        for (index in 0 until activePointers.size()) {
-            if (activePointers.valueAt(index) == id) return true
+        val rotationDegrees = state.definition.layout.rotationDegrees
+        if (rotationDegrees != 0f) {
+            val bounds = state.drawBounds
+            surfaceRotationMatrix.reset()
+            surfaceRotationMatrix.setRotate(rotationDegrees, bounds.centerX(), bounds.centerY())
+            path.transform(surfaceRotationMatrix)
         }
-        return false
+    }
+
+    private fun drawInstrumentShadow(canvas: Canvas, state: InstrumentRenderState) {
+        val saveCount = canvas.save()
+        canvas.clipRect(floorClipRect)
+        canvas.clipOutPath(instrumentOcclusionPath)
+        val shadow = state.shadowRect
+        canvas.rotate(
+            state.definition.layout.rotationDegrees * 0.35f,
+            shadow.centerX(),
+            shadow.centerY(),
+        )
+        canvas.drawOval(shadow, shadowPaint)
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawInstrumentSupport(canvas: Canvas, state: InstrumentRenderState) {
+        when (state.definition.id) {
+            InstrumentId.CRASH,
+            InstrumentId.RIDE,
+            InstrumentId.HI_HAT,
+            -> drawCymbalStand(canvas, state)
+
+            InstrumentId.TOM_HIGH,
+            InstrumentId.TOM_MID,
+            -> drawRackTomMount(canvas, state)
+
+            InstrumentId.KICK -> drawKickLegs(canvas, state)
+            InstrumentId.FLOOR_TOM -> drawFloorTomLegs(canvas, state)
+            InstrumentId.SNARE -> drawSnareStand(canvas, state)
+        }
+    }
+
+    private fun drawCymbalStand(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val disc = state.primaryRect
+        val bounds = state.drawBounds
+        val centerX = disc.centerX()
+        val jointY = floorY - maxOf(bounds.height() * 0.08f, density * 10f)
+        val footSpread = bounds.width() * 0.18f
+
+        canvas.drawLine(centerX, disc.centerY(), centerX, jointY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX - footSpread, floorY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX + footSpread, floorY, standPaint)
+    }
+
+    private fun drawRackTomMount(canvas: Canvas, state: InstrumentRenderState) {
+        val shell = state.primaryRect
+        val startX = if (state.definition.id == InstrumentId.TOM_HIGH) {
+            shell.right - shell.width() * 0.22f
+        } else {
+            shell.left + shell.width() * 0.22f
+        }
+        val startY = shell.bottom - shell.height() * 0.08f
+
+        canvas.drawLine(startX, startY, rackMountX, rackMountY, hardwarePaint)
+        canvas.drawCircle(rackMountX, rackMountY, density * 3f, hardwarePaint)
+    }
+
+    private fun drawKickLegs(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+
+        canvas.drawLine(
+            shell.left + shell.width() * 0.18f,
+            shell.bottom - shell.height() * 0.08f,
+            bounds.left - bounds.width() * 0.02f,
+            floorY,
+            standPaint,
+        )
+        canvas.drawLine(
+            shell.right - shell.width() * 0.18f,
+            shell.bottom - shell.height() * 0.08f,
+            bounds.right + bounds.width() * 0.02f,
+            floorY,
+            standPaint,
+        )
+    }
+
+    private fun drawFloorTomLegs(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+
+        canvas.drawLine(
+            shell.left + shell.width() * 0.16f,
+            shell.bottom - shell.height() * 0.12f,
+            bounds.left + bounds.width() * 0.04f,
+            floorY,
+            standPaint,
+        )
+        canvas.drawLine(
+            shell.right - shell.width() * 0.16f,
+            shell.bottom - shell.height() * 0.12f,
+            bounds.right - bounds.width() * 0.04f,
+            floorY,
+            standPaint,
+        )
+    }
+
+    private fun drawSnareStand(canvas: Canvas, state: InstrumentRenderState) {
+        val floorY = state.definition.layout.supportFloorY?.times(height.toFloat()) ?: return
+        val shell = state.primaryRect
+        val bounds = state.drawBounds
+        val centerX = shell.centerX()
+        val stemTopY = shell.bottom - shell.height() * 0.08f
+        val jointY = floorY - (floorY - shell.bottom) * 0.28f
+        val footSpread = bounds.width() * 0.18f
+
+        canvas.drawLine(centerX, stemTopY, centerX, jointY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX - footSpread, floorY, standPaint)
+        canvas.drawLine(centerX, jointY, centerX + footSpread, floorY, standPaint)
+    }
+
+    private fun drawInstrumentSurface(
+        canvas: Canvas,
+        state: InstrumentRenderState,
+        animation: InstrumentAnimationState,
+    ) {
+        val saveCount = canvas.save()
+        val bounds = state.drawBounds
+        canvas.rotate(
+            state.definition.layout.rotationDegrees,
+            bounds.centerX(),
+            bounds.centerY(),
+        )
+
+        when (state.definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL -> drawCymbal(canvas, state, animation, hiHat = false)
+            InstrumentRendererKey.HI_HAT -> drawCymbal(canvas, state, animation, hiHat = true)
+            InstrumentRendererKey.DRUM -> drawDrum(canvas, state, animation, snare = false)
+            InstrumentRendererKey.SNARE -> drawDrum(canvas, state, animation, snare = true)
+            InstrumentRendererKey.KICK -> drawKick(canvas, state, animation)
+        }
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawDrum(
+        canvas: Canvas,
+        state: InstrumentRenderState,
+        animation: InstrumentAnimationState,
+        snare: Boolean,
+    ) {
+        val artwork = state.artwork ?: return
+        val head = state.secondaryRect
+        artwork.drawBody(canvas, artworkPaint)
+
+        val impactX = head.left + animation.strikeX * head.width()
+        val impactY = head.top + animation.strikeY * head.height()
+        val headSaveCount = canvas.save()
+        if (animation.currentDeformation > 0f) {
+            canvas.scale(
+                1f + animation.currentDeformation * 0.012f,
+                1f - animation.currentDeformation * if (snare) 0.035f else 0.055f,
+                impactX,
+                impactY,
+            )
+        }
+        artwork.drawPlayable(canvas, artworkPaint)
+        canvas.restoreToCount(headSaveCount)
+
+        if (animation.currentDeformation > 0f) {
+            val radiusX = head.width() * (0.10f + animation.velocity * 0.08f)
+            val radiusY = head.height() * (0.08f + animation.velocity * 0.06f)
+            scratchRect.set(impactX - radiusX, impactY - radiusY, impactX + radiusX, impactY + radiusY)
+            impactPaint.alpha = (animation.currentDeformation * 90f).toInt().coerceIn(0, 90)
+            canvas.drawOval(scratchRect, impactPaint)
+        }
+        drawFlash(canvas, head, animation)
+    }
+
+    private fun drawKick(
+        canvas: Canvas,
+        state: InstrumentRenderState,
+        animation: InstrumentAnimationState,
+    ) {
+        val artwork = state.artwork ?: return
+        val head = state.secondaryRect
+        artwork.drawBody(canvas, artworkPaint)
+
+        val impactX = head.left + animation.strikeX * head.width()
+        val impactY = head.top + animation.strikeY * head.height()
+        val headSaveCount = canvas.save()
+        if (animation.currentDeformation > 0f) {
+            val scale = 1f - animation.currentDeformation * 0.045f
+            canvas.scale(scale, scale, impactX, impactY)
+        }
+        artwork.drawPlayable(canvas, artworkPaint)
+        canvas.restoreToCount(headSaveCount)
+        drawFlash(canvas, head, animation)
+    }
+
+    private fun drawCymbal(
+        canvas: Canvas,
+        state: InstrumentRenderState,
+        animation: InstrumentAnimationState,
+        hiHat: Boolean,
+    ) {
+        val artwork = state.artwork ?: return
+        val disc = state.primaryRect
+        val bounds = state.drawBounds
+        val impactX = disc.left + animation.strikeX * disc.width()
+        val impactY = disc.top + animation.strikeY * disc.height()
+
+        artwork.drawBody(canvas, artworkPaint)
+        val discSaveCount = canvas.save()
+        canvas.rotate(animation.currentRotation, impactX, impactY)
+        if (hiHat) {
+            canvas.translate(0f, -animation.currentDeformation * bounds.height() * 0.07f)
+        }
+        artwork.drawPlayable(canvas, artworkPaint)
+        drawFlash(canvas, disc, animation)
+        canvas.restoreToCount(discSaveCount)
+    }
+
+    private fun drawFlash(canvas: Canvas, bounds: RectF, animation: InstrumentAnimationState) {
+        if (animation.currentFlash <= 0f) return
+        flashPaint.alpha = (animation.currentFlash * 190f).toInt().coerceIn(0, 190)
+        canvas.drawOval(bounds, flashPaint)
+    }
+
+    private fun updateAnimation(
+        definition: InstrumentDefinition,
+        state: InstrumentAnimationState,
+        nowNanos: Long,
+    ): Boolean {
+        if (state.startTimeNanos == 0L) return false
+
+        val durationMillis = when (definition.id) {
+            InstrumentId.SNARE -> 110L
+            InstrumentId.TOM_HIGH -> 160L
+            InstrumentId.TOM_MID -> 195L
+            InstrumentId.FLOOR_TOM -> 245L
+            InstrumentId.KICK -> 230L
+            InstrumentId.HI_HAT -> 280L
+            InstrumentId.CRASH -> 620L
+            InstrumentId.RIDE -> 720L
+        }
+        val elapsedNanos = nowNanos - state.startTimeNanos
+        val durationNanos = durationMillis * NanosPerMillisecond
+        if (elapsedNanos >= durationNanos) {
+            state.startTimeNanos = 0L
+            state.currentDeformation = 0f
+            state.currentRotation = 0f
+            state.currentFlash = 0f
+            return false
+        }
+
+        val progress = elapsedNanos.toFloat() / durationNanos.toFloat()
+        val decay = 1f - progress
+        state.currentFlash = state.velocity * (1f - (progress / 0.22f).coerceIn(0f, 1f))
+
+        when (definition.layout.rendererKey) {
+            InstrumentRendererKey.CYMBAL -> {
+                state.currentDeformation = state.velocity * decay
+                state.currentRotation = sin(progress * PI * 5.0).toFloat() * state.velocity * 7f * decay
+            }
+
+            InstrumentRendererKey.HI_HAT -> {
+                state.currentDeformation = state.velocity * decay * decay
+                state.currentRotation = sin(progress * PI * 4.0).toFloat() * state.velocity * 2.5f * decay
+            }
+
+            InstrumentRendererKey.SNARE -> {
+                state.currentDeformation = state.velocity * decay * decay
+                state.currentRotation = 0f
+            }
+
+            InstrumentRendererKey.DRUM -> {
+                state.currentDeformation = state.velocity * decay * decay
+                state.currentRotation = 0f
+            }
+
+            InstrumentRendererKey.KICK -> {
+                state.currentDeformation = state.velocity * decay * decay
+                state.currentRotation = 0f
+            }
+        }
+        return true
+    }
+
+    private fun labelAlpha(nowNanos: Long): Int {
+        val elapsedMillis = (nowNanos - labelsVisibleSinceNanos) / NanosPerMillisecond
+        if (elapsedMillis <= LabelHoldMillis) return 255
+        if (elapsedMillis >= LabelHoldMillis + LabelFadeMillis) return 0
+
+        val fadeProgress = (elapsedMillis - LabelHoldMillis).toFloat() / LabelFadeMillis.toFloat()
+        return ((1f - fadeProgress) * 255f).toInt().coerceIn(0, 255)
     }
 
     private fun performInstrumentHaptic(instrument: InstrumentId, velocity: Float) {
         if (!hapticsEnabled) return
-        val vibrator = context.getSystemService(Vibrator::class.java) ?: return
-        if (!vibrator.hasVibrator()) return
-        val duration = when (instrument) {
-            InstrumentId.KICK -> 12L
+
+        val feedbackConstant = when (instrument) {
+            InstrumentId.KICK -> {
+                if (velocity >= 0.68f) HapticFeedbackConstants.CONTEXT_CLICK else HapticFeedbackConstants.KEYBOARD_TAP
+            }
+
             InstrumentId.SNARE,
             InstrumentId.TOM_HIGH,
             InstrumentId.TOM_MID,
             InstrumentId.FLOOR_TOM,
-            -> 7L
-            else -> 4L
+            -> {
+                if (velocity >= 0.86f) HapticFeedbackConstants.CONTEXT_CLICK else HapticFeedbackConstants.KEYBOARD_TAP
+            }
+
+            InstrumentId.HI_HAT,
+            InstrumentId.CRASH,
+            InstrumentId.RIDE,
+            -> {
+                if (velocity < 0.82f) return
+                HapticFeedbackConstants.CLOCK_TICK
+            }
         }
-        val amplitude = (60 + velocity * 150).toInt().coerceIn(1, 255)
-        vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+        performHapticFeedback(feedbackConstant)
+    }
+
+    private class InstrumentRenderState(
+        val definition: InstrumentDefinition,
+    ) {
+        val drawBounds = RectF()
+        val playableRect = RectF()
+        val primaryRect = RectF()
+        val secondaryRect = RectF()
+        val shadowRect = RectF()
+        val surfaceOcclusionPath = Path()
+        val label: String = definition.id.label.uppercase()
+        var labelX: Float = 0f
+        var labelY: Float = 0f
+        var artwork: InstrumentArtworkCache? = null
+    }
+
+    private class InstrumentAnimationState {
+        var strikeX: Float = 0.5f
+        var strikeY: Float = 0.5f
+        var velocity: Float = 0f
+        var startTimeNanos: Long = 0L
+        var activePointerCount: Int = 0
+        var currentDeformation: Float = 0f
+        var currentRotation: Float = 0f
+        var currentFlash: Float = 0f
     }
 }

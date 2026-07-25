@@ -1,6 +1,8 @@
 # Source mapping
 
-This foundation was extracted from the supplied `hyper_realistic_android_drum_kit.html` prototype and the native Android implementation plan.
+This foundation was extracted from the supplied `hyper_realistic_android_drum_kit.html` prototype, the native Android implementation plan, `Drum_Kit_Recovery_and_Development_Roadmap.md`, and the 2.5D studio-instrument redesign brief.
+
+The recovery roadmap is the authoritative execution sequence and status record. This document remains the source mapping for retained prototype identifiers, native codes, geometry, behavior, and deferred scope.
 
 ## Prototype mapping retained
 
@@ -15,7 +17,81 @@ This foundation was extracted from the supplied `hyper_realistic_android_drum_ki
 | `crash` | Crash | 6 | -0.52 |
 | `ride` | Ride | 7 | 0.52 |
 
-The native layout uses normalized rectangles so rendering and hit testing scale across phones and tablets in landscape.
+The native model now separates normalized draw bounds from independent typed hit regions. Supported hit-region shapes are ellipse, circle, polygon, and rectangle. Render z-index and hit-test priority are also modeled and sorted independently.
+
+Normalized strike coordinates use a stable `[0, 1]` playable-surface-local contract. The same viewport-aware rotation transform now drives hit selection, strike coordinates, impact animation placement, debug hit-region rendering, and snare articulation selection. Transient animation geometry does not change the canonical playable region.
+
+## Fixed camera contract
+
+Phase 2 Step 2.1 defines one shared elevated drummer-view camera in `StudioKitCamera`:
+
+- Elevation: 24 degrees
+- Normalized horizon: 0.68 from the top of the playable surface
+- Reference landscape viewport: 1536 by 707 pixels
+- Drum-head ellipse compression: 0.27 minor axis to major axis
+- Cymbal ellipse compression: 0.18 minor axis to major axis
+
+The elevation and horizon retain the prototype's slightly elevated viewpoint and floor transition. The compression ratios normalize representative drum and cymbal profiles from the prototype into explicit screen-space targets.
+
+## Camera-aligned kit placement
+
+Phase 2 Step 2.2 applies the fixed camera contract to the normalized instrument layout:
+
+- Rack tom centers flank the kick center symmetrically.
+- The snare sits lower and to the player's left.
+- The floor tom sits to the player's right, behind the snare line, and is larger than either rack tom.
+- The hi-hat sits left of the snare in a player-side position.
+- The crash and ride are rebalanced around the rack toms, with the ride remaining larger.
+- Cymbal and drum draw-bound heights are derived from the shared camera compression targets.
+- The top 12 percent of the playable surface remains reserved as a control-safe area.
+- Hit-test priority remains unchanged; Step 2.3 subsequently revises visual depth independently.
+
+## Depth relationships and shared floor plane
+
+Phase 2 Step 2.3 separates the renderer into background-shadow, support-hardware, and playable-surface passes:
+
+- Crash and ride remain the farthest visual surfaces.
+- The kick renders behind the rack toms, floor tom, hi-hat, and snare.
+- Rack toms render behind the player-side snare while remaining in front of the kick.
+- Cymbal and hi-hat stands render before every drum surface, so hardware stays visually behind shells.
+- Rack-tom mount stems render behind both the kick and rack-tom surfaces.
+- Kick legs, floor-tom legs, the snare stand, and cymbal stands terminate at the shared normalized floor plane `StudioKitCamera.FLOOR_PLANE_Y = 0.94`.
+- Instrument rotation applies to playable surfaces and shadows, not to floor anchors, so stand feet remain grounded.
+
+## Hardware occlusion and shadow masks
+
+Phase 2 Step 2.4 merges support and surface layers by explicit depth instead of drawing every stand behind every drum. Rack-tom mounts remain behind the kick, while foreground snare, floor-tom, and hi-hat supports remain in front of background drums and behind their own surfaces. Canonical rotated surface masks are cached during `onSizeChanged()` and reused to clip grounded shadows out of shells, heads, kicks, and cymbals without steady-state allocation. Animated deformation does not alter the canonical occlusion mask or playable hit region.
+
+## Cached layered instrument artwork
+
+Phase 2 Step 2.5 replaces the transitional per-frame shell, head, kick, and cymbal primitives with renderer-key artwork profiles and cached Canvas layers built during `onSizeChanged()`. Drum caches separate shell, bottom hoop, lugs, reflections, and wear from the animated batter head and top hoop. The snare uses a brushed-steel material profile. The kick separates its wine shell and rear hoop from the animated dark front head, port, badge, and front hoop. Cymbal caches include bronze edge shading, six lathe rings, deterministic hammering marks, raised bells, highlights, felt/bolt hardware, and a darker lower hi-hat disc. Body and playable layers remain separate so existing position- and velocity-driven deformation continues without rebuilding static detail. Cached bitmaps are released and rebuilt on resize and retained across temporary View detach/reattach cycles. Reattachment also restarts the timed label-fade schedule so a removed callback cannot leave labels permanently visible.
+
+## RenderNode-backed static artwork
+
+Phase 2 Step 2.6 records complete static body and playable artwork layers into RenderNode display lists on API 29 and newer hardware-accelerated canvases. API 26–28 and software canvases retain the bitmap cache. Display lists are re-recorded if Android discards them, and Compose permanently releases cached resources through AndroidView's release callback. A later device regression caused missing artwork, so the production backend policy currently stays on bitmap caching until RenderNode is diagnosed and revalidated. Input geometry, support ordering, animation transforms, and audio dispatch remain independent from the cache backend.
+
+## Pre-2.6 corrective audit
+
+The corrective audit separates complete artwork bounds, rendered playable-surface bounds, and touch hit regions into three explicit contracts. Artwork no longer changes size when hit boxes are tuned. All kit-level hit APIs now delegate to the same viewport-aware geometry used by `DrumSurfaceView`. Head and cymbal hit ellipses are inset from visible rims and hardware, and the former kick/snare overlap is removed at the reference landscape viewport. Containment uses the inset region while normalized strike coordinates remain local to the rendered playable surface, keeping animation and position-sensitive audio aligned with the physical tap.
+
+## Sample-first snare integration
+
+The snare placeholder has been replaced by a deterministic predecoded acoustic bank while preserving the existing low-latency and recovery architecture:
+
+- Five articulations: centre, off-centre, edge, rimshot, and cross-stick
+- Six velocity layers per articulation
+- Four round robins per layer
+- 120 stereo samples at 48 kHz
+- Equal-power interpolation between adjacent velocity layers
+- Small pitch, gain, and articulation-aware filter variation
+- Low-level parallel room processing
+- Shared fast-attack, slow-release peak limiting after the complete mix
+
+The centre, off-centre, edge-expression, and rimshot material comes from the CC BY 4.0 Aasimonster 2.1 DrumGizmo kit. Cross-stick material comes from Free Wave Samples under its published application-embedding terms. Attribution is recorded in `THIRD_PARTY_NOTICES.md` and packaged beside the generated bank.
+
+The generated bank is loaded before the Oboe stream opens. The real-time callback performs no file access, decoding, allocation, locking, JNI calls, or logging. Android audio focus, startup retry, exclusive-to-shared fallback, unexpected-stream recovery, finite-value guards, and underrun diagnostics remain active.
+
+Because strike coordinates are playable-surface-local, `(0.5, 0.5)` is the centre of the rendered snare head. A lower-head gesture currently selects cross-stick until a future explicit stick-angle or articulation control exists.
 
 ## Prototype behavior represented in the base
 
@@ -25,31 +101,71 @@ The native layout uses normalized rectangles so rendering and hit testing scale 
 - Instrument-specific stereo panning
 - Master volume and room controls
 - Haptic toggle
-- Fullscreen landscape presentation
+- Immersive resizable presentation optimized for landscape
 - Kick, snare, three toms, hi-hat, crash, and ride
+
+## Redesign behavior implemented
+
+- Compact kit selector in the upper-left safe drawing area
+- Compact recording and mixer controls in the upper-right safe drawing area
+- Expandable Room, Volume, and Haptics controls
+- Fixed-capacity strike-performance recording with relative timing and expressive input values
+- Recording finalization when the activity stops or audio becomes unavailable
+- Debug-only audio diagnostics and diagnostics polling
+- Android audio-focus acquisition, loss handling, delayed focus support, and startup retry
+- Automatic Oboe stream recovery after unexpected closure, with shared-mode fallback when exclusive opening fails
+- Closed-stream-safe diagnostics access and finite-value validation at Kotlin and native audio boundaries
+- Sample-first five-articulation snare with velocity layers and round robins
+- Deterministic CI generation, structure verification, caching, attribution, and APK packaging of the snare bank
+- Independent draw bounds, visual playable-surface bounds, and playable hit regions
+- Shared viewport-aware rotation for rendering, hit testing, strike positions, and debug overlays
+- Playable-surface-local strike coordinates for audio and animation input
+- Independent render z-index and hit-test priority
+- Labels outside playable heads with timed fade-out
+- Per-instrument strike position, velocity, start time, active-pointer count, deformation, and rotation state
+- Faster snare rebound and progressively slower tom rebound
+- Kick-head compression, cymbal flex, and hi-hat upper-disc movement
+- Cached static rectangles, labels, occlusion paths, and layered instrument artwork created in `onSizeChanged()`
+- Animation-only redraw through `postInvalidateOnAnimation()`
+- System-respecting haptic feedback with restrained velocity thresholds
+- Audio dispatch before recording, haptic, and visual state updates
+- Shared fixed camera constants and projected ellipse helpers for the Phase 2 layout
+- Camera-aligned instrument positions, scale relationships, and control-safe placement
+- Explicit drummer-view surface depth, independently layered support hardware, cached occlusion masks, layered material profiles, and one shared floor plane
+- CI unit tests, Android build, lint, snare-bank verification, and downloadable combined debug APK artifact
+
+The performance recorder uses preallocated primitive arrays during play. It materializes immutable recorded-strike objects only after STOP or lifecycle finalization, keeping the touch-to-audio path ahead of recording work.
+
+## Redesign behavior remaining
+
+- Physical-device listening and balance refinement for centre, edge, rimshot, and cross-stick
+- Device-profiled hit-region, articulation-zone, render-performance, and sample-memory tuning
+- Strike-take playback and PCM/WAV export
+- Optional AGSL effects after profiling
 
 ## Deliberately deferred
 
-The following behaviors require the later expressive-engine phases and are not faked in the foundation:
+The following behaviors require later expressive-engine phases and are not faked in the current implementation:
 
-- Sample layers and round robins
-- Five-zone snare articulation model
+- Production sample banks for kick, toms, hi-hat, crash, and ride
 - Continuous pressure damping and pitch bend
 - Continuous hi-hat openness and pedal events
-- Cymbal edge/bow/bell zones and choking
-- Snare throw-off, rimshot, cross-stick, and press roll
-- Recording, export, MIDI, calibration, and production OpenGL rendering
+- Cymbal edge, bow, bell, choke, and mute behavior
+- Snare throw-off, press roll, and explicit stick-angle control
+- PCM/WAV export, MIDI, and calibration
+- OpenGL rendering unless profiling proves Canvas/RenderNode insufficient
 
 ## Architectural decisions
 
 - No WebView
-- Compose for application shell and controls
-- Custom Android `View` for raw `MotionEvent` access
+- Compose for application shell, selectors, settings, sheets, and overlays
+- Custom Android `View` for raw `MotionEvent` access, hit testing, animation state, and rendering
 - C++/Oboe for the audio callback
-- Fixed-capacity event queue and voice pool
+- Fixed-capacity event queue, voice pool, performance-recording buffers, and preloaded sample descriptors
 - No allocation or Kotlin calls from the real-time callback
 - Source-independent instrument definitions to support future kits
+- Render technology remains independent from input and audio contracts
 
 ## Foundation completion
 
-This branch covers the practical core of Phase 0, the audio-stream portion of Phase 1, the basic multi-touch path from Phase 2, and a synthesized placeholder version of the Phase 3 instrument map.
+The repository now covers the practical core of Phase 0, the native audio-stream and sampled-snare portions of Phase 1, the raw multi-touch path from Phase 2, a mixed sample/synthesis version of the Phase 3 instrument map, the first structural slice of the 2.5D UI redesign, fixed-capacity expressive strike-performance capture, the fixed camera contract, camera-aligned Phase 2 kit placement, explicit Step 2.3 depth relationships, Step 2.4 hardware occlusion, Step 2.5 cached layered artwork, the pre-2.6 geometry and cache-lifecycle corrections, cached surface masks, a shared floor plane, shared viewport-aware input geometry, lifecycle-hardened audio operation, deterministic snare-bank generation, articulation mapping, and combined APK packaging.

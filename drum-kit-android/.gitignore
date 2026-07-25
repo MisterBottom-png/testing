@@ -8,3 +8,4 @@ local.properties
 .externalNativeBuild/
 .cxx/
 .DS_Store
+engine-audio/src/main/assets/snare/snare-bank.pcm

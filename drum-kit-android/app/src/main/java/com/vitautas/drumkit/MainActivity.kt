@@ -7,19 +7,29 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.vitautas.drumkit.audio.AudioEngine
 import com.vitautas.drumkit.feature.kit.DrumKitScreen
+import com.vitautas.drumkit.feature.kit.DrumKitSessionController
 
 class MainActivity : ComponentActivity() {
+    private val audioAvailableState = mutableStateOf(true)
+    private val kitSessionController = DrumKitSessionController()
+    private lateinit var audioSessionController: AudioSessionController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         hideSystemBars()
 
+        audioSessionController = AudioSessionController(this) { available ->
+            audioAvailableState.value = available
+        }
+        val showDiagnostics = BuildConfig.DEBUG
         setContent {
             NativeDrumKitTheme {
                 DrumKitScreen(
@@ -27,6 +37,9 @@ class MainActivity : ComponentActivity() {
                     onMasterVolumeChanged = AudioEngine::setMasterVolume,
                     onRoomMixChanged = AudioEngine::setRoomMix,
                     diagnosticsProvider = AudioEngine::diagnostics,
+                    sessionController = kitSessionController,
+                    audioAvailable = audioAvailableState.value,
+                    showDiagnostics = showDiagnostics,
                 )
             }
         }
@@ -34,11 +47,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        AudioEngine.start()
+        audioSessionController.start()
     }
 
     override fun onStop() {
-        AudioEngine.stop()
+        kitSessionController.onAppStopping()
+        audioSessionController.stop()
         super.onStop()
     }
 
@@ -60,11 +74,11 @@ class MainActivity : ComponentActivity() {
 private fun NativeDrumKitTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xffffb44a),
-            background = Color(0xff05070a),
-            surface = Color(0xff0d1016),
-            onBackground = Color(0xfff3f5f8),
-            onSurface = Color(0xfff3f5f8),
+            primary = Color(0xffffa13a),
+            background = Color(0xff08090b),
+            surface = Color(0xff111318),
+            onBackground = Color(0xfff2f0eb),
+            onSurface = Color(0xfff2f0eb),
         ),
         content = content,
     )

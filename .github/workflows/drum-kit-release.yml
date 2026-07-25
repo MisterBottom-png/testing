@@ -1,0 +1,158 @@
+name: Drum Kit Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "drum-kit-v*"
+    paths:
+      - "drum-kit-android/**"
+      - ".github/workflows/drum-kit-release.yml"
+
+concurrency:
+  group: drum-kit-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: drum-kit-android
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install snare bank tooling
+        run: python -m pip install numpy==2.2.6 remotezip==0.12.3 soundfile==0.13.1
+
+      - name: Validate snare bank tooling
+        run: python -m py_compile tools/prepare_snare_bank.py tools/build_snare_bank.py
+
+      - name: Cache downloaded acoustic samples
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/native-drum-kit
+          key: snare-sources-v1
+
+      - name: Restore generated snare bank
+        id: snare-bank-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            drum-kit-android/engine-audio/src/main/assets/snare/snare-bank.pcm
+            drum-kit-android/build/snare-bank-manifest.json
+          key: snare-bank-v2-${{ runner.os }}-${{ hashFiles('drum-kit-android/tools/prepare_snare_bank.py', 'drum-kit-android/tools/build_snare_bank.py') }}
+
+      - name: Build predecoded snare PCM bank
+        if: steps.snare-bank-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python tools/build_snare_bank.py \
+            --output engine-audio/src/main/assets/snare/snare-bank.pcm \
+            --manifest build/snare-bank-manifest.json \
+            --cache-dir ~/.cache/native-drum-kit \
+            2>&1 | tee build/snare-bank-build.log
+
+      - name: Verify snare bank structure
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import struct
+          from pathlib import Path
+
+          bank = Path("engine-audio/src/main/assets/snare/snare-bank.pcm")
+          manifest_path = Path("build/snare-bank-manifest.json")
+          manifest = json.loads(manifest_path.read_text())
+          raw = bank.read_bytes()
+          header = struct.unpack_from("<8sIIIIII", raw)
+          assert header == (b"SNAREPCM", 1, 48000, 5, 6, 4, 120), header
+          assert len(manifest["samples"]) == 120
+          assert manifest["bank_sha256"] == hashlib.sha256(raw).hexdigest()
+          print(f"Verified {len(raw) / 1048576:.1f} MiB PCM bank with 120 samples")
+          PY
+
+      - name: Save generated snare bank
+        if: steps.snare-bank-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            drum-kit-android/engine-audio/src/main/assets/snare/snare-bank.pcm
+            drum-kit-android/build/snare-bank-manifest.json
+          key: ${{ steps.snare-bank-cache.outputs.cache-primary-key }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --channel=3 \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0" \
+            "ndk;29.0.14206865" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+          cache-provider: basic
+
+      - name: Test, lint, and build release artifacts
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --console=plain --warning-mode=fail \
+            testDebugUnitTest \
+            :app:lintRelease \
+            :app:assembleRelease \
+            :app:bundleRelease 2>&1 | tee release-build.log
+
+      - name: Upload release build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-release-build-log
+          path: drum-kit-android/release-build.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unsigned release artifacts
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: drum-kit-unsigned-release
+          path: |
+            drum-kit-android/app/build/outputs/apk/release/*.apk
+            drum-kit-android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload snare bank manifest
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: snare-bank-manifest
+          path: drum-kit-android/build/snare-bank-manifest.json
+          if-no-files-found: error
+          retention-days: 30
