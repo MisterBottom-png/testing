@@ -1,6 +1,7 @@
 package com.vitautas.drumkit
 
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
     private val audioAvailableState = mutableStateOf(true)
     private val kitSessionController = DrumKitSessionController()
     private lateinit var audioSessionController: AudioSessionController
+    private var diagnosticTouchObserver: DiagnosticTouchObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +37,7 @@ class MainActivity : ComponentActivity() {
                     DiagnosticDrumKitScreen(
                         sessionController = kitSessionController,
                         audioAvailable = audioAvailableState.value,
+                        onTouchObserverChanged = { observer -> diagnosticTouchObserver = observer },
                     )
                 } else {
                     DrumKitScreen(
@@ -51,6 +54,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(event)
+        if (BuildConfig.DEBUG) {
+            diagnosticTouchObserver?.invoke(event, window.decorView.width, window.decorView.height)
+        }
+        return handled
+    }
+
     override fun onStart() {
         super.onStart()
         audioSessionController.start()
@@ -60,6 +71,11 @@ class MainActivity : ComponentActivity() {
         kitSessionController.onAppStopping()
         audioSessionController.stop()
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        diagnosticTouchObserver = null
+        super.onDestroy()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
