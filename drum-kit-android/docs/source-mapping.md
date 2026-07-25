@@ -1,6 +1,8 @@
 # Source mapping
 
-This foundation was extracted from the supplied `hyper_realistic_android_drum_kit.html` prototype, the native Android implementation plan, and the 2.5D studio-instrument redesign brief.
+This foundation was extracted from the supplied `hyper_realistic_android_drum_kit.html` prototype, the native Android implementation plan, `Drum_Kit_Recovery_and_Development_Roadmap.md`, and the 2.5D studio-instrument redesign brief.
+
+The recovery roadmap is the authoritative execution sequence and status record. This document remains the source mapping for retained prototype identifiers, native codes, geometry, behavior, and deferred scope.
 
 ## Prototype mapping retained
 
