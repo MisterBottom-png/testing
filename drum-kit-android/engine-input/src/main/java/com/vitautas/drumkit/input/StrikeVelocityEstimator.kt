@@ -99,12 +99,14 @@ internal class StrikeVelocityEstimator(
         const val MaximumVelocity = 1f
         const val MediumVelocity = 0.62f
         const val MinimumPressure = 0.02f
-        const val MinimumContactSize = 0.01f
+        const val MinimumContactSize = 0.001f
         const val DefaultPressure = 0.5f
         const val PressureChangeThreshold = 0.015f
         const val FixedPressureObservationCount = 4
-        const val ContactSizeLow = 0.05f
-        const val ContactSizeHigh = 0.80f
+        // Samsung SM-S931B reports meaningful finger contacts in approximately 0.008..0.057.
+        // Keep this deliberately restrained: size is an auxiliary signal, not a proxy for force.
+        const val ContactSizeLow = 0.006f
+        const val ContactSizeHigh = 0.060f
         const val MotionHistoryWindowMillis = 80L
     }
 }

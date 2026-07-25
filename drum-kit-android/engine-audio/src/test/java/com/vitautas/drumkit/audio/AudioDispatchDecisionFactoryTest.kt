@@ -24,13 +24,22 @@ class AudioDispatchDecisionFactoryTest {
         assertEquals(2, decision.lowerVelocityLayer)
         assertEquals(3, decision.upperVelocityLayer)
         assertEquals(0.75f, decision.velocityLayerBlend ?: -1f, 0.0001f)
-        assertEquals("pressure_plus_contact_size", decision.velocityEstimatorInputMode)
+        assertEquals("deterministic_fallback", decision.velocityEstimatorInputMode)
         assertEquals(-0.12f, decision.stereoPan, 0.0001f)
         assertEquals(0L, decision.diagnosticToken)
         assertEquals(NativeQueueState.UNOBSERVED.wireName, decision.nativeQueueState)
         assertNull(decision.lowerRoundRobinIndex)
         assertNull(decision.activeVoiceCount)
         assertFalse(decision.nativeSelectionTraceAvailable)
+    }
+
+    @Test
+    fun honorsInputResolvedCrossStickArticulation() {
+        val decision = AudioDispatchDecisionFactory.create(
+            strike(requestedArticulation = SnareArticulation.CROSS_STICK),
+        )
+
+        assertEquals(SnareArticulation.CROSS_STICK, decision.articulation)
     }
 
     @Test
@@ -117,7 +126,7 @@ class AudioDispatchDecisionFactoryTest {
         assertEquals(0.8f, decision.sanitizedVelocity, 0.0001f)
         assertEquals(0.5f, decision.sanitizedNormalizedX, 0.0001f)
         assertEquals(0.5f, decision.sanitizedNormalizedY, 0.0001f)
-        assertEquals("timestamp_fallback_plus_contact_size", decision.velocityEstimatorInputMode)
+        assertEquals("deterministic_fallback", decision.velocityEstimatorInputMode)
         assertEquals(4, decision.lowerVelocityLayer)
         assertEquals(5, decision.upperVelocityLayer)
     }
@@ -141,6 +150,7 @@ class AudioDispatchDecisionFactoryTest {
         normalizedX: Float = 0.5f,
         normalizedY: Float = 0.5f,
         pressure: Float = 0.7f,
+        requestedArticulation: SnareArticulation? = null,
     ): DrumStrike = DrumStrike(
         pointerId = 7,
         instrument = instrument,
@@ -150,5 +160,6 @@ class AudioDispatchDecisionFactoryTest {
         pressure = pressure,
         contactSize = 0.2f,
         eventTimeNanos = 12_000L,
+        requestedArticulation = requestedArticulation,
     )
 }

@@ -37,17 +37,17 @@ class SnareArticulationResolverTest {
     }
 
     @Test
-    fun lowerHeadGestureSelectsCrossStick() {
+    fun lowerHeadStrikeDoesNotAccidentallySelectCrossStick() {
         assertEquals(
-            SnareArticulation.CROSS_STICK,
+            SnareArticulation.OFF_CENTER,
             SnareArticulationResolver.resolve(0.5f, 0.82f, 0.7f),
         )
     }
 
     @Test
-    fun softHoopStrikeSelectsCrossStick() {
+    fun softHoopStrikeSelectsEdgeRatherThanCrossStick() {
         assertEquals(
-            SnareArticulation.CROSS_STICK,
+            SnareArticulation.EDGE,
             SnareArticulationResolver.resolve(0.96f, 0.5f, 0.3f),
         )
     }

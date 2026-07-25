@@ -73,7 +73,7 @@ internal inline fun <T> dispatchAudioFirst(
     val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
     val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
     val articulation = if (strike.instrument == InstrumentId.SNARE) {
-        SnareArticulationResolver.resolve(
+        strike.requestedArticulation ?: SnareArticulationResolver.resolve(
             normalizedX = normalizedX,
             normalizedY = normalizedY,
             velocity = velocity,
@@ -111,7 +111,7 @@ object AudioDispatchDecisionFactory {
         val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
         val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
         val articulation = if (strike.instrument == InstrumentId.SNARE) {
-            SnareArticulationResolver.resolve(
+            strike.requestedArticulation ?: SnareArticulationResolver.resolve(
                 normalizedX = normalizedX,
                 normalizedY = normalizedY,
                 velocity = velocity,
@@ -172,12 +172,7 @@ object AudioDispatchDecisionFactory {
         )
     }
 
-    private fun velocityEstimatorInputMode(strike: DrumStrike): String =
-        if (strike.pressure > 0.02f && strike.pressure != 0.5f) {
-            "pressure_plus_contact_size"
-        } else {
-            "timestamp_fallback_plus_contact_size"
-        }
+    private fun velocityEstimatorInputMode(strike: DrumStrike): String = strike.velocitySource.wireName
 
     private fun actualNativePan(instrument: InstrumentId): Float = when (instrument) {
         InstrumentId.KICK -> 0.0f

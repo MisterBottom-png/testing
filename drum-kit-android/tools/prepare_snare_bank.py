@@ -287,6 +287,54 @@ def prepare_cross_sticks(cache_dir: Path) -> list[PreparedHit]:
     return prepared
 
 
+def attack_rms(samples: np.ndarray) -> float:
+    window = samples[: min(len(samples), 4_096)]
+    return float(np.sqrt(np.mean(np.square(window)))) if len(window) else 0.0
+
+
+def balance_articulation_layers(hits: list[PreparedHit]) -> None:
+    """Remove round-robin loudness outliers and enforce monotonic layer loudness per articulation."""
+    for articulation in ARTICULATIONS:
+        layers = [
+            [hit for hit in hits if hit.articulation == articulation and hit.layer == layer]
+            for layer in range(LAYER_COUNT)
+        ]
+        medians: list[float] = []
+        for layer_hits in layers:
+            rms_values = [max(attack_rms(hit.samples), 1e-8) for hit in layer_hits]
+            target = float(np.median(rms_values))
+            medians.append(target)
+            for hit, rms in zip(layer_hits, rms_values):
+                hit.samples *= np.clip(target / rms, 0.5, 2.0)
+
+        monotonic_targets = np.maximum.accumulate(np.asarray(medians, dtype=np.float32))
+        for layer_hits, target, median in zip(layers, monotonic_targets, medians):
+            if median > 0.0:
+                for hit in layer_hits:
+                    hit.samples *= float(target / median)
+
+
+def sample_measurements(samples: np.ndarray) -> dict[str, float | int]:
+    envelope = np.max(np.abs(samples), axis=1)
+    peak_index = int(np.argmax(envelope))
+    peak = float(envelope[peak_index])
+    onset_candidates = np.flatnonzero(envelope >= max(peak * 0.01, 1e-6))
+    onset = int(onset_candidates[0]) if len(onset_candidates) else peak_index
+    decay_candidates = np.flatnonzero(envelope[peak_index:] <= max(peak * 0.1, 1e-6))
+    decay_frames = int(decay_candidates[0]) if len(decay_candidates) else len(envelope) - peak_index
+    analysis_window = np.mean(samples[: min(len(samples), 4_096)], axis=1)
+    spectrum = np.abs(np.fft.rfft(analysis_window * np.hanning(len(analysis_window))))
+    frequencies = np.fft.rfftfreq(len(analysis_window), d=1.0 / SAMPLE_RATE)
+    centroid = float(np.sum(frequencies * spectrum) / np.sum(spectrum)) if np.sum(spectrum) > 0 else 0.0
+    return {
+        "onset_frame": onset,
+        "peak": peak,
+        "attack_rms": attack_rms(samples),
+        "decay_frames_to_minus_20db": decay_frames,
+        "spectral_centroid_hz": centroid,
+    }
+
+
 def normalize_globally(hits: list[PreparedHit]) -> float:
     peak = max(float(np.max(np.abs(hit.samples))) for hit in hits)
     if not math.isfinite(peak) or peak <= 0.0:
@@ -338,6 +386,7 @@ def write_bank(output: Path, hits: list[PreparedHit]) -> list[dict[str, object]]
                 "source_power": hit.source_power,
                 "frames": len(pcm),
                 "peak": peak,
+                "measurements": sample_measurements(hit.samples),
             },
         )
         offset_frames += len(pcm)
@@ -369,6 +418,7 @@ def main() -> int:
     with RemoteZip(AASIMONSTER_URL) as archive:
         hits = prepare_aasimonster(archive)
     hits.extend(prepare_cross_sticks(args.cache_dir))
+    balance_articulation_layers(hits)
     global_gain = normalize_globally(hits)
     manifest_samples = write_bank(args.output, hits)
 
@@ -382,7 +432,7 @@ def main() -> int:
         "onset_threshold_dbfs": -60.0,
         "onset_frame": ONSET_FRAME,
         "max_duration_seconds": MAX_FRAMES / SAMPLE_RATE,
-        "normalization": "one global gain across the complete bank to -1 dBFS peak",
+        "normalization": "per-articulation round-robin RMS balancing, monotonic velocity-layer balancing, then one global gain to -1 dBFS peak",
         "global_gain": global_gain,
         "bank_sha256": bank_sha256,
         "sources": [
@@ -401,6 +451,7 @@ def main() -> int:
             },
         ],
         "samples": manifest_samples,
+        "analysis": "Each sample includes aligned onset, peak, attack RMS, -20 dB decay, and spectral-centroid measurements.",
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")

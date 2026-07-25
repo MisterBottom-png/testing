@@ -56,7 +56,7 @@ class DiagnosticDispatchTraceRecorderTest {
             val strikes = zip.readText("strikes.jsonl")
             assertTrue(strikes.contains("\"schemaVersion\":2"))
             assertTrue(strikes.contains("\"diagnosticToken\":42"))
-            assertTrue(strikes.contains("\"velocityEstimatorInputMode\":\"pressure_plus_contact_size\""))
+            assertTrue(strikes.contains("\"velocityEstimatorInputMode\":\"deterministic_fallback\""))
             assertTrue(strikes.contains("\"selectedArticulation\":\"center\""))
             assertTrue(strikes.contains("\"lowerVelocityLayer\":2"))
             assertTrue(strikes.contains("\"upperVelocityLayer\":3"))
