@@ -32,6 +32,44 @@ class AudioDispatchDecisionFactoryTest {
     }
 
     @Test
+    fun dispatchesNativeAudioBeforeDiagnosticReconstruction() {
+        val events = mutableListOf<String>()
+        val strike = strike(
+            velocity = 0.55f,
+            normalizedX = 0.5f,
+            normalizedY = 0.5f,
+            pressure = 0.7f,
+        )
+
+        val decision = dispatchAudioFirst(
+            strike = strike,
+            nativeTrigger = { instrument, articulation, velocity, normalizedX, normalizedY ->
+                events += "native"
+                assertEquals(InstrumentId.SNARE.nativeCode, instrument)
+                assertEquals(SnareArticulation.CENTER.nativeCode, articulation)
+                assertEquals(0.55f, velocity, 0.0001f)
+                assertEquals(0.5f, normalizedX, 0.0001f)
+                assertEquals(0.5f, normalizedY, 0.0001f)
+            },
+            afterDispatch = { velocity, normalizedX, normalizedY, articulation ->
+                events += "diagnostics"
+                AudioDispatchDecisionFactory.createFromDispatchedValues(
+                    strike = strike,
+                    sanitizedVelocity = velocity,
+                    sanitizedNormalizedX = normalizedX,
+                    sanitizedNormalizedY = normalizedY,
+                    articulation = articulation,
+                )
+            },
+        )
+
+        assertEquals(listOf("native", "diagnostics"), events)
+        assertEquals(SnareArticulation.CENTER, decision.articulation)
+        assertEquals(2, decision.lowerVelocityLayer)
+        assertEquals(3, decision.upperVelocityLayer)
+    }
+
+    @Test
     fun sanitizesInvalidInputsAndLabelsLegacyFallback() {
         val decision = AudioDispatchDecisionFactory.create(
             strike(
