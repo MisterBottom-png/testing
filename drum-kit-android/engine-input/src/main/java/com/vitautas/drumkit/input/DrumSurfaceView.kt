@@ -319,6 +319,7 @@ class DrumSurfaceView @JvmOverloads constructor(
                 eventTimeNanos = eventTimeNanos,
                 velocitySource = velocityEstimate.source,
                 requestedArticulation = requestedArticulation,
+                inputTarget = hit.inputTarget,
             ),
         )
 

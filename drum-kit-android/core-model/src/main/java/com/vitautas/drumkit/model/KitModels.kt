@@ -508,6 +508,7 @@ data class DrumStrike(
     val velocitySource: StrikeVelocitySource = StrikeVelocitySource.DETERMINISTIC_FALLBACK,
     /** Resolved by the input layer when a deliberate multi-contact gesture is present. */
     val requestedArticulation: SnareArticulation? = null,
+    val inputTarget: StrikeInputTarget = StrikeInputTarget.INSTRUMENT_SURFACE,
 )
 
 data class AudioDiagnostics(

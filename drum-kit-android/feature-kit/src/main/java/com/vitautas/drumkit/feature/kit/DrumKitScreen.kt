@@ -62,6 +62,7 @@ import com.vitautas.drumkit.model.PolygonHitRegion
 import com.vitautas.drumkit.model.RectangleHitRegion
 import com.vitautas.drumkit.model.StudioKitDefinition
 import com.vitautas.drumkit.model.StudioKitGeometry
+import com.vitautas.drumkit.model.StudioKitInputGeometry
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -378,7 +379,7 @@ private fun HitRegionOverlay(lastStrike: DrumStrike?) {
         )
         val marker = Offset(screenPoint.x * size.width, screenPoint.y * size.height)
         val color = debugColor(strike.instrument)
-        val overlapCount = StudioKitGeometry.matchingInstrumentCount(
+        val overlapCount = StudioKitInputGeometry.matchingTargetCount(
             screenX = screenPoint.x,
             screenY = screenPoint.y,
             aspectRatio = aspectRatio,
@@ -400,7 +401,7 @@ private fun HitRegionOverlay(lastStrike: DrumStrike?) {
         )
         textPaint.color = color.toArgb()
         drawContext.canvas.nativeCanvas.drawText(
-            "${strike.instrument.label.uppercase()} · $overlapCount TARGET${if (overlapCount == 1) "" else "S"}",
+            "${strike.instrument.label.uppercase()} · ${strike.inputTarget.wireName.uppercase()} · $overlapCount TARGET${if (overlapCount == 1) "" else "S"}",
             marker.x,
             marker.y - markerRadius * 1.7f,
             textPaint,
