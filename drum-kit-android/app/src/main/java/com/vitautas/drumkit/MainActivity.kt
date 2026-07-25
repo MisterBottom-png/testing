@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
     private val kitSessionController = DrumKitSessionController()
     private lateinit var audioSessionController: AudioSessionController
     private var diagnosticTouchObserver: DiagnosticTouchObserver? = null
+    private var diagnosticLifecycleObserver: DiagnosticLifecycleObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +39,9 @@ class MainActivity : ComponentActivity() {
                         sessionController = kitSessionController,
                         audioAvailable = audioAvailableState.value,
                         onTouchObserverChanged = { observer -> diagnosticTouchObserver = observer },
+                        onPerformanceLifecycleObserverChanged = { observer ->
+                            diagnosticLifecycleObserver = observer
+                        },
                     )
                 } else {
                     DrumKitScreen(
@@ -64,17 +68,36 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.START)
         audioSessionController.start()
     }
 
+    override fun onResume() {
+        super.onResume()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.RESUME)
+    }
+
+    override fun onPause() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.PAUSE)
+        super.onPause()
+    }
+
     override fun onStop() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.STOP)
         kitSessionController.onAppStopping()
         audioSessionController.stop()
         super.onStop()
     }
 
+    override fun onRestart() {
+        super.onRestart()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.RESTART)
+    }
+
     override fun onDestroy() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.DESTROY)
         diagnosticTouchObserver = null
+        diagnosticLifecycleObserver = null
         super.onDestroy()
     }
 
