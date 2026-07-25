@@ -24,7 +24,7 @@ The source prototype is treated as a layout, instrument-mapping, and interaction
 - Safe-drawing inset handling for compact overlays while the instrument canvas retains the full edge-to-edge window
 - Fixed-capacity expressive strike-performance recording
 - Debug-only audio diagnostics
-- Debug-only diagnostic-session foundation with accepted-strike capture, periodic audio diagnostics, user markers, bounded buffers, and ZIP/checksum export
+- Debug-only diagnostic-session foundation with raw accepted/rejected touch capture, periodic audio diagnostics, user markers, request-side strike reconstruction, bounded buffers, and ZIP/checksum export
 - Cached layered Canvas artwork, geometry, and masks created during size changes
 - Stable bitmap artwork caching on all supported devices; the experimental RenderNode backend remains disabled pending device validation
 - Position- and velocity-aware drum, kick, cymbal, and hi-hat animation state
@@ -80,10 +80,10 @@ The audio layer preserves Android audio-focus handling, startup retry, exclusive
 
 The recording control captures an expressive strike-event take using fixed-capacity primitive buffers. Audio dispatch remains first; recording copies timing, instrument, velocity, normalized position, pressure, and contact size afterward. The take is materialized only when recording stops. PCM/WAV export remains deferred.
 
-The Step 1.2 diagnostic foundation is debug-only. One control starts a free-play diagnostic session and one control stops and exports it. The current ZIP records session/device/build metadata, accepted strikes, periodic audio diagnostics, markers, dropped-data counts, a summary, and SHA-256 checksums. Raw rejected touches, articulation and sample-selection traces, rendering telemetry, generated-output WAV capture, guided tests, lifecycle recovery, sharing, and deletion remain within the unfinished portion of Step 1.2.
+The Step 1.2 diagnostic foundation is debug-only. One control starts a free-play diagnostic session and one control stops and exports it. The current ZIP records session/device/build metadata, raw accepted and rejected touch events with historical samples and hit candidates, accepted strikes, periodic audio diagnostics, user markers, dropped-data counts, request-side velocity-source, articulation, velocity-layer, blend, and stereo-pan reconstruction, a summary, and SHA-256 checksums. Native round-robin, variation, queue, and voice-allocation outcomes are explicitly marked as unobserved. Rendering telemetry, generated-output WAV capture, guided tests, lifecycle recovery, sharing, and deletion remain within the unfinished portion of Step 1.2.
 
 ## Next milestone
 
-Continue `docs/Drum_Kit_Recovery_and_Development_Roadmap.md` sequentially. Step 1.1 is complete. Step 1.2 remains partially complete and should continue with raw accepted/rejected touch logging and reconstruction data before native generated-output capture or later tuning work.
+Continue `docs/Drum_Kit_Recovery_and_Development_Roadmap.md` sequentially. Step 1.1 is complete. Step 1.2 remains partially complete and should continue with native round-robin, variation, queue, and voice-allocation tracing before generated-output capture or later tuning work.
 
 The raw `MotionEvent` input path, custom playable `View`, playable-surface-local strike coordinates, JNI bridge, native Oboe callback, lock-free queue, and velocity-aware events remain architectural invariants.
