@@ -371,7 +371,7 @@ internal class DiagnosticSessionRecorder(
         append("Dropped strikes: ").append(snapshot.droppedStrikeCount).append('\n')
         append("Dropped audio diagnostic samples: ").append(snapshot.droppedDiagnosticsCount).append('\n')
         append("Dropped markers: ").append(snapshot.droppedMarkerCount).append('\n')
-        append("\nThis foundation bundle does not yet contain raw rejected touches, rendering telemetry, or generated-output WAV capture.\n")
+        append("\nRendering telemetry and generated-output WAV capture are not yet implemented.\n")
     }
 
     private fun DiagnosticSessionMetadata.sanitized(): DiagnosticSessionMetadata = copy(
