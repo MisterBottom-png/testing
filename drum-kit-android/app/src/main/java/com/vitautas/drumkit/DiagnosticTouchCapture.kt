@@ -5,8 +5,8 @@ import android.view.MotionEvent
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
 import com.vitautas.drumkit.model.InstrumentId
-import com.vitautas.drumkit.model.StudioKitDefinition
-import com.vitautas.drumkit.model.StudioKitGeometry
+import com.vitautas.drumkit.model.StrikeInputTarget
+import com.vitautas.drumkit.model.StudioKitInputGeometry
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -17,7 +17,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-private const val DiagnosticTouchSchemaVersion = 1
+private const val DiagnosticTouchSchemaVersion = 2
 private const val DefaultTouchEventCapacity = 32_768
 private const val NanosPerMillisecond = 1_000_000L
 
@@ -66,6 +66,8 @@ internal data class DiagnosticTouchSample(
     val selectedInstrument: InstrumentId?,
     val rejectionReason: String?,
     val historicalSamples: List<DiagnosticHistoricalTouchSample>,
+    val candidateTargets: List<StrikeInputTarget> = emptyList(),
+    val selectedTarget: StrikeInputTarget? = null,
 )
 
 internal data class RecordedDiagnosticTouchEvent(
@@ -105,17 +107,13 @@ internal object DiagnosticTouchEventFactory {
                 val rawY = event.rawYFor(pointerIndex)
                 val normalizedX = localX / viewportWidth.toFloat()
                 val normalizedY = localY / viewportHeight.toFloat()
-                val candidates = StudioKitDefinition.hitTestOrder
-                    .filter { definition ->
-                        StudioKitGeometry.contains(
-                            definition.layout,
-                            normalizedX,
-                            normalizedY,
-                            aspectRatio,
-                        )
-                    }
-                    .map { it.id }
-                val selectedInstrument = candidates.firstOrNull()
+                val inputCandidates = StudioKitInputGeometry.candidates(
+                    screenX = normalizedX,
+                    screenY = normalizedY,
+                    aspectRatio = aspectRatio,
+                )
+                val selectedCandidate = inputCandidates.firstOrNull()
+                val candidateInstruments = inputCandidates.map { it.instrument }.distinct()
                 val isActionPointer = pointerIndex == event.actionIndex
                 add(
                     DiagnosticTouchSample(
@@ -126,7 +124,7 @@ internal object DiagnosticTouchEventFactory {
                         pointerId = event.getPointerId(pointerIndex),
                         pointerIndex = pointerIndex,
                         isActionPointer = isActionPointer,
-                        acceptedStrike = isActionPointer && action.isDownAction() && selectedInstrument != null,
+                        acceptedStrike = isActionPointer && action.isDownAction() && selectedCandidate != null,
                         rawX = rawX,
                         rawY = rawY,
                         normalizedX = normalizedX,
@@ -135,10 +133,10 @@ internal object DiagnosticTouchEventFactory {
                         contactSize = event.getSize(pointerIndex).finiteOrZero().coerceAtLeast(0f),
                         toolType = event.getToolType(pointerIndex).toolTypeName(),
                         orientationRadians = event.getOrientation(pointerIndex).finiteOrZero(),
-                        hitRegionCount = candidates.size,
-                        candidateInstruments = candidates,
-                        selectedInstrument = selectedInstrument,
-                        rejectionReason = if (selectedInstrument == null) "outside_hit_regions" else null,
+                        hitRegionCount = inputCandidates.size,
+                        candidateInstruments = candidateInstruments,
+                        selectedInstrument = selectedCandidate?.instrument,
+                        rejectionReason = if (selectedCandidate == null) "outside_hit_regions" else null,
                         historicalSamples = event.historyFor(
                             pointerIndex,
                             viewportWidth,
@@ -146,6 +144,8 @@ internal object DiagnosticTouchEventFactory {
                             rawX - localX,
                             rawY - localY,
                         ),
+                        candidateTargets = inputCandidates.map { it.inputTarget },
+                        selectedTarget = selectedCandidate?.inputTarget,
                     ),
                 )
             }
@@ -275,7 +275,7 @@ internal class DiagnosticSessionBundleRecorder(
                 selectedInstrument = if (downActionPointer) acceptedInstrument else sample.selectedInstrument,
                 rejectionReason = when {
                     acceptedInstrument != null -> null
-                    downActionPointer && sample.candidateInstruments.isNotEmpty() -> "consumed_before_playable_surface"
+                    downActionPointer && sample.candidateTargets.isNotEmpty() -> "consumed_before_playable_surface"
                     sample.selectedInstrument == null -> "outside_hit_regions"
                     else -> sample.rejectionReason
                 },
@@ -423,8 +423,15 @@ private fun touchEventsJsonLines(capture: DiagnosticSessionBundleCapture): Strin
             if (index > 0) append(',')
             appendJson(instrument.name.lowercase())
         }
+        append("],\"candidateTargets\":[")
+        sample.candidateTargets.forEachIndexed { index, target ->
+            if (index > 0) append(',')
+            appendJson(target.wireName)
+        }
         append("],\"selectedInstrument\":")
         if (sample.selectedInstrument == null) append("null") else appendJson(sample.selectedInstrument.name.lowercase())
+        append(",\"selectedTarget\":")
+        if (sample.selectedTarget == null) append("null") else appendJson(sample.selectedTarget.wireName)
         append(",\"rejectionReason\":")
         if (sample.rejectionReason == null) append("null") else appendJson(sample.rejectionReason)
         append(",\"historicalSamples\":[")
