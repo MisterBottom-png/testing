@@ -50,6 +50,7 @@ internal fun DiagnosticDrumKitScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val recorder = remember { DiagnosticSessionBundleRecorder() }
+    val dispatchTraceRecorder = remember { DiagnosticDispatchTraceRecorder() }
     var isRecording by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     var markerMenuExpanded by remember { mutableStateOf(false) }
@@ -76,8 +77,9 @@ internal fun DiagnosticDrumKitScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         DrumKitScreen(
             onStrike = { strike ->
-                AudioEngine.trigger(strike)
+                val dispatchDecision = AudioEngine.triggerWithDiagnostics(strike)
                 recorder.recordStrike(strike)
+                dispatchTraceRecorder.record(strike, dispatchDecision)
             },
             onMasterVolumeChanged = { value ->
                 masterVolume = value
@@ -107,13 +109,20 @@ internal fun DiagnosticDrumKitScreen(
                 onClick = {
                     if (isRecording) {
                         val capture = recorder.stop()
+                        val dispatchTraceCapture = dispatchTraceRecorder.stop()
                         isRecording = false
                         isExporting = true
                         status = "Exporting diagnostic bundle"
                         scope.launch {
                             runCatching {
                                 withContext(Dispatchers.IO) {
-                                    recorder.export(capture, File(context.cacheDir, "diagnostics"))
+                                    val result = recorder.export(capture, File(context.cacheDir, "diagnostics"))
+                                    dispatchTraceRecorder.augmentBundle(
+                                        bundle = result.file,
+                                        sessionCapture = capture,
+                                        traceCapture = dispatchTraceCapture,
+                                    )
+                                    result
                                 }
                             }.onSuccess { result ->
                                 status = "${result.touchEventCount} touches · ${result.strikeCount} strikes · ${result.file.name}"
@@ -131,6 +140,7 @@ internal fun DiagnosticDrumKitScreen(
                             roomLevel = roomLevel,
                         )
                         val sessionId = recorder.start(metadata)
+                        dispatchTraceRecorder.start()
                         recorder.recordAudioDiagnostics(diagnostics)
                         isRecording = true
                         status = "Recording ${sessionId.take(8)}"
