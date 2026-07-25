@@ -101,27 +101,22 @@ internal object DiagnosticTouchEventFactory {
             for (pointerIndex in 0 until event.pointerCount) {
                 val localX = event.getX(pointerIndex)
                 val localY = event.getY(pointerIndex)
-                val rawX = event.rawX(pointerIndex)
-                val rawY = event.rawY(pointerIndex)
+                val rawX = event.rawXFor(pointerIndex)
+                val rawY = event.rawYFor(pointerIndex)
                 val normalizedX = localX / viewportWidth.toFloat()
                 val normalizedY = localY / viewportHeight.toFloat()
                 val candidates = StudioKitDefinition.hitTestOrder
-                    .asSequence()
                     .filter { definition ->
                         StudioKitGeometry.contains(
-                            layout = definition.layout,
-                            screenX = normalizedX,
-                            screenY = normalizedY,
-                            aspectRatio = aspectRatio,
+                            definition.layout,
+                            normalizedX,
+                            normalizedY,
+                            aspectRatio,
                         )
                     }
                     .map { it.id }
-                    .toList()
                 val selectedInstrument = candidates.firstOrNull()
                 val isActionPointer = pointerIndex == event.actionIndex
-                val acceptedStrike = isActionPointer &&
-                    (action == DiagnosticTouchAction.DOWN || action == DiagnosticTouchAction.POINTER_DOWN) &&
-                    selectedInstrument != null
                 add(
                     DiagnosticTouchSample(
                         eventTimeNanos = event.eventTime * NanosPerMillisecond,
@@ -131,7 +126,7 @@ internal object DiagnosticTouchEventFactory {
                         pointerId = event.getPointerId(pointerIndex),
                         pointerIndex = pointerIndex,
                         isActionPointer = isActionPointer,
-                        acceptedStrike = acceptedStrike,
+                        acceptedStrike = isActionPointer && action.isDownAction() && selectedInstrument != null,
                         rawX = rawX,
                         rawY = rawY,
                         normalizedX = normalizedX,
@@ -143,18 +138,13 @@ internal object DiagnosticTouchEventFactory {
                         hitRegionCount = candidates.size,
                         candidateInstruments = candidates,
                         selectedInstrument = selectedInstrument,
-                        rejectionReason = when {
-                            selectedInstrument != null -> null
-                            !normalizedX.isFinite() || !normalizedY.isFinite() -> "non_finite_coordinate"
-                            else -> "outside_hit_regions"
-                        },
-                        historicalSamples = historicalSamples(
-                            event = event,
-                            pointerIndex = pointerIndex,
-                            viewportWidth = viewportWidth,
-                            viewportHeight = viewportHeight,
-                            rawOffsetX = rawX - localX,
-                            rawOffsetY = rawY - localY,
+                        rejectionReason = if (selectedInstrument == null) "outside_hit_regions" else null,
+                        historicalSamples = event.historyFor(
+                            pointerIndex,
+                            viewportWidth,
+                            viewportHeight,
+                            rawX - localX,
+                            rawY - localY,
                         ),
                     ),
                 )
@@ -162,27 +152,29 @@ internal object DiagnosticTouchEventFactory {
         }
     }
 
-    private fun historicalSamples(
-        event: MotionEvent,
+    private fun DiagnosticTouchAction.isDownAction(): Boolean =
+        this == DiagnosticTouchAction.DOWN || this == DiagnosticTouchAction.POINTER_DOWN
+
+    private fun MotionEvent.historyFor(
         pointerIndex: Int,
         viewportWidth: Int,
         viewportHeight: Int,
         rawOffsetX: Float,
         rawOffsetY: Float,
-    ): List<DiagnosticHistoricalTouchSample> = buildList(event.historySize) {
-        for (historyIndex in 0 until event.historySize) {
-            val localX = event.getHistoricalX(pointerIndex, historyIndex)
-            val localY = event.getHistoricalY(pointerIndex, historyIndex)
+    ): List<DiagnosticHistoricalTouchSample> = buildList(historySize) {
+        for (historyIndex in 0 until historySize) {
+            val localX = getHistoricalX(pointerIndex, historyIndex)
+            val localY = getHistoricalY(pointerIndex, historyIndex)
             add(
                 DiagnosticHistoricalTouchSample(
-                    eventTimeNanos = event.getHistoricalEventTime(historyIndex) * NanosPerMillisecond,
+                    eventTimeNanos = getHistoricalEventTime(historyIndex) * NanosPerMillisecond,
                     rawX = localX + rawOffsetX,
                     rawY = localY + rawOffsetY,
                     normalizedX = localX / viewportWidth.toFloat(),
                     normalizedY = localY / viewportHeight.toFloat(),
-                    pressure = event.getHistoricalPressure(pointerIndex, historyIndex).finiteOrZero().coerceAtLeast(0f),
-                    contactSize = event.getHistoricalSize(pointerIndex, historyIndex).finiteOrZero().coerceAtLeast(0f),
-                    orientationRadians = event.getHistoricalAxisValue(
+                    pressure = getHistoricalPressure(pointerIndex, historyIndex).finiteOrZero().coerceAtLeast(0f),
+                    contactSize = getHistoricalSize(pointerIndex, historyIndex).finiteOrZero().coerceAtLeast(0f),
+                    orientationRadians = getHistoricalAxisValue(
                         MotionEvent.AXIS_ORIENTATION,
                         pointerIndex,
                         historyIndex,
@@ -193,20 +185,12 @@ internal object DiagnosticTouchEventFactory {
     }
 
     @Suppress("DEPRECATION")
-    private fun MotionEvent.rawX(pointerIndex: Int): Float =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getRawX(pointerIndex)
-        } else {
-            rawX + getX(pointerIndex) - x
-        }
+    private fun MotionEvent.rawXFor(pointerIndex: Int): Float =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) getRawX(pointerIndex) else rawX + getX(pointerIndex) - x
 
     @Suppress("DEPRECATION")
-    private fun MotionEvent.rawY(pointerIndex: Int): Float =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getRawY(pointerIndex)
-        } else {
-            rawY + getY(pointerIndex) - y
-        }
+    private fun MotionEvent.rawYFor(pointerIndex: Int): Float =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) getRawY(pointerIndex) else rawY + getY(pointerIndex) - y
 
     private fun Int.toolTypeName(): String = when (this) {
         MotionEvent.TOOL_TYPE_FINGER -> "finger"
@@ -226,9 +210,9 @@ internal object DiagnosticTouchEventFactory {
         MotionEvent.ACTION_CANCEL -> DiagnosticTouchAction.CANCEL
         else -> DiagnosticTouchAction.OTHER
     }
-
-    private fun Float.finiteOrZero(): Float = if (isFinite()) this else 0f
 }
+
+private data class TouchStrikeKey(val eventTimeNanos: Long, val pointerId: Int)
 
 internal class DiagnosticSessionBundleRecorder(
     strikeCapacity: Int = 16_384,
@@ -247,11 +231,12 @@ internal class DiagnosticSessionBundleRecorder(
         wallClockMillis = wallClockMillis,
         sessionIdFactory = sessionIdFactory,
     )
-    private val validatedTouchEventCapacity = touchEventCapacity.requirePositive("touchEventCapacity")
-    private val touchEvents = ArrayList<RecordedDiagnosticTouchEvent>(validatedTouchEventCapacity.coerceAtMost(1_024))
+    private val touchCapacity = touchEventCapacity.positive("touchEventCapacity")
+    private val touchEvents = ArrayList<RecordedDiagnosticTouchEvent>(touchCapacity.coerceAtMost(1_024))
     private var touchSessionStartNanos = 0L
     private var nextMotionEventSequence = 0L
     private var droppedTouchEventCount = 0
+    private val acceptedStrikeInstruments = HashMap<TouchStrikeKey, InstrumentId>()
 
     val isRecording: Boolean
         get() = delegate.isRecording
@@ -265,7 +250,10 @@ internal class DiagnosticSessionBundleRecorder(
         return sessionId
     }
 
-    fun recordStrike(strike: DrumStrike) = delegate.recordStrike(strike)
+    fun recordStrike(strike: DrumStrike) {
+        delegate.recordStrike(strike)
+        acceptedStrikeInstruments[TouchStrikeKey(strike.eventTimeNanos, strike.pointerId)] = strike.instrument
+    }
 
     fun recordAudioDiagnostics(value: AudioDiagnostics) = delegate.recordAudioDiagnostics(value)
 
@@ -274,14 +262,31 @@ internal class DiagnosticSessionBundleRecorder(
     fun recordTouchEvent(event: MotionEvent, viewportWidth: Int, viewportHeight: Int) {
         if (!isRecording) return
         val sequence = nextMotionEventSequence++
-        for (sample in DiagnosticTouchEventFactory.capture(event, viewportWidth, viewportHeight)) {
-            recordTouchSample(sample, sequence)
+        DiagnosticTouchEventFactory.capture(event, viewportWidth, viewportHeight).forEach { sample ->
+            val downActionPointer = sample.isActionPointer &&
+                (sample.action == DiagnosticTouchAction.DOWN || sample.action == DiagnosticTouchAction.POINTER_DOWN)
+            val acceptedInstrument = if (downActionPointer) {
+                acceptedStrikeInstruments.remove(TouchStrikeKey(sample.eventTimeNanos, sample.pointerId))
+            } else {
+                null
+            }
+            val resolvedSample = sample.copy(
+                acceptedStrike = acceptedInstrument != null,
+                selectedInstrument = if (downActionPointer) acceptedInstrument else sample.selectedInstrument,
+                rejectionReason = when {
+                    acceptedInstrument != null -> null
+                    downActionPointer && sample.candidateInstruments.isNotEmpty() -> "consumed_before_playable_surface"
+                    sample.selectedInstrument == null -> "outside_hit_regions"
+                    else -> sample.rejectionReason
+                },
+            )
+            recordTouchSample(resolvedSample, sequence)
         }
     }
 
     internal fun recordTouchSample(sample: DiagnosticTouchSample, motionEventSequence: Long = nextMotionEventSequence++) {
         if (!isRecording) return
-        if (touchEvents.size >= validatedTouchEventCapacity) {
+        if (touchEvents.size >= touchCapacity) {
             droppedTouchEventCount += 1
             return
         }
@@ -294,21 +299,16 @@ internal class DiagnosticSessionBundleRecorder(
 
     fun cancel() {
         delegate.cancel()
-        touchEvents.clear()
-        droppedTouchEventCount = 0
-        nextMotionEventSequence = 0L
+        resetTouchState()
     }
 
     fun stop(): DiagnosticSessionBundleCapture {
-        val baseCapture = delegate.stop()
         val capture = DiagnosticSessionBundleCapture(
-            baseCapture = baseCapture,
+            baseCapture = delegate.stop(),
             touchEvents = touchEvents.toList(),
             droppedTouchEventCount = droppedTouchEventCount,
         )
-        touchEvents.clear()
-        droppedTouchEventCount = 0
-        nextMotionEventSequence = 0L
+        resetTouchState()
         return capture
     }
 
@@ -330,43 +330,43 @@ internal class DiagnosticSessionBundleRecorder(
 
     fun stopAndExport(outputDirectory: File): DiagnosticSessionBundleExportResult = export(stop(), outputDirectory)
 
+    private fun resetTouchState() {
+        touchEvents.clear()
+        droppedTouchEventCount = 0
+        nextMotionEventSequence = 0L
+        acceptedStrikeInstruments.clear()
+    }
+
     private fun augmentBundle(bundle: File, capture: DiagnosticSessionBundleCapture) {
-        val originalEntries = linkedMapOf<String, ByteArray>()
+        val retained = linkedMapOf<String, ByteArray>()
         ZipFile(bundle).use { zip ->
-            val entries = zip.entries()
-            while (entries.hasMoreElements()) {
-                val entry = entries.nextElement()
+            val iterator = zip.entries()
+            while (iterator.hasMoreElements()) {
+                val entry = iterator.nextElement()
                 if (entry.name != "manifest.json" && entry.name != "checksums.sha256") {
-                    originalEntries[entry.name] = zip.getInputStream(entry).use { it.readBytes() }
+                    retained[entry.name] = zip.getInputStream(entry).use { it.readBytes() }
                 }
             }
         }
-
-        val summary = originalEntries["summary.txt"]?.toString(StandardCharsets.UTF_8).orEmpty() + buildString {
-            append("\nTouch events: ").append(capture.touchEvents.size).append('\n')
-            append("Dropped touch events: ").append(capture.droppedTouchEventCount).append('\n')
-        }
-        originalEntries["summary.txt"] = summary.toByteArray(StandardCharsets.UTF_8)
+        val summary = retained["summary.txt"]?.toString(StandardCharsets.UTF_8).orEmpty() +
+            "\nTouch events: ${capture.touchEvents.size}\nDropped touch events: ${capture.droppedTouchEventCount}\n"
+        retained["summary.txt"] = summary.toByteArray(StandardCharsets.UTF_8)
 
         val entries = linkedMapOf<String, ByteArray>()
-        entries["manifest.json"] = manifestJson(capture).toByteArray(StandardCharsets.UTF_8)
-        originalEntries["session.json"]?.let { entries["session.json"] = it }
-        entries["touch-events.jsonl"] = touchEventsJsonLines(capture).toByteArray(StandardCharsets.UTF_8)
-        for ((name, bytes) in originalEntries) {
-            if (name != "session.json") entries[name] = bytes
-        }
+        entries["manifest.json"] = manifestJson(capture).utf8()
+        retained["session.json"]?.let { entries["session.json"] = it }
+        entries["touch-events.jsonl"] = touchEventsJsonLines(capture).utf8()
+        retained.forEach { (name, bytes) -> if (name != "session.json") entries[name] = bytes }
         entries["checksums.sha256"] = buildString {
-            for ((name, bytes) in entries) {
-                append(sha256(bytes)).append("  ").append(name).append('\n')
-            }
-        }.toByteArray(StandardCharsets.UTF_8)
+            entries.forEach { (name, bytes) -> append(sha256(bytes)).append("  ").append(name).append('\n') }
+        }.utf8()
 
         val temporary = File(bundle.parentFile, ".${bundle.name}.touch.tmp")
         if (temporary.exists()) temporary.delete()
         try {
             temporary.outputStream().buffered().use { output ->
                 ZipOutputStream(output).use { zip ->
-                    for ((name, bytes) in entries) {
+                    entries.forEach { (name, bytes) ->
                         zip.putNextEntry(ZipEntry(name).apply { time = capture.baseCapture.endedAtEpochMillis })
                         zip.write(bytes)
                         zip.closeEntry()
@@ -379,130 +379,110 @@ internal class DiagnosticSessionBundleRecorder(
             throw failure
         }
     }
+}
 
-    private fun manifestJson(capture: DiagnosticSessionBundleCapture): String = buildString {
-        val base = capture.baseCapture
-        append("{\n")
-        append("  \"schemaVersion\": ").append(DiagnosticTouchSchemaVersion).append(",\n")
-        append("  \"sessionId\": ").appendJson(base.sessionId).append(",\n")
-        append("  \"bundleState\": \"step_1_2_partial\",\n")
-        append("  \"includedFiles\": [\"session.json\", \"touch-events.jsonl\", \"strikes.jsonl\", \"audio-diagnostics.csv\", \"markers.json\", \"summary.txt\", \"checksums.sha256\"],\n")
-        append("  \"plannedFilesNotYetImplemented\": [\"performance.csv\", \"generated-output.wav\"],\n")
-        append("  \"droppedData\": {\n")
-        append("    \"touchEvents\": ").append(capture.droppedTouchEventCount).append(",\n")
-        append("    \"strikes\": ").append(base.droppedStrikeCount).append(",\n")
-        append("    \"audioDiagnostics\": ").append(base.droppedDiagnosticsCount).append(",\n")
-        append("    \"markers\": ").append(base.droppedMarkerCount).append("\n")
-        append("  }\n")
-        append("}\n")
-    }
+private fun manifestJson(capture: DiagnosticSessionBundleCapture): String = buildString {
+    val base = capture.baseCapture
+    append("{\n")
+    append("  \"schemaVersion\": $DiagnosticTouchSchemaVersion,\n")
+    append("  \"sessionId\": ").appendJson(base.sessionId).append(",\n")
+    append("  \"bundleState\": \"step_1_2_partial\",\n")
+    append("  \"includedFiles\": [\"session.json\", \"touch-events.jsonl\", \"strikes.jsonl\", \"audio-diagnostics.csv\", \"markers.json\", \"summary.txt\", \"checksums.sha256\"],\n")
+    append("  \"plannedFilesNotYetImplemented\": [\"performance.csv\", \"generated-output.wav\"],\n")
+    append("  \"droppedData\": {\n")
+    append("    \"touchEvents\": ${capture.droppedTouchEventCount},\n")
+    append("    \"strikes\": ${base.droppedStrikeCount},\n")
+    append("    \"audioDiagnostics\": ${base.droppedDiagnosticsCount},\n")
+    append("    \"markers\": ${base.droppedMarkerCount}\n")
+    append("  }\n}\n")
+}
 
-    private fun touchEventsJsonLines(capture: DiagnosticSessionBundleCapture): String = buildString {
-        for (recorded in capture.touchEvents) {
-            val sample = recorded.sample
+private fun touchEventsJsonLines(capture: DiagnosticSessionBundleCapture): String = buildString {
+    capture.touchEvents.forEach { recorded ->
+        val sample = recorded.sample
+        append('{')
+        append("\"schemaVersion\":$DiagnosticTouchSchemaVersion,")
+        append("\"offsetNanos\":${recorded.offsetNanos},")
+        append("\"motionEventSequence\":${recorded.motionEventSequence},")
+        append("\"eventTimeNanos\":${sample.eventTimeNanos},")
+        append("\"action\":").appendJson(sample.action.wireName).append(',')
+        append("\"actionMasked\":${sample.actionMasked},")
+        append("\"actionIndex\":${sample.actionIndex},")
+        append("\"pointerId\":${sample.pointerId},")
+        append("\"pointerIndex\":${sample.pointerIndex},")
+        append("\"isActionPointer\":${sample.isActionPointer},")
+        append("\"acceptedStrike\":${sample.acceptedStrike},")
+        append("\"rawX\":${sample.rawX},\"rawY\":${sample.rawY},")
+        append("\"normalizedX\":${sample.normalizedX},\"normalizedY\":${sample.normalizedY},")
+        append("\"pressure\":${sample.pressure},\"contactSize\":${sample.contactSize},")
+        append("\"toolType\":").appendJson(sample.toolType).append(',')
+        append("\"orientationRadians\":${sample.orientationRadians},")
+        append("\"hitRegionCount\":${sample.hitRegionCount},")
+        append("\"candidateInstruments\":[")
+        sample.candidateInstruments.forEachIndexed { index, instrument ->
+            if (index > 0) append(',')
+            appendJson(instrument.name.lowercase())
+        }
+        append("],\"selectedInstrument\":")
+        if (sample.selectedInstrument == null) append("null") else appendJson(sample.selectedInstrument.name.lowercase())
+        append(",\"rejectionReason\":")
+        if (sample.rejectionReason == null) append("null") else appendJson(sample.rejectionReason)
+        append(",\"historicalSamples\":[")
+        sample.historicalSamples.forEachIndexed { index, historical ->
+            if (index > 0) append(',')
             append('{')
-            append("\"schemaVersion\":").append(DiagnosticTouchSchemaVersion).append(',')
-            append("\"offsetNanos\":").append(recorded.offsetNanos).append(',')
-            append("\"motionEventSequence\":").append(recorded.motionEventSequence).append(',')
-            append("\"eventTimeNanos\":").append(sample.eventTimeNanos).append(',')
-            append("\"action\":").appendJson(sample.action.wireName).append(',')
-            append("\"actionMasked\":").append(sample.actionMasked).append(',')
-            append("\"actionIndex\":").append(sample.actionIndex).append(',')
-            append("\"pointerId\":").append(sample.pointerId).append(',')
-            append("\"pointerIndex\":").append(sample.pointerIndex).append(',')
-            append("\"isActionPointer\":").append(sample.isActionPointer).append(',')
-            append("\"acceptedStrike\":").append(sample.acceptedStrike).append(',')
-            append("\"rawX\":").append(sample.rawX).append(',')
-            append("\"rawY\":").append(sample.rawY).append(',')
-            append("\"normalizedX\":").append(sample.normalizedX).append(',')
-            append("\"normalizedY\":").append(sample.normalizedY).append(',')
-            append("\"pressure\":").append(sample.pressure).append(',')
-            append("\"contactSize\":").append(sample.contactSize).append(',')
-            append("\"toolType\":").appendJson(sample.toolType).append(',')
-            append("\"orientationRadians\":").append(sample.orientationRadians).append(',')
-            append("\"hitRegionCount\":").append(sample.hitRegionCount).append(',')
-            append("\"candidateInstruments\":[")
-            sample.candidateInstruments.forEachIndexed { index, instrument ->
-                if (index > 0) append(',')
-                appendJson(instrument.name.lowercase())
-            }
-            append("],")
-            append("\"selectedInstrument\":")
-            sample.selectedInstrument?.let { appendJson(it.name.lowercase()) } ?: append("null")
-            append(',')
-            append("\"rejectionReason\":")
-            sample.rejectionReason?.let(::appendJson) ?: append("null")
-            append(',')
-            append("\"historicalSamples\":[")
-            sample.historicalSamples.forEachIndexed { index, historical ->
-                if (index > 0) append(',')
-                append('{')
-                append("\"eventTimeNanos\":").append(historical.eventTimeNanos).append(',')
-                append("\"rawX\":").append(historical.rawX).append(',')
-                append("\"rawY\":").append(historical.rawY).append(',')
-                append("\"normalizedX\":").append(historical.normalizedX).append(',')
-                append("\"normalizedY\":").append(historical.normalizedY).append(',')
-                append("\"pressure\":").append(historical.pressure).append(',')
-                append("\"contactSize\":").append(historical.contactSize).append(',')
-                append("\"orientationRadians\":").append(historical.orientationRadians)
-                append('}')
-            }
-            append("]}\n")
+            append("\"eventTimeNanos\":${historical.eventTimeNanos},")
+            append("\"rawX\":${historical.rawX},\"rawY\":${historical.rawY},")
+            append("\"normalizedX\":${historical.normalizedX},\"normalizedY\":${historical.normalizedY},")
+            append("\"pressure\":${historical.pressure},\"contactSize\":${historical.contactSize},")
+            append("\"orientationRadians\":${historical.orientationRadians}")
+            append('}')
         }
+        append("]}\n")
     }
+}
 
-    private fun DiagnosticTouchSample.sanitized(): DiagnosticTouchSample = copy(
-        rawX = rawX.finiteOrZero(),
-        rawY = rawY.finiteOrZero(),
-        normalizedX = normalizedX.finiteOrZero(),
-        normalizedY = normalizedY.finiteOrZero(),
-        pressure = pressure.finiteOrZero().coerceAtLeast(0f),
-        contactSize = contactSize.finiteOrZero().coerceAtLeast(0f),
-        orientationRadians = orientationRadians.finiteOrZero(),
-        rejectionReason = rejectionReason?.take(80),
-        historicalSamples = historicalSamples.map { historical ->
-            historical.copy(
-                rawX = historical.rawX.finiteOrZero(),
-                rawY = historical.rawY.finiteOrZero(),
-                normalizedX = historical.normalizedX.finiteOrZero(),
-                normalizedY = historical.normalizedY.finiteOrZero(),
-                pressure = historical.pressure.finiteOrZero().coerceAtLeast(0f),
-                contactSize = historical.contactSize.finiteOrZero().coerceAtLeast(0f),
-                orientationRadians = historical.orientationRadians.finiteOrZero(),
-            )
-        },
-    )
+private fun DiagnosticTouchSample.sanitized(): DiagnosticTouchSample = copy(
+    rawX = rawX.finiteOrZero(),
+    rawY = rawY.finiteOrZero(),
+    normalizedX = normalizedX.finiteOrZero(),
+    normalizedY = normalizedY.finiteOrZero(),
+    pressure = pressure.finiteOrZero().coerceAtLeast(0f),
+    contactSize = contactSize.finiteOrZero().coerceAtLeast(0f),
+    orientationRadians = orientationRadians.finiteOrZero(),
+    rejectionReason = rejectionReason?.take(80),
+    historicalSamples = historicalSamples.map { sample ->
+        sample.copy(
+            rawX = sample.rawX.finiteOrZero(),
+            rawY = sample.rawY.finiteOrZero(),
+            normalizedX = sample.normalizedX.finiteOrZero(),
+            normalizedY = sample.normalizedY.finiteOrZero(),
+            pressure = sample.pressure.finiteOrZero().coerceAtLeast(0f),
+            contactSize = sample.contactSize.finiteOrZero().coerceAtLeast(0f),
+            orientationRadians = sample.orientationRadians.finiteOrZero(),
+        )
+    },
+)
 
-    private fun replaceFile(source: File, destination: File) {
-        runCatching {
-            Files.move(
-                source.toPath(),
-                destination.toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        }.getOrElse {
-            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
+private fun replaceFile(source: File, destination: File) {
+    runCatching {
+        Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    }.getOrElse {
+        Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
+}
 
-    private fun StringBuilder.appendJson(value: String): StringBuilder = append('"').append(
-        value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t"),
-    ).append('"')
+private fun StringBuilder.appendJson(value: String): StringBuilder = append('"').append(
+    value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t"),
+).append('"')
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
-        .digest(bytes)
-        .joinToString("") { byte -> "%02x".format(byte) }
+private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+    .digest(bytes)
+    .joinToString("") { byte -> "%02x".format(byte) }
 
-    private fun Float.finiteOrZero(): Float = if (isFinite()) this else 0f
-
-    private fun Int.requirePositive(name: String): Int {
-        require(this > 0) { "$name must be positive" }
-        return this
-    }
+private fun String.utf8(): ByteArray = toByteArray(StandardCharsets.UTF_8)
+private fun Float.finiteOrZero(): Float = if (isFinite()) this else 0f
+private fun Int.positive(name: String): Int {
+    require(this > 0) { "$name must be positive" }
+    return this
 }
