@@ -327,6 +327,7 @@ internal class DiagnosticSessionRecorder(
             append("\"pointerId\":").append(strike.pointerId).append(',')
             append("\"instrument\":").appendJson(strike.instrument.name.lowercase()).append(',')
             append("\"velocity\":").append(strike.velocity).append(',')
+            append("\"velocitySource\":").appendJson(strike.velocitySource.wireName).append(',')
             append("\"normalizedX\":").append(strike.normalizedX).append(',')
             append("\"normalizedY\":").append(strike.normalizedY).append(',')
             append("\"pressure\":").append(strike.pressure).append(',')

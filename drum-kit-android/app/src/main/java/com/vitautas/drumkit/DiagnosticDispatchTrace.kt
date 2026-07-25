@@ -284,6 +284,7 @@ private fun enrichedStrikesJsonLines(
             append("\"pointerId\":${strike.pointerId},")
             append("\"instrument\":").appendJson(strike.instrument.name.lowercase()).append(',')
             append("\"velocity\":${strike.velocity},")
+            append("\"velocitySource\":").appendJson(strike.velocitySource.wireName).append(',')
             append("\"normalizedX\":${strike.normalizedX},\"normalizedY\":${strike.normalizedY},")
             append("\"pressure\":${strike.pressure},\"contactSize\":${strike.contactSize},")
             append("\"dispatchDecisionOffsetNanos\":").appendNullable(trace?.offsetNanos).append(',')

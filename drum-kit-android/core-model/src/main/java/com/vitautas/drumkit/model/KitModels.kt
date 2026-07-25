@@ -489,6 +489,13 @@ object StudioKitDefinition {
     }
 }
 
+enum class StrikeVelocitySource(val wireName: String) {
+    PRESSURE("pressure"),
+    CONTACT_SIZE("contact_size"),
+    HISTORY("history"),
+    DETERMINISTIC_FALLBACK("deterministic_fallback"),
+}
+
 data class DrumStrike(
     val pointerId: Int,
     val instrument: InstrumentId,
@@ -498,6 +505,7 @@ data class DrumStrike(
     val pressure: Float,
     val contactSize: Float,
     val eventTimeNanos: Long,
+    val velocitySource: StrikeVelocitySource = StrikeVelocitySource.DETERMINISTIC_FALLBACK,
 )
 
 data class AudioDiagnostics(

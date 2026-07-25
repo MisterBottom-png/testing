@@ -51,6 +51,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val animationStates = Array(InstrumentId.entries.size) { InstrumentAnimationState() }
     private val kickPedalAnimation = KickPedalAnimationState()
     private val kickPedalRenderer = KickPedalRenderer(density)
+    private val velocityEstimator = StrikeVelocityEstimator()
     private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
     private var rackMountX = 0f
     private var rackMountY = 0f
@@ -271,7 +272,25 @@ class DrumSurfaceView @JvmOverloads constructor(
         val pointerId = event.getPointerId(pointerIndex)
         val pressure = event.getPressure(pointerIndex).coerceAtLeast(0f)
         val contactSize = event.getSize(pointerIndex).coerceAtLeast(0f)
-        val velocity = estimateVelocity(pressure, contactSize, event.eventTime)
+        val velocityEstimate = velocityEstimator.estimate(
+            StrikeVelocityInput(
+                pressure = pressure,
+                contactSize = contactSize,
+                x = x,
+                y = y,
+                eventTimeMillis = event.eventTime,
+                history = List(event.historySize) { historyIndex ->
+                    StrikeVelocityHistoricalSample(
+                        pressure = event.getHistoricalPressure(pointerIndex, historyIndex),
+                        contactSize = event.getHistoricalSize(pointerIndex, historyIndex),
+                        x = event.getHistoricalX(pointerIndex, historyIndex),
+                        y = event.getHistoricalY(pointerIndex, historyIndex),
+                        eventTimeMillis = event.getHistoricalEventTime(historyIndex),
+                    )
+                },
+            ),
+        )
+        val velocity = velocityEstimate.velocity
         val eventTimeNanos = event.eventTime * NanosPerMillisecond
         val nowNanos = System.nanoTime()
 
@@ -285,6 +304,7 @@ class DrumSurfaceView @JvmOverloads constructor(
                 pressure = pressure,
                 contactSize = contactSize,
                 eventTimeNanos = eventTimeNanos,
+                velocitySource = velocityEstimate.source,
             ),
         )
 
@@ -349,15 +369,6 @@ class DrumSurfaceView @JvmOverloads constructor(
         playableRect = state.secondaryRect.takeUnless { it.isEmpty } ?: state.primaryRect,
         backend = artworkBackend,
     )
-
-    private fun estimateVelocity(pressure: Float, contactSize: Float, eventTime: Long): Float {
-        val pressureVelocity = if (pressure > 0.02f && pressure != 0.5f) {
-            0.24f + pressure.coerceIn(0f, 1.2f) * 0.72f
-        } else {
-            0.58f + ((eventTime % 23L).toFloat() / 100f)
-        }
-        return (pressureVelocity + contactSize.coerceIn(0f, 1f) * 0.12f).coerceIn(0.22f, 1f)
-    }
 
     private fun configureRenderState(state: InstrumentRenderState, viewWidth: Float, viewHeight: Float) {
         val normalized = state.definition.layout.drawBounds
