@@ -16,19 +16,31 @@ els.createForm.addEventListener('input', event => {
 });
 els.speakerList.addEventListener('input', event => {
   const card = event.target.closest('[data-speaker-index]'); const field = event.target.dataset.speakerField; if (!card || !field) return;
-  const index = Number(card.dataset.speakerIndex); appState.characters[index][field] = event.target.value;
-  if (field === 'voice') event.target.parentElement.querySelector('.voice-description').textContent = `${event.target.value} · ${voiceDescription(event.target.value)}`;
+  const index = Number(card.dataset.speakerIndex); const speaker = appState.speakers[index];
+  speaker[field] = event.target.value;
+  if (field === 'geminiVoiceName') {
+    const voice = getGeminiTtsVoice(event.target.value);
+    speaker.gender = voice?.gender || '';
+    speaker.voiceType = voice?.type || '';
+    if (voice) delete speaker.voiceUnavailable; else if (event.target.value) speaker.voiceUnavailable = true;
+    event.target.parentElement.querySelector('.voice-description').textContent = event.target.value ? `${event.target.value} · ${voiceDescription(event.target.value) || 'Unavailable voice'}` : 'No Gemini voice selected';
+  }
   queueSave();
 });
 els.speakerList.addEventListener('click', event => {
   const button = event.target.closest('[data-speaker-action]'); const card = event.target.closest('[data-speaker-index]'); if (!button || !card) return;
   const index = Number(card.dataset.speakerIndex); const action = button.dataset.speakerAction;
   if (action === 'toggle') { appState.expandedSpeakers.has(index) ? appState.expandedSpeakers.delete(index) : appState.expandedSpeakers.add(index); renderSpeakerCards(); }
-  if (action === 'randomise') randomiseCharacter(index);
-  if (action === 'reset') resetCharacter(index);
+  if (action === 'randomise') randomiseSpeaker(index);
+  if (action === 'reset') resetSpeaker(index);
   if (action === 'voice-test') generateVoiceTest(index);
 });
-els.swapCharacters.addEventListener('click', () => { appState.characters.reverse(); appState.characters[0].id = 'speaker-a'; appState.characters[1].id = 'speaker-b'; renderSpeakerCards(); queueSave(); });
+els.swapCharacters.addEventListener('click', () => {
+  appState.speakers.reverse();
+  appState.speakers[0].id = 'host-1';
+  appState.speakers[1].id = 'host-2';
+  renderSpeakerCards(); queueSave();
+});
 
 els.scriptTabs.addEventListener('click', event => { const tab = event.target.closest('[data-script-view]'); if (!tab) return; appState.scriptView = tab.dataset.scriptView; renderScriptTabs(); });
 els.scriptTabs.addEventListener('keydown', event => {
