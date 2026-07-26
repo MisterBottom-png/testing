@@ -15,25 +15,21 @@ els.createForm.addEventListener('input', event => {
   syncCreateInputs();
 });
 els.speakerList.addEventListener('input', event => {
-  const card = event.target.closest('[data-speaker-index]'); const field = event.target.dataset.speakerField; if (!card || !field) return;
-  const index = Number(card.dataset.speakerIndex); const speaker = appState.speakers[index];
-  speaker[field] = event.target.value;
-  if (field === 'geminiVoiceName') {
-    const voice = getGeminiTtsVoice(event.target.value);
-    speaker.gender = voice?.gender || '';
-    speaker.voiceType = voice?.type || '';
-    if (voice) delete speaker.voiceUnavailable; else if (event.target.value) speaker.voiceUnavailable = true;
-    event.target.parentElement.querySelector('.voice-description').textContent = event.target.value ? `${event.target.value} · ${voiceDescription(event.target.value) || 'Unavailable voice'}` : 'No Gemini voice selected';
-  }
+  const card = event.target.closest('[data-speaker-index]');
+  const field = event.target.dataset.speakerField;
+  if (!card || !['speakerName', 'personality', 'deliveryInstructions'].includes(field)) return;
+  const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  updateSpeakerField(speaker, field, event.target.value);
   queueSave();
 });
-els.speakerList.addEventListener('click', event => {
-  const button = event.target.closest('[data-speaker-action]'); const card = event.target.closest('[data-speaker-index]'); if (!button || !card) return;
-  const index = Number(card.dataset.speakerIndex); const action = button.dataset.speakerAction;
-  if (action === 'toggle') { appState.expandedSpeakers.has(index) ? appState.expandedSpeakers.delete(index) : appState.expandedSpeakers.add(index); renderSpeakerCards(); }
-  if (action === 'randomise') randomiseSpeaker(index);
-  if (action === 'reset') resetSpeaker(index);
-  if (action === 'voice-test') generateVoiceTest(index);
+els.speakerList.addEventListener('change', event => {
+  const card = event.target.closest('[data-speaker-index]');
+  const field = event.target.dataset.speakerField;
+  if (!card || !['gender', 'voiceType', 'geminiVoiceName'].includes(field)) return;
+  const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  updateSpeakerField(speaker, field, event.target.value);
+  renderSpeakerCards();
+  queueSave();
 });
 els.swapCharacters.addEventListener('click', () => {
   appState.speakers.reverse();
