@@ -18,8 +18,24 @@ els.speakerList.addEventListener('input', event => {
   const card = event.target.closest('[data-speaker-index]');
   const field = event.target.dataset.speakerField;
   if (!card || !['speakerName', 'personality', 'deliveryInstructions'].includes(field)) return;
-  const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  const index = Number(card.dataset.speakerIndex);
+  const speaker = appState.speakers[index];
+  const previousSpeakerName = speaker.speakerName;
+  const previousVoiceName = speaker.geminiVoiceName;
   updateSpeakerField(speaker, field, event.target.value);
+
+  if (field === 'speakerName' && previousSpeakerName !== speaker.speakerName) {
+    renameScriptSpeaker(previousSpeakerName, speaker.speakerName);
+    invalidateAudioForSpeakerMappingChange({
+      speakerId: speaker.id,
+      previousSpeakerName,
+      nextSpeakerName: speaker.speakerName,
+      previousVoiceName,
+      nextVoiceName: speaker.geminiVoiceName
+    });
+    if (appState.currentStage === 'script') renderScriptStage();
+  }
+  if (field === 'personality' || field === 'deliveryInstructions') invalidatePodcastAudio(`speaker-${field}-changed`);
   queueSave();
 });
 els.speakerList.addEventListener('change', event => {
@@ -27,8 +43,17 @@ els.speakerList.addEventListener('change', event => {
   const field = event.target.dataset.speakerField;
   if (!card || !['gender', 'voiceType', 'geminiVoiceName'].includes(field)) return;
   const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  const previousSpeakerName = speaker.speakerName;
+  const previousVoiceName = speaker.geminiVoiceName;
   resetDuplicateVoiceApproval();
   updateSpeakerField(speaker, field, event.target.value);
+  invalidateAudioForSpeakerMappingChange({
+    speakerId: speaker.id,
+    previousSpeakerName,
+    nextSpeakerName: speaker.speakerName,
+    previousVoiceName,
+    nextVoiceName: speaker.geminiVoiceName
+  });
   renderSpeakerCards();
   queueSave();
 });
@@ -51,6 +76,7 @@ els.swapCharacters.addEventListener('click', () => {
   appState.speakers.reverse();
   appState.speakers[0].id = 'host-1';
   appState.speakers[1].id = 'host-2';
+  invalidatePodcastAudio('speaker-order-changed');
   renderSpeakerCards(); queueSave();
 });
 
@@ -74,7 +100,7 @@ els.scriptPanel.addEventListener('dragend', () => { dragIndex = null; for (const
 for (const menu of [els.refineMenu, els.scriptMoreMenu]) menu.addEventListener('click', event => {
   const button = event.target.closest('[data-script-action]'); if (!button) return; const action = button.dataset.scriptAction; menu.removeAttribute('open');
   if (['regenerate','shorten','expand','conversational','serious','humour'].includes(action)) refineScript(action);
-  if (action === 'reset' && appState.originalScript) { snapshotScript(); appState.script = deepClone(appState.originalScript); snapshotScript({ force: true }); queueSave(); renderScriptStage(); }
+  if (action === 'reset' && appState.originalScript) { snapshotScript(); appState.script = deepClone(appState.originalScript); invalidatePodcastAudio('script-reset'); snapshotScript({ force: true }); queueSave(); renderScriptStage(); }
   if (action === 'copy') copyText(buildCleanTranscript(), 'Transcript copied.');
   if (action === 'download-json') downloadBlob(new Blob([JSON.stringify(appState.script, null, 2)], { type: 'application/json' }), buildEpisodeFilename('json'));
 });
