@@ -15,29 +15,199 @@ function pcm16ToWavBlob(pcmBytes, sampleRate = 24000, channels = 1) {
   new Uint8Array(buffer, 44).set(pcmBytes); return new Blob([buffer], { type: 'audio/wav' });
 }
 function sampleRateFromMimeType(mimeType) { return Number(String(mimeType || '').match(/rate=(\d+)/i)?.[1]) || 24000; }
+
+function buildSpeakerVoiceConfigs(speakers = appState.speakers) {
+  return (Array.isArray(speakers) ? speakers : []).map(speaker => ({
+    speaker: normaliseWhitespace(speaker.speakerName),
+    voiceConfig: { prebuiltVoiceConfig: { voiceName: normaliseWhitespace(speaker.geminiVoiceName) } }
+  }));
+}
+
+function getSpeakerVoiceMappingSignature(speakers = appState.speakers) {
+  return JSON.stringify((Array.isArray(speakers) ? speakers : []).map(speaker => ({
+    id: speaker.id,
+    speakerName: normaliseWhitespace(speaker.speakerName),
+    geminiVoiceName: normaliseWhitespace(speaker.geminiVoiceName)
+  })));
+}
+
+function hashTtsCacheValue(value) {
+  let hash = 2166136261;
+  const text = String(value ?? '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildTtsChunkCacheKey({ transcript, mappingSignature, index }) {
+  return `tts-${index}-${hashTtsCacheValue(`${mappingSignature}\n${transcript}`)}`;
+}
+
+function buildTtsRequestBody(transcript, speakerVoiceConfigs) {
+  return {
+    contents: [{ role: 'user', parts: [{ text: transcript }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: deepClone(speakerVoiceConfigs)
+        }
+      }
+    }
+  };
+}
+
+function createTtsChunks(script = appState.script, maxCharacters = appState.settings.maxTtsCharacters) {
+  if (!Array.isArray(script?.segments) || !script.segments.length) return [];
+  const safeLimit = Math.max(1, Number(maxCharacters) || DEFAULT_MAX_TTS_CHARACTERS);
+  const chunks = [];
+  let currentSegments = [];
+
+  const createChunk = segments => {
+    const chunkScript = { ...script, segments: deepClone(segments) };
+    return { script: chunkScript, transcript: buildTtsTranscript(chunkScript) };
+  };
+
+  for (const segment of script.segments) {
+    const candidateSegments = [...currentSegments, segment];
+    const candidate = createChunk(candidateSegments);
+    if (candidate.transcript.length <= safeLimit) {
+      currentSegments = candidateSegments;
+      continue;
+    }
+
+    if (!currentSegments.length) {
+      throw new Error(`A single script segment exceeds the ${safeLimit.toLocaleString('en-GB')} character TTS chunk limit.`);
+    }
+
+    chunks.push(createChunk(currentSegments));
+    currentSegments = [segment];
+    const singleSegmentChunk = createChunk(currentSegments);
+    if (singleSegmentChunk.transcript.length > safeLimit) {
+      throw new Error(`A single script segment exceeds the ${safeLimit.toLocaleString('en-GB')} character TTS chunk limit.`);
+    }
+  }
+
+  if (currentSegments.length) chunks.push(createChunk(currentSegments));
+  return chunks.map((chunk, index) => ({ ...chunk, index }));
+}
+
+function concatPcmBytes(parts) {
+  const totalLength = parts.reduce((total, part) => total + part.byteLength, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  parts.forEach(part => { combined.set(part, offset); offset += part.byteLength; });
+  return combined;
+}
+
+function invalidatePodcastAudio(reason = '') {
+  const hadAudio = Boolean(appState.audio?.url || appState.audio?.blob || Object.keys(appState.audioCacheReferences || {}).length);
+  revokeAudioUrl();
+  appState.audioCacheReferences = {};
+  if (appState.currentStage === 'audio' && appState.script) appState.currentStage = 'script';
+  if (reason) appState.lastAudioInvalidationReason = reason;
+  return hadAudio;
+}
+
+function invalidateAudioForSpeakerMappingChange({
+  speakerId = '',
+  previousSpeakerName = '',
+  nextSpeakerName = '',
+  previousVoiceName = '',
+  nextVoiceName = ''
+} = {}) {
+  const nameChanged = previousSpeakerName !== nextSpeakerName;
+  const voiceChanged = previousVoiceName !== nextVoiceName;
+  if (!nameChanged && !voiceChanged) return false;
+  return invalidatePodcastAudio(`speaker-mapping:${speakerId || 'unknown'}`);
+}
+
+function getTtsSpeakerValidationIssue(script = appState.script, speakers = appState.speakers) {
+  const issue = validateScriptSpeakers(script, speakers)[0];
+  if (!issue) return null;
+  return {
+    title: 'Script speaker mismatch',
+    message: `Segment ${issue.index + 1} uses “${issue.speaker || 'blank'}”, which is not a configured speaker.`,
+    suggestion: 'Choose one of the configured human speaker names before generating audio.'
+  };
+}
+
+async function requestTtsChunk(endpoint, transcript, speakerVoiceConfigs) {
+  const requestBody = buildTtsRequestBody(transcript, speakerVoiceConfigs);
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey },
+    body: JSON.stringify(requestBody)
+  });
+  const raw = await response.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { throw createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw); }
+  if (!response.ok) throw createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
+  const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
+  if (!audioPart) throw createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
+  return {
+    pcmBytes: base64ToBytes(audioPart.inlineData.data),
+    sampleRate: sampleRateFromMimeType(audioPart.inlineData.mimeType)
+  };
+}
+
 async function generatePodcastAudio() {
   if (!appState.script?.segments?.length) return;
-  const transcript = buildTtsTranscript();
-  if (transcript.length > appState.settings.maxTtsCharacters) return showServiceError({ title: 'Script is too long', message: `The TTS transcript contains ${transcript.length.toLocaleString('en-GB')} characters.`, suggestion: 'Shorten the script or increase the threshold in settings.', details: '', retry: null });
-  if (appState.speakers.some(speaker => !getGeminiTtsVoice(speaker.geminiVoiceName))) return showServiceError({ title: 'Voice selection required', message: 'One or more saved Gemini voices are unavailable.', suggestion: 'Select an available Gemini voice for both speakers.', details: '', retry: null });
-  hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
+  const speakerIssue = getTtsSpeakerValidationIssue();
+  if (speakerIssue) return showServiceError({ ...speakerIssue, details: '', retry: null });
+
+  const invalidSpeaker = appState.speakers.find(speaker => {
+    const voice = getGeminiTtsVoice(speaker.geminiVoiceName);
+    return !voice || voice.gender !== speaker.gender || voice.type !== speaker.voiceType;
+  });
+  if (invalidSpeaker) return showServiceError({ title: 'Voice selection required', message: `${invalidSpeaker.speakerName || 'A speaker'} does not have a valid matching Gemini voice.`, suggestion: 'Select an available voice matching the chosen gender and voice type.', details: '', retry: null });
+
+  let chunks;
+  try {
+    chunks = createTtsChunks();
+  } catch (error) {
+    return showServiceError({ title: 'Script segment is too long', message: error.message, suggestion: 'Split the long dialogue segment into shorter turns.', details: '', retry: null });
+  }
+  if (!chunks.length) return;
+
+  const speakerVoiceConfigs = buildSpeakerVoiceConfigs();
+  const mappingSignature = getSpeakerVoiceMappingSignature();
+  hideServiceError(); invalidatePodcastAudio('audio-regeneration'); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
   const startedAt = performance.now();
-  const requestBody = { contents: [{ role: 'user', parts: [{ text: transcript }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: appState.speakers.map(speaker => ({ speaker: speaker.speakerName, voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker.geminiVoiceName } } })) } } } };
+  const pcmParts = [];
+  let sampleRate = 0;
+
   try {
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify(requestBody) });
-    const raw = await response.text(); let data;
-    try { data = JSON.parse(raw); } catch { throw createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw); }
-    if (!response.ok) throw createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
-    const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
-    if (!audioPart) throw createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
-    const pcmBytes = base64ToBytes(audioPart.inlineData.data); const sampleRate = sampleRateFromMimeType(audioPart.inlineData.mimeType); const wavBlob = pcm16ToWavBlob(pcmBytes, sampleRate, 1);
-    appState.audio = { blob: wavBlob, url: URL.createObjectURL(wavBlob), sampleRate, generationSeconds: (performance.now() - startedAt) / 1000, durationSeconds: pcmBytes.byteLength / (sampleRate * 2), createdAt: new Date().toISOString() };
+    for (const chunk of chunks) {
+      if (els.scriptLoadingMessage) els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
+      const result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);
+      if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+      sampleRate = sampleRate || result.sampleRate;
+      pcmParts.push(result.pcmBytes);
+    }
+
+    const pcmBytes = concatPcmBytes(pcmParts);
+    const wavBlob = pcm16ToWavBlob(pcmBytes, sampleRate || 24000, 1);
+    appState.audio = { blob: wavBlob, url: URL.createObjectURL(wavBlob), sampleRate: sampleRate || 24000, generationSeconds: (performance.now() - startedAt) / 1000, durationSeconds: pcmBytes.byteLength / ((sampleRate || 24000) * 2), createdAt: new Date().toISOString() };
+    appState.audioCacheReferences = {
+      voiceMappingSignature: mappingSignature,
+      chunks: chunks.map(chunk => ({
+        index: chunk.index,
+        cacheKey: buildTtsChunkCacheKey({ transcript: chunk.transcript, mappingSignature, index: chunk.index }),
+        speakerOrder: speakerVoiceConfigs.map(config => config.speaker)
+      }))
+    };
+    queueSave();
     setStage('audio');
   } catch (error) {
+    invalidatePodcastAudio('audio-generation-failed');
     handleGenerationError(error, 'Audio generation failed', 'Try a shorter script or select a different TTS model.', generatePodcastAudio);
   } finally { setBusy(false); }
 }
+
 async function generateVoiceTest(index) {
   const speaker = appState.speakers[index];
   if (!appState.connection.apiKey.trim()) return showServiceError({ title: 'API key required', message: 'Add a Gemini API key before generating a voice test.', suggestion: 'Open connection settings.', details: '', retry: null });
