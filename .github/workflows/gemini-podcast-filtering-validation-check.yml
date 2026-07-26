@@ -1,0 +1,46 @@
+name: Gemini Podcast Studio filtering validation check
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - gemini-podcast-studio/.run-filtering-validation-check
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gemini-podcast-studio
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build, verify and test
+        run: npm run check
+
+      - name: Commit refreshed single-file build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/gemini-podcast-studio.html
+          if git diff --cached --quiet; then
+            echo "Generated distribution is already current."
+          else
+            git commit -m "Refresh Gemini Podcast Studio build"
+            git push
+          fi
