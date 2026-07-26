@@ -17,7 +17,7 @@ test('javascript is loaded in dependency order', async () => {
   const expected = [
     'constants.js', 'state.js', 'text-utils.js', 'preferences.js',
     'ui-create.js', 'ui-script.js', 'gemini-api.js', 'audio.js',
-    'ui-status.js', 'ui-events.js', 'main.js'
+    'ui-status.js', 'ui-events.js', 'voice-preview.js', 'main.js'
   ];
   let previous = -1;
   for (const file of expected) {
