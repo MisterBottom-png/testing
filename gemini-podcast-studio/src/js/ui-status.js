@@ -43,9 +43,11 @@ function handleGenerationError(error, title, fallbackSuggestion, retry) {
 }
 
 function resetProject({ preserveConnection = true, preservePreferences = true } = {}) {
-  revokeAudioUrl(); appState.currentStage = 'create'; appState.script = null; appState.originalScript = null; appState.history = []; appState.historyIndex = -1;
+  revokeAudioUrl(); appState.schemaVersion = PODCAST_PROJECT_SCHEMA_VERSION; appState.currentStage = 'create'; appState.script = null; appState.legacyScript = null; appState.originalScript = null; appState.history = []; appState.historyIndex = -1;
   appState.podcast = { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' };
-  appState.characters = [{ id: 'speaker-a', ...CHARACTER_TEMPLATES[0], voice: 'Aoede' }, { id: 'speaker-b', ...CHARACTER_TEMPLATES[1], voice: 'Charon' }];
+  appState.speakers = createDefaultPodcastSpeakers();
+  appState.audioCacheReferences = {};
+  appState.lastModified = '';
   appState.expandedSpeakers.clear();
   if (!preserveConnection) appState.connection = { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' };
   if (!preservePreferences) appState.settings = { theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', maxTtsCharacters: DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 };
