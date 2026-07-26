@@ -47,15 +47,19 @@ function updateTargetSummary() {
 }
 
 function renderSpeakerCards() {
-  els.speakerList.innerHTML = appState.characters.map((character, index) => {
+  els.speakerList.innerHTML = appState.speakers.map((speaker, index) => {
     const expanded = appState.expandedSpeakers.has(index);
-    const options = getGeminiTtsVoices().map(({ apiName, description }) => `<option value="${apiName}"${character.voice === apiName ? ' selected' : ''}>${apiName} — ${description}</option>`).join('');
+    const selectedVoice = speaker.geminiVoiceName || '';
+    const unavailableOption = selectedVoice && !getGeminiTtsVoice(selectedVoice)
+      ? `<option value="${escapeHtml(selectedVoice)}" selected>${escapeHtml(selectedVoice)} — unavailable</option>`
+      : '';
+    const options = unavailableOption + getGeminiTtsVoices().map(({ apiName, description }) => `<option value="${apiName}"${selectedVoice === apiName ? ' selected' : ''}>${apiName} — ${description}</option>`).join('');
     return `<article class="speaker-card${expanded ? ' expanded' : ''}" data-speaker-index="${index}">
       <div class="speaker-card-head">
         <span class="speaker-id">${index === 0 ? 'A' : 'B'}</span>
         <div class="speaker-copy">
-          <div class="speaker-name-line"><h3>${escapeHtml(character.name || `Speaker ${index + 1}`)}</h3><span class="voice-label">${escapeHtml(character.voice)}</span></div>
-          <p class="speaker-description">${escapeHtml(character.role || 'Podcast participant')} · ${escapeHtml(character.personality || 'Natural and engaging')}</p>
+          <div class="speaker-name-line"><h3>${escapeHtml(speaker.speakerName || `Host ${index + 1}`)}</h3><span class="voice-label">${escapeHtml(selectedVoice || 'No voice selected')}</span></div>
+          <p class="speaker-description">${escapeHtml(speaker.role || 'Podcast participant')} · ${escapeHtml(speaker.personality || 'Natural and engaging')}</p>
         </div>
         <div class="speaker-actions">
           <button class="ghost-button compact-button" type="button" data-speaker-action="voice-test">Test voice</button>
@@ -68,27 +72,38 @@ function renderSpeakerCards() {
       </div>
       <div class="speaker-editor${expanded ? '' : ' hidden'}">
         <div class="field-grid">
-          <div class="field"><label for="speakerName${index}">Name</label><input id="speakerName${index}" data-speaker-field="name" value="${escapeHtml(character.name)}" maxlength="40" /></div>
-          <div class="field"><label for="speakerRole${index}">Role</label><input id="speakerRole${index}" data-speaker-field="role" value="${escapeHtml(character.role)}" placeholder="Host, scientist, journalist…" /></div>
-          <div class="field"><label for="speakerVoice${index}">Gemini voice</label><select id="speakerVoice${index}" data-speaker-field="voice">${options}</select><p class="voice-description">${escapeHtml(character.voice)} · ${escapeHtml(voiceDescription(character.voice))}</p></div>
-          <div class="field"><label for="speakerAccent${index}">Accent or language note</label><input id="speakerAccent${index}" data-speaker-field="accent" value="${escapeHtml(character.accent)}" placeholder="Optional pronunciation note" /></div>
-          <div class="field full"><label for="speakerPersonality${index}">Personality</label><textarea id="speakerPersonality${index}" data-speaker-field="personality">${escapeHtml(character.personality)}</textarea></div>
-          <div class="field full"><label for="speakerDirection${index}">Performance direction</label><textarea id="speakerDirection${index}" data-speaker-field="direction">${escapeHtml(character.direction)}</textarea></div>
+          <div class="field"><label for="speakerName${index}">Name</label><input id="speakerName${index}" data-speaker-field="speakerName" value="${escapeHtml(speaker.speakerName)}" maxlength="40" /></div>
+          <div class="field"><label for="speakerRole${index}">Role</label><input id="speakerRole${index}" data-speaker-field="role" value="${escapeHtml(speaker.role || '')}" placeholder="Host, scientist, journalist…" /></div>
+          <div class="field"><label for="speakerVoice${index}">Gemini voice</label><select id="speakerVoice${index}" data-speaker-field="geminiVoiceName"><option value="">Select a Gemini voice</option>${options}</select><p class="voice-description">${selectedVoice ? `${escapeHtml(selectedVoice)} · ${escapeHtml(voiceDescription(selectedVoice) || 'Unavailable voice')}` : 'No Gemini voice selected'}</p></div>
+          <div class="field"><label for="speakerAccent${index}">Accent or language note</label><input id="speakerAccent${index}" data-speaker-field="accent" value="${escapeHtml(speaker.accent || '')}" placeholder="Optional pronunciation note" /></div>
+          <div class="field full"><label for="speakerPersonality${index}">Personality</label><textarea id="speakerPersonality${index}" data-speaker-field="personality">${escapeHtml(speaker.personality)}</textarea></div>
+          <div class="field full"><label for="speakerDirection${index}">Performance direction</label><textarea id="speakerDirection${index}" data-speaker-field="deliveryInstructions">${escapeHtml(speaker.deliveryInstructions)}</textarea></div>
         </div>
       </div>
     </article>`;
   }).join('');
 }
-function resetCharacter(index) {
-  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...(index ? CHARACTER_TEMPLATES[1] : CHARACTER_TEMPLATES[0]), voice: index ? 'Charon' : 'Aoede' };
+function resetSpeaker(index) {
+  appState.speakers[index] = { ...createDefaultPodcastSpeakers()[index] };
   renderSpeakerCards(); queueSave();
 }
-function randomiseCharacter(index) {
-  const other = appState.characters[index ? 0 : 1];
-  const templates = CHARACTER_TEMPLATES.filter(template => template.name !== other.name);
+function randomiseSpeaker(index) {
+  const other = appState.speakers[index ? 0 : 1];
+  const templates = CHARACTER_TEMPLATES.filter(template => template.speakerName !== other.speakerName);
   const template = templates[Math.floor(Math.random() * templates.length)];
-  const voices = getGeminiTtsVoices().filter(({ apiName }) => apiName !== other.voice);
-  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...template, voice: voices[Math.floor(Math.random() * voices.length)]?.apiName || '' };
+  const voices = getGeminiTtsVoices().filter(({ apiName }) => apiName !== other.geminiVoiceName);
+  const voice = voices[Math.floor(Math.random() * voices.length)] || null;
+  appState.speakers[index] = {
+    id: `host-${index + 1}`,
+    speakerName: template.speakerName,
+    gender: voice?.gender || '',
+    voiceType: voice?.type || '',
+    geminiVoiceName: voice?.apiName || '',
+    personality: template.personality,
+    deliveryInstructions: template.deliveryInstructions,
+    role: template.role,
+    accent: template.accent
+  };
   renderSpeakerCards(); queueSave();
 }
 
@@ -100,7 +115,7 @@ function clearValidation() {
 }
 function validatePodcastBrief() {
   const errors = [];
-  const names = appState.characters.map(character => normaliseWhitespace(character.name));
+  const names = appState.speakers.map(speaker => normaliseWhitespace(speaker.speakerName));
   if (!appState.connection.apiKey.trim()) errors.push({ id: 'setupApiKey', field: document.getElementById('setupApiKey') || els.connectionChip, message: 'Enter a Gemini API key.' });
   if (!getTextModel()) errors.push({ id: 'setupCustomTextModel', field: document.getElementById('setupCustomTextModel'), message: 'Enter a valid text model ID.' });
   if (!getTtsModel()) errors.push({ id: 'setupCustomTtsModel', field: document.getElementById('setupCustomTtsModel'), message: 'Enter a valid TTS model ID.' });
@@ -110,7 +125,7 @@ function validatePodcastBrief() {
   if (!(appState.podcast.durationMinutes > 0 && appState.podcast.durationMinutes <= 10)) errors.push({ id: 'customDuration', field: els.customDuration, message: 'Choose a duration between 1 and 10 minutes.' });
   if (names.some(name => !name)) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Both speakers need names.' });
   if (names[0]?.toLocaleLowerCase() === names[1]?.toLocaleLowerCase()) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Speaker names must be different.' });
-  if (appState.characters.some(character => !character.voice)) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Select a voice for both speakers.' });
+  if (appState.speakers.some(speaker => !speaker.geminiVoiceName || !getGeminiTtsVoice(speaker.geminiVoiceName))) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Select an available Gemini voice for both speakers.' });
   return errors;
 }
 function showValidationErrors(errors) {
