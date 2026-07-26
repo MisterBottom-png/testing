@@ -53,13 +53,13 @@ jobs:
               raise SystemExit(f'Duplicate element IDs: {duplicates}')
 
           required = [
-              'connectionStatus',
-              'validationSummary',
+              'connectionChip',
+              'createErrorSummary',
               'role="tablist"',
               'aria-current="step"',
-              'scriptHistory',
-              'drawAudioWaveform',
-              'moveSegment',
+              'historyIndex',
+              'drawWaveform',
+              'reorderSegments',
               'Saved locally'
           ]
           for marker in required:
