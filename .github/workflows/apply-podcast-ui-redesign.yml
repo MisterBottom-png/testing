@@ -1,0 +1,78 @@
+name: Apply podcast studio UI redesign
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-studio
+    paths:
+      - .github/workflows/apply-podcast-ui-redesign.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-redesign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Restore redesigned application
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/podcast-ui-payload/part-*.txt | base64 --decode | gzip --decompress > podcast-studio.html
+
+      - name: Validate application
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          source = Path('podcast-studio.html').read_text(encoding='utf-8')
+          HTMLParser().feed(source)
+
+          if source.count('<style>') != 1 or source.count('</style>') != 1:
+              raise SystemExit('Expected exactly one style block')
+          if source.count('<script>') != 1 or source.count('</script>') != 1:
+              raise SystemExit('Expected exactly one script block')
+
+          ids = re.findall(r'\bid="([^"]+)"', source)
+          duplicates = sorted({value for value in ids if ids.count(value) > 1})
+          if duplicates:
+              raise SystemExit(f'Duplicate element IDs: {duplicates}')
+
+          required = [
+              'connectionStatus',
+              'validationSummary',
+              'role="tablist"',
+              'aria-current="step"',
+              'scriptHistory',
+              'drawAudioWaveform',
+              'moveSegment',
+              'Saved locally'
+          ]
+          for marker in required:
+              if marker not in source:
+                  raise SystemExit(f'Missing required redesign marker: {marker}')
+
+          start = source.index('<script>') + len('<script>')
+          end = source.rindex('</script>')
+          Path('/tmp/podcast-studio.js').write_text(source[start:end], encoding='utf-8')
+          PY
+          node --check /tmp/podcast-studio.js
+
+      - name: Commit validated redesign
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/podcast-ui-payload
+          rm -f .github/workflows/apply-podcast-ui-redesign.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Redesign podcast studio workspace"
+          git push
