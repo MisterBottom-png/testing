@@ -22,7 +22,7 @@ function getWordCount(script = appState.script) {
 }
 function getEstimatedSeconds(words = getWordCount()) { return (words / Math.max(1, appState.settings.speakingRate)) * 60; }
 function getTargetWords() { return Math.round(appState.podcast.durationMinutes * appState.settings.speakingRate); }
-function voiceDescription(name) { return VOICES.find(([voice]) => voice === name)?.[1] || ''; }
+function voiceDescription(name) { return getGeminiTtsVoice(name)?.description || ''; }
 function buildEpisodeFilename(extension) {
   const base = normaliseWhitespace(appState.script?.title || 'gemini-podcast').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'gemini-podcast';
   return `${base}-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
