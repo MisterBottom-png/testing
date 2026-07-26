@@ -102,8 +102,8 @@ function segmentMenu(index) {
 }
 function renderSegmentList() {
   els.scriptPanel.innerHTML = `<div class="segment-list">${appState.script.segments.map((segment, index) => {
-    const speakerIndex = Math.max(0, appState.characters.findIndex(character => character.name === segment.speaker));
-    const speakerOptions = appState.characters.map(character => `<option value="${escapeHtml(character.name)}"${character.name === segment.speaker ? ' selected' : ''}>${escapeHtml(character.name)}</option>`).join('');
+    const speakerIndex = Math.max(0, appState.speakers.findIndex(speaker => speaker.speakerName === segment.speaker));
+    const speakerOptions = appState.speakers.map(speaker => `<option value="${escapeHtml(speaker.speakerName)}"${speaker.speakerName === segment.speaker ? ' selected' : ''}>${escapeHtml(speaker.speakerName)}</option>`).join('');
     return `<article class="segment-card" draggable="true" data-segment-index="${index}" data-speaker-index="${speakerIndex}">
       <div class="segment-header">
         <button class="drag-handle" type="button" aria-label="Drag segment ${index + 1} to reorder" title="Drag to reorder">${ICONS.grip}</button>
@@ -124,7 +124,7 @@ function updateSegmentFromControl(control) {
   if (!segment) return;
   segment[control.dataset.segmentField] = control.dataset.segmentField === 'direction' ? normalisePerformanceTag(control.value) : control.value;
   if (control.dataset.segmentField === 'speaker') {
-    card.dataset.speakerIndex = String(Math.max(0, appState.characters.findIndex(character => character.name === control.value)));
+    card.dataset.speakerIndex = String(Math.max(0, appState.speakers.findIndex(speaker => speaker.speakerName === control.value)));
   }
   appState.script.estimatedWords = getWordCount();
   renderScriptMetrics(); queueSave();
@@ -140,7 +140,7 @@ function performSegmentAction(index, action) {
   if (action === 'duplicate') segments.splice(index + 1, 0, deepClone(segments[index]));
   if (action === 'delete' && segments.length > 2) segments.splice(index, 1);
   if (action === 'insert') {
-    const nextSpeaker = appState.characters.find(character => character.name !== segments[index].speaker)?.name || appState.characters[0].name;
+    const nextSpeaker = appState.speakers.find(speaker => speaker.speakerName !== segments[index].speaker)?.speakerName || appState.speakers[0].speakerName;
     segments.splice(index + 1, 0, { speaker: nextSpeaker, direction: '', text: '' });
   }
   appState.script.estimatedWords = getWordCount(); snapshotScript({ force: true }); queueSave(); renderScriptStage();
@@ -158,10 +158,10 @@ function reorderSegments(from, to) {
 function buildCleanTranscript() { return appState.script?.segments?.map(segment => `${segment.speaker}: ${segment.text}`).join('\n\n') || ''; }
 function buildTtsTranscript(script = appState.script) {
   if (!script) return '';
-  const [a, b] = appState.characters;
-  const speakerInstructions = appState.characters.map(character => {
-    const details = [character.personality, character.direction, character.accent ? `Accent or language note: ${character.accent}` : ''].filter(Boolean).join('. ');
-    return `${character.name} should sound ${details || 'natural and conversational'}.`;
+  const [a, b] = appState.speakers;
+  const speakerInstructions = appState.speakers.map(speaker => {
+    const details = [speaker.personality, speaker.deliveryInstructions, speaker.accent ? `Accent or language note: ${speaker.accent}` : ''].filter(Boolean).join('. ');
+    return `${speaker.speakerName} should sound ${details || 'natural and conversational'}.`;
   }).join('\n');
   let previousTag = '';
   const dialogue = script.segments.map(segment => {
@@ -170,5 +170,5 @@ function buildTtsTranscript(script = appState.script) {
     previousTag = tag || '';
     return `${segment.speaker}:${cue} ${segment.text}`;
   }).join('\n\n');
-  return `Create a natural podcast conversation between ${a.name} and ${b.name}.\n\n${speakerInstructions}\n\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Bracketed cues are silent, subtle performance directions that apply only to the line immediately following them. Do not exaggerate them. Keep the delivery conversational and preserve every spoken word exactly.\n\n${dialogue}`;
+  return `Create a natural podcast conversation between ${a.speakerName} and ${b.speakerName}.\n\n${speakerInstructions}\n\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Bracketed cues are silent, subtle performance directions that apply only to the line immediately following them. Do not exaggerate them. Keep the delivery conversational and preserve every spoken word exactly.\n\n${dialogue}`;
 }
