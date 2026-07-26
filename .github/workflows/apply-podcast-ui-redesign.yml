@@ -6,6 +6,9 @@ on:
       - agent/gemini-podcast-studio
     paths:
       - .github/workflows/apply-podcast-ui-redesign.yml
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -14,8 +17,10 @@ jobs:
   apply-redesign:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
+      - name: Check out podcast branch
         uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-studio
 
       - name: Restore redesigned application
         shell: bash
@@ -69,10 +74,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .github/podcast-ui-payload
+          rm -rf .github/podcast-ui-payload .podcast-build
           rm -f .github/workflows/apply-podcast-ui-redesign.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
           git commit -m "Redesign podcast studio workspace"
-          git push
+          git push origin HEAD:agent/gemini-podcast-studio
