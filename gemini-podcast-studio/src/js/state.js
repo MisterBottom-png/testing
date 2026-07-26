@@ -1,4 +1,5 @@
 const appState = {
+  schemaVersion: PODCAST_PROJECT_SCHEMA_VERSION,
   currentStage: 'create',
   scriptView: 'editor',
   busy: false,
@@ -12,16 +13,15 @@ const appState = {
     topic: '', durationMinutes: 5, language: 'English', customLanguage: '',
     format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: ''
   },
-  characters: [
-    { id: 'speaker-a', ...CHARACTER_TEMPLATES[0], voice: 'Aoede' },
-    { id: 'speaker-b', ...CHARACTER_TEMPLATES[1], voice: 'Charon' }
-  ],
+  speakers: createDefaultPodcastSpeakers(),
   expandedSpeakers: new Set(),
   script: null,
   originalScript: null,
   history: [],
   historyIndex: -1,
   audio: { blob: null, url: '', sampleRate: 24000, generationSeconds: 0, durationSeconds: 0, createdAt: null },
+  audioCacheReferences: {},
+  lastModified: '',
   settings: { theme: 'light', maxTtsCharacters: DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
 };
 
