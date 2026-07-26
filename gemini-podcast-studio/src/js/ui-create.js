@@ -46,38 +46,146 @@ function updateTargetSummary() {
   els.createActionHint.textContent = `Approx. ${target.toLocaleString('en-GB')} words · ${duration}`;
 }
 
+function formatVoiceTypeLabel(type) {
+  const normalised = normaliseWhitespace(type);
+  return normalised ? `${normalised.charAt(0).toUpperCase()}${normalised.slice(1)}` : '';
+}
+function getSpeakerVoiceTypes(speaker) {
+  return speaker?.gender ? getAvailableVoiceTypes(speaker.gender) : [];
+}
+function getSpeakerVoiceChoices(speaker) {
+  if (!speaker?.gender || !speaker?.voiceType) return [];
+  return getGeminiTtsVoices({ gender: speaker.gender, type: speaker.voiceType });
+}
+function updateSpeakerField(speaker, field, value) {
+  if (!speaker || typeof speaker !== 'object') return speaker;
+  const nextValue = String(value ?? '');
+
+  if (field === 'speakerName') speaker.speakerName = nextValue.slice(0, 40);
+  if (field === 'personality') speaker.personality = nextValue;
+  if (field === 'deliveryInstructions') speaker.deliveryInstructions = nextValue;
+
+  if (field === 'gender') {
+    speaker.gender = GEMINI_TTS_VOICE_GENDERS.includes(nextValue) ? nextValue : '';
+    const availableTypes = getSpeakerVoiceTypes(speaker);
+    if (!availableTypes.includes(speaker.voiceType)) speaker.voiceType = '';
+    const selectedVoice = getGeminiTtsVoice(speaker.geminiVoiceName);
+    if (!selectedVoice || selectedVoice.gender !== speaker.gender || (speaker.voiceType && selectedVoice.type !== speaker.voiceType)) {
+      speaker.geminiVoiceName = '';
+      delete speaker.voiceUnavailable;
+    }
+  }
+
+  if (field === 'voiceType') {
+    const availableTypes = getSpeakerVoiceTypes(speaker);
+    speaker.voiceType = availableTypes.includes(nextValue) ? nextValue : '';
+    const selectedVoice = getGeminiTtsVoice(speaker.geminiVoiceName);
+    if (!selectedVoice || selectedVoice.gender !== speaker.gender || selectedVoice.type !== speaker.voiceType) {
+      speaker.geminiVoiceName = '';
+      delete speaker.voiceUnavailable;
+    }
+  }
+
+  if (field === 'geminiVoiceName') {
+    const selectedVoice = getGeminiTtsVoice(nextValue);
+    const matchesFilters = selectedVoice && selectedVoice.gender === speaker.gender && selectedVoice.type === speaker.voiceType;
+    if (!nextValue) {
+      speaker.geminiVoiceName = '';
+      delete speaker.voiceUnavailable;
+    } else if (!selectedVoice) {
+      speaker.geminiVoiceName = nextValue;
+      speaker.voiceUnavailable = true;
+    } else if (matchesFilters) {
+      speaker.geminiVoiceName = nextValue;
+      delete speaker.voiceUnavailable;
+    } else {
+      speaker.geminiVoiceName = '';
+      delete speaker.voiceUnavailable;
+    }
+  }
+
+  return speaker;
+}
 function renderSpeakerCards() {
   els.speakerList.innerHTML = appState.speakers.map((speaker, index) => {
-    const expanded = appState.expandedSpeakers.has(index);
-    const selectedVoice = speaker.geminiVoiceName || '';
-    const unavailableOption = selectedVoice && !getGeminiTtsVoice(selectedVoice)
-      ? `<option value="${escapeHtml(selectedVoice)}" selected>${escapeHtml(selectedVoice)} — unavailable</option>`
+    const positionLabel = `Host ${index + 1}`;
+    const selectedVoiceName = speaker.geminiVoiceName || '';
+    const selectedVoice = getGeminiTtsVoice(selectedVoiceName);
+    const availableTypes = getSpeakerVoiceTypes(speaker);
+    const availableVoices = getSpeakerVoiceChoices(speaker);
+    const voiceTypeDisabled = !speaker.gender;
+    const voiceDisabled = voiceTypeDisabled || !speaker.voiceType;
+    const selectedVoiceAvailable = selectedVoice && selectedVoice.gender === speaker.gender && selectedVoice.type === speaker.voiceType;
+    const previewDisabled = !selectedVoiceAvailable;
+    const voiceTypePlaceholder = voiceTypeDisabled ? 'Select gender first' : 'Select a voice type';
+    const voicePlaceholder = !speaker.gender ? 'Select gender first' : !speaker.voiceType ? 'Select voice type first' : 'Select a Gemini voice';
+    const unavailableOption = selectedVoiceName && !selectedVoiceAvailable
+      ? `<option value="${escapeHtml(selectedVoiceName)}" selected>${escapeHtml(selectedVoiceName)} · Unavailable voice</option>`
       : '';
-    const options = unavailableOption + getGeminiTtsVoices().map(({ apiName, description }) => `<option value="${apiName}"${selectedVoice === apiName ? ' selected' : ''}>${apiName} — ${description}</option>`).join('');
-    return `<article class="speaker-card${expanded ? ' expanded' : ''}" data-speaker-index="${index}">
+    const voiceTypeOptions = availableTypes.map(type => `<option value="${escapeHtml(type)}"${speaker.voiceType === type ? ' selected' : ''}>${escapeHtml(formatVoiceTypeLabel(type))}</option>`).join('');
+    const voiceOptions = unavailableOption + availableVoices.map(({ apiName, description }) => `<option value="${apiName}"${selectedVoiceName === apiName ? ' selected' : ''}>${apiName} · ${description}</option>`).join('');
+    const voiceTypeHelp = voiceTypeDisabled
+      ? 'Select a gender to choose a voice type.'
+      : speaker.voiceType
+        ? `Selected type: ${formatVoiceTypeLabel(speaker.voiceType)}.`
+        : 'Select a voice type.';
+    const voiceHelp = selectedVoiceAvailable
+      ? `${selectedVoice.apiName} · ${selectedVoice.description}`
+      : selectedVoiceName
+        ? `${selectedVoiceName} is unavailable. Select a gender and voice type to choose another voice.`
+        : voiceDisabled
+          ? 'Select gender and voice type first.'
+          : 'Select a Gemini voice.';
+
+    return `<article class="speaker-card speaker-config-card expanded" data-speaker-index="${index}" aria-labelledby="speakerCardTitle${index}">
       <div class="speaker-card-head">
-        <span class="speaker-id">${index === 0 ? 'A' : 'B'}</span>
+        <span class="speaker-id" aria-hidden="true">${index === 0 ? 'A' : 'B'}</span>
         <div class="speaker-copy">
-          <div class="speaker-name-line"><h3>${escapeHtml(speaker.speakerName || `Host ${index + 1}`)}</h3><span class="voice-label">${escapeHtml(selectedVoice || 'No voice selected')}</span></div>
-          <p class="speaker-description">${escapeHtml(speaker.role || 'Podcast participant')} · ${escapeHtml(speaker.personality || 'Natural and engaging')}</p>
-        </div>
-        <div class="speaker-actions">
-          <button class="ghost-button compact-button" type="button" data-speaker-action="voice-test">Test voice</button>
-          <button class="secondary-button compact-button" type="button" data-speaker-action="toggle" aria-expanded="${expanded}">${expanded ? 'Done' : 'Edit'}</button>
-          <details class="menu icon-menu">
-            <summary class="menu-summary" aria-label="More speaker actions">${ICONS.more}</summary>
-            <div class="menu-popover"><button class="menu-item" type="button" data-speaker-action="randomise">Randomise</button><button class="menu-item" type="button" data-speaker-action="reset">Reset</button></div>
-          </details>
+          <h3 id="speakerCardTitle${index}">${positionLabel}</h3>
+          <p class="speaker-description">Configure the podcast character and Gemini TTS voice independently.</p>
         </div>
       </div>
-      <div class="speaker-editor${expanded ? '' : ' hidden'}">
+      <div class="speaker-editor">
         <div class="field-grid">
-          <div class="field"><label for="speakerName${index}">Name</label><input id="speakerName${index}" data-speaker-field="speakerName" value="${escapeHtml(speaker.speakerName)}" maxlength="40" /></div>
-          <div class="field"><label for="speakerRole${index}">Role</label><input id="speakerRole${index}" data-speaker-field="role" value="${escapeHtml(speaker.role || '')}" placeholder="Host, scientist, journalist…" /></div>
-          <div class="field"><label for="speakerVoice${index}">Gemini voice</label><select id="speakerVoice${index}" data-speaker-field="geminiVoiceName"><option value="">Select a Gemini voice</option>${options}</select><p class="voice-description">${selectedVoice ? `${escapeHtml(selectedVoice)} · ${escapeHtml(voiceDescription(selectedVoice) || 'Unavailable voice')}` : 'No Gemini voice selected'}</p></div>
-          <div class="field"><label for="speakerAccent${index}">Accent or language note</label><input id="speakerAccent${index}" data-speaker-field="accent" value="${escapeHtml(speaker.accent || '')}" placeholder="Optional pronunciation note" /></div>
-          <div class="field full"><label for="speakerPersonality${index}">Personality</label><textarea id="speakerPersonality${index}" data-speaker-field="personality">${escapeHtml(speaker.personality)}</textarea></div>
-          <div class="field full"><label for="speakerDirection${index}">Performance direction</label><textarea id="speakerDirection${index}" data-speaker-field="deliveryInstructions">${escapeHtml(speaker.deliveryInstructions)}</textarea></div>
+          <div class="field full">
+            <label for="speakerName${index}">Speaker name</label>
+            <input id="speakerName${index}" type="text" data-speaker-field="speakerName" value="${escapeHtml(speaker.speakerName)}" maxlength="40" placeholder="For example, James" />
+          </div>
+          <fieldset class="field full speaker-gender-field">
+            <legend>Gender</legend>
+            <div class="choice-group speaker-gender-options">
+              <input class="choice-input" id="speakerGenderMale${index}" type="radio" name="speakerGender${index}" value="male" data-speaker-field="gender"${speaker.gender === 'male' ? ' checked' : ''} />
+              <label class="chip-label" for="speakerGenderMale${index}">Male</label>
+              <input class="choice-input" id="speakerGenderFemale${index}" type="radio" name="speakerGender${index}" value="female" data-speaker-field="gender"${speaker.gender === 'female' ? ' checked' : ''} />
+              <label class="chip-label" for="speakerGenderFemale${index}">Female</label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="speakerVoiceType${index}">Voice type</label>
+            <select id="speakerVoiceType${index}" data-speaker-field="voiceType" aria-describedby="speakerVoiceTypeHelp${index}"${voiceTypeDisabled ? ' disabled' : ''}>
+              <option value="">${voiceTypePlaceholder}</option>${voiceTypeOptions}
+            </select>
+            <p id="speakerVoiceTypeHelp${index}" class="voice-description">${escapeHtml(voiceTypeHelp)}</p>
+          </div>
+          <div class="field">
+            <label for="speakerVoice${index}">Gemini voice</label>
+            <select id="speakerVoice${index}" data-speaker-field="geminiVoiceName" aria-describedby="speakerVoiceHelp${index}"${voiceDisabled ? ' disabled' : ''}>
+              <option value="">${voicePlaceholder}</option>${voiceOptions}
+            </select>
+            <p id="speakerVoiceHelp${index}" class="voice-description">${escapeHtml(voiceHelp)}</p>
+          </div>
+          <div class="field full speaker-preview-row">
+            <button id="speakerPreview${index}" class="secondary-button" type="button"${previewDisabled ? ' disabled' : ''}>Preview voice</button>
+            <p class="field-help">Audio preview will be added in a later step.</p>
+          </div>
+          <div class="field full">
+            <label for="speakerPersonality${index}">Personality</label>
+            <textarea id="speakerPersonality${index}" data-speaker-field="personality" placeholder="Calm, curious and analytical">${escapeHtml(speaker.personality)}</textarea>
+          </div>
+          <div class="field full">
+            <label for="speakerDelivery${index}">Delivery instructions</label>
+            <textarea id="speakerDelivery${index}" data-speaker-field="deliveryInstructions" placeholder="Natural pace, conversational">${escapeHtml(speaker.deliveryInstructions)}</textarea>
+          </div>
         </div>
       </div>
     </article>`;
@@ -85,25 +193,6 @@ function renderSpeakerCards() {
 }
 function resetSpeaker(index) {
   appState.speakers[index] = { ...createDefaultPodcastSpeakers()[index] };
-  renderSpeakerCards(); queueSave();
-}
-function randomiseSpeaker(index) {
-  const other = appState.speakers[index ? 0 : 1];
-  const templates = CHARACTER_TEMPLATES.filter(template => template.speakerName !== other.speakerName);
-  const template = templates[Math.floor(Math.random() * templates.length)];
-  const voices = getGeminiTtsVoices().filter(({ apiName }) => apiName !== other.geminiVoiceName);
-  const voice = voices[Math.floor(Math.random() * voices.length)] || null;
-  appState.speakers[index] = {
-    id: `host-${index + 1}`,
-    speakerName: template.speakerName,
-    gender: voice?.gender || '',
-    voiceType: voice?.type || '',
-    geminiVoiceName: voice?.apiName || '',
-    personality: template.personality,
-    deliveryInstructions: template.deliveryInstructions,
-    role: template.role,
-    accent: template.accent
-  };
   renderSpeakerCards(); queueSave();
 }
 
