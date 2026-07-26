@@ -19,10 +19,11 @@ async function generatePodcastAudio() {
   if (!appState.script?.segments?.length) return;
   const transcript = buildTtsTranscript();
   if (transcript.length > appState.settings.maxTtsCharacters) return showServiceError({ title: 'Script is too long', message: `The TTS transcript contains ${transcript.length.toLocaleString('en-GB')} characters.`, suggestion: 'Shorten the script or increase the threshold in settings.', details: '', retry: null });
+  if (appState.speakers.some(speaker => !getGeminiTtsVoice(speaker.geminiVoiceName))) return showServiceError({ title: 'Voice selection required', message: 'One or more saved Gemini voices are unavailable.', suggestion: 'Select an available Gemini voice for both speakers.', details: '', retry: null });
   hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
   const startedAt = performance.now();
-  const requestBody = { contents: [{ role: 'user', parts: [{ text: transcript }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: appState.characters.map(character => ({ speaker: character.name, voiceConfig: { prebuiltVoiceConfig: { voiceName: character.voice } } })) } } } };
+  const requestBody = { contents: [{ role: 'user', parts: [{ text: transcript }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: appState.speakers.map(speaker => ({ speaker: speaker.speakerName, voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker.geminiVoiceName } } })) } } } };
   try {
     const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify(requestBody) });
     const raw = await response.text(); let data;
@@ -38,13 +39,14 @@ async function generatePodcastAudio() {
   } finally { setBusy(false); }
 }
 async function generateVoiceTest(index) {
-  const character = appState.characters[index];
+  const speaker = appState.speakers[index];
   if (!appState.connection.apiKey.trim()) return showServiceError({ title: 'API key required', message: 'Add a Gemini API key before generating a voice test.', suggestion: 'Open connection settings.', details: '', retry: null });
+  if (!getGeminiTtsVoice(speaker.geminiVoiceName)) return showServiceError({ title: 'Voice selection required', message: 'This saved Gemini voice is unavailable.', suggestion: 'Select an available Gemini voice.', details: '', retry: null });
   hideServiceError(); setBusy(true, 'voice', AUDIO_PROGRESS_MESSAGES);
-  const prompt = `${character.direction || 'Speak naturally and clearly.'}\n${character.accent || ''}\nRead exactly: Hello, I am ${character.name}. This is a short voice preview for the podcast.`;
+  const prompt = `${speaker.deliveryInstructions || 'Speak naturally and clearly.'}\n${speaker.accent || ''}\nRead exactly: Hello, I am ${speaker.speakerName}. This is a short voice preview for the podcast.`;
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: character.voice } } } } }) });
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker.geminiVoiceName } } } } }) });
     const data = await response.json();
     if (!response.ok) throw createApiError(response.status, data?.error?.message || 'Voice test failed.', JSON.stringify(data, null, 2));
     const part = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData?.data);
@@ -60,7 +62,7 @@ function renderAudioStage() {
   els.audioContent.innerHTML = `<article class="audio-card">
     <div class="audio-header"><div><p class="eyebrow">Generated episode</p><h2 id="audioStageTitle" tabindex="-1">${escapeHtml(appState.script?.title || 'Podcast')}</h2><p>${escapeHtml(appState.script?.summary || '')}</p></div></div>
     <div class="waveform-wrap"><canvas id="waveformCanvas" aria-label="Waveform for generated episode"></canvas><audio id="audioPlayer" controls preload="metadata" src="${escapeHtml(appState.audio.url)}"></audio></div>
-    <div class="voice-chips">${appState.characters.map((character, index) => `<span class="voice-chip"><b>${index ? 'B' : 'A'}</b>${escapeHtml(character.name)} · ${escapeHtml(character.voice)}</span>`).join('')}</div>
+    <div class="voice-chips">${appState.speakers.map((speaker, index) => `<span class="voice-chip"><b>${index ? 'B' : 'A'}</b>${escapeHtml(speaker.speakerName)} · ${escapeHtml(speaker.geminiVoiceName)}</span>`).join('')}</div>
     <div class="audio-meta">
       <div class="metric"><strong>${formatDuration(appState.audio.durationSeconds)}</strong><span>duration</span></div>
       <div class="metric"><strong>${formatBytes(appState.audio.blob.size)}</strong><span>file size</span></div>
