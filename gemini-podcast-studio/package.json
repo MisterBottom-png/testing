@@ -1,0 +1,16 @@
+{
+  "name": "gemini-podcast-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite src --host 0.0.0.0",
+    "build": "node scripts/build-single-file.mjs",
+    "verify": "node scripts/verify-single-file.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run build && npm run verify && npm test"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}

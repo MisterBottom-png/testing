@@ -1,0 +1,1631 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="Create, edit, voice and download a two-speaker podcast with Gemini." />
+  <title>Gemini Podcast Studio</title>
+  <style>
+@layer reset, tokens, base, layout, components, utilities, responsive;
+
+@layer reset {
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body, h1, h2, h3, p { margin: 0; }
+      button, input, select, textarea { font: inherit; }
+      button { color: inherit; }
+      fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+      summary { list-style: none; }
+      summary::-webkit-details-marker { display: none; }
+    }
+
+@layer tokens {
+      :root {
+        --bg: #f7f5fa;
+        --surface: #ffffff;
+        --surface-subtle: #f1edf7;
+        --surface-tint: #eee8ff;
+        --surface-glass: rgba(255, 255, 255, 0.88);
+        --primary: #6550c8;
+        --primary-hover: #5842bb;
+        --secondary: #3f7479;
+        --text: #211d27;
+        --text-muted: #625c68;
+        --outline: rgba(40, 32, 55, 0.14);
+        --outline-strong: rgba(40, 32, 55, 0.28);
+        --success: #287a50;
+        --success-bg: #e2f4e9;
+        --danger: #b3261e;
+        --danger-bg: #ffebe8;
+        --warning: #7b5200;
+        --warning-bg: #fff3d3;
+        --speaker-a: #6550c8;
+        --speaker-a-bg: #eee8ff;
+        --speaker-b: #2f7379;
+        --speaker-b-bg: #e0f0f1;
+        --radius-xl: 22px;
+        --radius-lg: 16px;
+        --radius-md: 12px;
+        --radius-sm: 9px;
+        --shadow-1: 0 1px 2px rgba(34, 25, 50, 0.06);
+        --shadow-2: 0 10px 30px rgba(34, 25, 50, 0.09);
+        --focus: 0 0 0 3px color-mix(in srgb, var(--primary) 34%, transparent);
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 20px;
+        --space-6: 24px;
+        --space-8: 32px;
+        --space-12: 48px;
+      }
+
+      html[data-theme="dark"] {
+        --bg: #15121b;
+        --surface: #211d29;
+        --surface-subtle: #2b2634;
+        --surface-tint: #382d5b;
+        --surface-glass: rgba(33, 29, 41, 0.9);
+        --primary: #cdbdff;
+        --primary-hover: #ded4ff;
+        --secondary: #a9ced1;
+        --text: #eee8f1;
+        --text-muted: #c8c0cb;
+        --outline: rgba(235, 226, 240, 0.15);
+        --outline-strong: rgba(235, 226, 240, 0.3);
+        --success: #7bd7a6;
+        --success-bg: rgba(40, 122, 80, 0.24);
+        --danger: #ffb4ab;
+        --danger-bg: rgba(179, 38, 30, 0.22);
+        --warning: #ffd180;
+        --warning-bg: rgba(139, 93, 0, 0.25);
+        --speaker-a: #cdbdff;
+        --speaker-a-bg: #382d5b;
+        --speaker-b: #a9ced1;
+        --speaker-b-bg: #263f43;
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2);
+        --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.28);
+      }
+    }
+  </style>
+  <style>
+@layer base {
+      body {
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 28rem),
+          var(--bg);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+        box-shadow: var(--focus);
+      }
+
+      h1, h2, h3 { letter-spacing: -0.025em; line-height: 1.15; }
+      h1 { font-size: 1.35rem; }
+      h2 { font-size: clamp(1.55rem, 3vw, 2rem); }
+      h3 { font-size: 1.05rem; }
+      p { max-width: 72ch; }
+      button { cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: 0.5; }
+      input, select, textarea {
+        width: 100%;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--outline);
+        border-radius: var(--radius-md);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      }
+      input, select { min-height: 46px; padding: 0 13px; }
+      textarea { min-height: 112px; padding: 12px 13px; resize: vertical; line-height: 1.55; }
+      input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: var(--focus); }
+      [aria-invalid="true"] { border-color: var(--danger) !important; }
+    }
+  </style>
+  <style>
+@layer layout {
+      .app-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 16px 0 72px; }
+      .app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        min-height: 68px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        margin: 0 -8px;
+        padding: 10px 8px;
+        background: color-mix(in srgb, var(--bg) 84%, transparent);
+        backdrop-filter: blur(16px);
+      }
+      .brand, .app-actions, .status-group, .speaker-summary, .button-row, .metric-row, .audio-actions { display: flex; align-items: center; }
+      .brand { min-width: 0; gap: 11px; }
+      .brand-copy { min-width: 0; }
+      .brand-copy p { color: var(--text-muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .brand-mark { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; color: #fff; background: #6550c8; box-shadow: var(--shadow-1); }
+      html[data-theme="dark"] .brand-mark { color: #211d27; background: #cdbdff; }
+      .app-actions { justify-content: flex-end; gap: 8px; }
+      .status-group { gap: 8px; }
+
+      .stepper-shell { margin: 2px 0 14px; }
+      .stepper { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; list-style: none; }
+      .step-item { position: relative; min-width: 0; }
+      .step-item:not(:last-child)::after { content: ""; position: absolute; z-index: 0; top: 22px; left: calc(50% + 38px); right: calc(-50% + 38px); height: 1px; background: var(--outline-strong); }
+      .step-button { position: relative; z-index: 1; width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: 999px; color: var(--text-muted); background: transparent; font-weight: 700; }
+      .step-button[aria-current="step"] { color: var(--text); background: var(--surface-tint); }
+      .step-button.completed { color: var(--primary); }
+      .step-number { width: 26px; height: 26px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--outline); border-radius: 50%; background: var(--surface); font-size: 0.75rem; }
+      .step-button[aria-current="step"] .step-number, .step-button.completed .step-number { border-color: transparent; color: #fff; background: #6550c8; }
+      html[data-theme="dark"] .step-button[aria-current="step"] .step-number,
+      html[data-theme="dark"] .step-button.completed .step-number { color: #211d27; background: #cdbdff; }
+
+      .workspace { overflow: visible; border: 1px solid var(--outline); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-2); }
+      .stage { display: none; }
+      .stage.active { display: block; }
+      .stage-inner { padding: clamp(18px, 3vw, 32px); }
+      .stage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-6); }
+      .stage-heading p { margin-top: 7px; color: var(--text-muted); }
+      .create-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr); gap: var(--space-6); align-items: start; }
+      .brief-column, .speaker-column { min-width: 0; }
+      .section-stack { display: grid; gap: var(--space-6); }
+      .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+      .field-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .field.full { grid-column: 1 / -1; }
+      .field { min-width: 0; }
+      .action-dock {
+        position: sticky;
+        bottom: 10px;
+        z-index: 12;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        margin: var(--space-6) calc(-1 * clamp(18px, 3vw, 32px)) calc(-1 * clamp(18px, 3vw, 32px));
+        padding: 14px clamp(18px, 3vw, 32px) calc(14px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--outline);
+        border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+        background: var(--surface-glass);
+        backdrop-filter: blur(16px);
+        box-shadow: 0 -8px 24px rgba(34, 25, 50, 0.05);
+      }
+      .action-dock-copy { min-width: 0; }
+      .action-dock-copy strong { display: block; }
+      .action-dock-copy span { color: var(--text-muted); font-size: 0.82rem; }
+
+      .script-layout { display: grid; grid-template-columns: minmax(0, 2.25fr) minmax(260px, 0.75fr); gap: var(--space-6); align-items: start; }
+      .script-main { min-width: 0; }
+      .episode-panel { position: sticky; top: 92px; display: grid; gap: 16px; padding: 18px; border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface-subtle); }
+      .audio-layout { max-width: 920px; margin: 0 auto; }
+
+      footer { margin: 16px 4px 0; color: var(--text-muted); font-size: 0.76rem; }
+    }
+  </style>
+  <style>
+@layer components {
+      .icon { width: 19px; height: 19px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-button, .primary-button, .secondary-button, .ghost-button, .danger-button, .chip-label, .menu-summary, .menu-item, .tab-button, .segment-speaker, .drag-handle {
+        min-height: 44px;
+        border: 1px solid var(--outline);
+        border-radius: var(--radius-md);
+        transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, opacity 140ms ease;
+      }
+      .icon-button { width: 44px; display: inline-grid; place-items: center; padding: 0; background: var(--surface); }
+      .icon-button:hover, .secondary-button:hover, .ghost-button:hover, .menu-summary:hover, .menu-item:hover, .tab-button:hover { background: var(--surface-subtle); }
+      .primary-button, .secondary-button, .ghost-button, .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; font-weight: 750; }
+      .primary-button { border-color: transparent; color: #fff; background: #6550c8; }
+      .primary-button:hover:not(:disabled) { background: #5842bb; transform: translateY(-1px); }
+      html[data-theme="dark"] .primary-button { color: #211d27; background: #cdbdff; }
+      html[data-theme="dark"] .primary-button:hover:not(:disabled) { background: #ded4ff; }
+      .secondary-button, .ghost-button { background: transparent; }
+      .ghost-button { border-color: transparent; }
+      .danger-button { color: var(--danger); background: transparent; }
+      .compact-button { min-height: 40px; padding-inline: 12px; font-size: 0.82rem; }
+      .connection-chip { max-width: 290px; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--outline); border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 0.78rem; }
+      .connection-chip strong { color: var(--text); }
+      .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+      .connection-chip.connected .connection-dot { background: var(--success); }
+      .save-state { color: var(--text-muted); font-size: 0.78rem; white-space: nowrap; }
+
+      .section-card { padding: 20px; border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface); }
+      .section-card.subtle { background: var(--surface-subtle); }
+      .section-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+      .section-title-row p { margin-top: 4px; color: var(--text-muted); font-size: 0.84rem; }
+      .eyebrow { color: var(--primary); font-size: 0.73rem; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
+      .hint, .field-help { color: var(--text-muted); font-size: 0.82rem; }
+      .field-help { margin-top: 6px; }
+      label, legend, .field-label { display: block; margin-bottom: 7px; font-size: 0.84rem; font-weight: 750; }
+      .topic-input { min-height: 164px; font-size: 1.02rem; }
+      .key-wrap { position: relative; }
+      .key-wrap input { padding-right: 78px; }
+      .key-toggle { position: absolute; top: 7px; right: 7px; min-height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); color: var(--primary); background: var(--surface-tint); font-size: 0.78rem; font-weight: 750; }
+      .check-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; color: var(--text-muted); font-size: 0.8rem; }
+      .check-row input { width: 20px; min-height: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; accent-color: var(--primary); }
+      .disclosure { border: 1px solid var(--outline); border-radius: var(--radius-md); background: var(--surface); }
+      .disclosure > summary { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; cursor: pointer; font-weight: 750; }
+      .disclosure > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 180ms ease; }
+      .disclosure[open] > summary::after { transform: rotate(225deg) translate(-1px, -1px); }
+      .disclosure-content { padding: 0 14px 14px; }
+
+      .choice-group { display: flex; flex-wrap: wrap; gap: 8px; }
+      .choice-input { position: absolute; opacity: 0; pointer-events: none; }
+      .chip-label { display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; background: transparent; font-size: 0.8rem; font-weight: 750; cursor: pointer; }
+      .choice-input:checked + .chip-label { border-color: transparent; color: #fff; background: #6550c8; }
+      html[data-theme="dark"] .choice-input:checked + .chip-label { color: #211d27; background: #cdbdff; }
+      .choice-input:focus-visible + .chip-label { outline: 2px solid var(--primary); outline-offset: 2px; box-shadow: var(--focus); }
+      .target-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; color: var(--text-muted); font-size: 0.82rem; }
+      .target-summary strong { color: var(--text); }
+
+      .speaker-list { display: grid; gap: 12px; }
+      .speaker-card { position: relative; overflow: visible; border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface); }
+      .speaker-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: var(--radius-lg) 0 0 var(--radius-lg); background: var(--speaker-a); }
+      .speaker-card[data-speaker-index="1"]::before { background: var(--speaker-b); }
+      .speaker-card[aria-busy="true"] { opacity: 0.74; }
+      .speaker-card-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 15px 14px 15px 17px; }
+      .speaker-id { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: var(--speaker-a); background: var(--speaker-a-bg); font-weight: 850; }
+      .speaker-card[data-speaker-index="1"] .speaker-id { color: var(--speaker-b); background: var(--speaker-b-bg); }
+      .speaker-copy { min-width: 0; }
+      .speaker-name-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+      .speaker-name-line strong { overflow: hidden; text-overflow: ellipsis; }
+      .voice-label { color: var(--text-muted); font-size: 0.78rem; }
+      .speaker-description { margin-top: 3px; color: var(--text-muted); font-size: 0.82rem; overflow-wrap: anywhere; }
+      .speaker-actions { display: flex; gap: 6px; }
+      .speaker-editor { display: none; padding: 0 14px 16px 17px; }
+      .speaker-card.expanded .speaker-editor { display: block; }
+      .speaker-card.expanded .speaker-card-head { border-bottom: 1px solid var(--outline); margin-bottom: 16px; }
+      .voice-description { min-height: 20px; margin-top: 6px; color: var(--text-muted); font-size: 0.78rem; }
+
+      .menu { position: relative; }
+      .menu-summary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; background: var(--surface); cursor: pointer; font-weight: 750; }
+      .menu.icon-menu .menu-summary { width: 44px; padding: 0; }
+      .menu-popover { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; min-width: 210px; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--outline); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-2); }
+      .menu:not([open]) .menu-popover { display: none; }
+      .menu-item { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 11px; border-color: transparent; background: transparent; text-align: left; font-size: 0.84rem; }
+      .menu-item.danger { color: var(--danger); }
+
+      .error-summary { margin-bottom: 18px; padding: 16px; border: 1px solid color-mix(in srgb, var(--danger) 48%, transparent); border-radius: var(--radius-md); color: var(--danger); background: var(--danger-bg); }
+      .error-summary h3 { margin-bottom: 8px; }
+      .error-summary ul { margin: 0; padding-left: 20px; }
+      .error-summary a { color: inherit; font-weight: 700; }
+      .field-error { margin-top: 6px; color: var(--danger); font-size: 0.8rem; font-weight: 650; }
+      .service-error { display: none; margin-top: 16px; padding: 18px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: var(--radius-lg); color: var(--danger); background: var(--danger-bg); }
+      .service-error.visible { display: block; }
+      .service-error p { margin-top: 7px; }
+      .service-error details { margin-top: 12px; }
+      .service-error pre { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+
+      .inline-status { display: none; padding: 14px; border: 1px solid var(--outline); border-radius: var(--radius-md); background: var(--surface-tint); }
+      .inline-status.visible { display: block; }
+      .inline-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .inline-status strong { display: block; }
+      .inline-status p { margin-top: 3px; color: var(--text-muted); font-size: 0.82rem; }
+      .elapsed { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+      .indeterminate { position: relative; height: 4px; margin-top: 11px; overflow: hidden; border-radius: 999px; background: var(--outline); }
+      .indeterminate::before { content: ""; position: absolute; inset: 0 auto 0 -35%; width: 35%; border-radius: inherit; background: var(--primary); animation: progress-slide 1.2s ease-in-out infinite; }
+      @keyframes progress-slide { to { transform: translateX(390%); } }
+      .spinner { width: 17px; height: 17px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .episode-title { margin-bottom: 4px; font-size: clamp(1.5rem, 3vw, 2rem); }
+      .episode-summary { color: var(--text-muted); }
+      .tablist { display: inline-flex; gap: 4px; margin-top: 18px; padding: 4px; border-radius: var(--radius-md); background: var(--surface-subtle); }
+      .tab-button { padding: 0 13px; border-color: transparent; background: transparent; font-size: 0.8rem; font-weight: 750; }
+      .tab-button[aria-selected="true"] { background: var(--surface); box-shadow: var(--shadow-1); }
+      .script-content { margin-top: 16px; }
+      .segment-list { display: grid; gap: 12px; }
+      .segment-card { border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface); }
+      .segment-card:focus-within { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+      .segment-card.dragging { opacity: 0.5; }
+      .segment-card.drag-over { border-color: var(--primary); }
+      .segment-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 10px 8px; }
+      .drag-handle { width: 44px; display: grid; place-items: center; padding: 0; border-color: transparent; color: var(--text-muted); background: transparent; cursor: grab; }
+      .drag-handle:active { cursor: grabbing; }
+      .segment-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+      .segment-speaker { min-height: 36px; padding: 0 10px; color: var(--speaker-a); border-color: transparent; border-radius: 999px; background: var(--speaker-a-bg); font-size: 0.78rem; font-weight: 800; }
+      .segment-card[data-speaker-index="1"] .segment-speaker { color: var(--speaker-b); background: var(--speaker-b-bg); }
+      .performance-input { min-height: 36px; width: min(190px, 100%); padding: 0 10px; border-radius: 999px; font-size: 0.78rem; }
+      .segment-body { padding: 0 12px 12px; }
+      .segment-body textarea { min-height: 92px; overflow-y: hidden; resize: none; }
+      .preview-block { padding: 18px; border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface-subtle); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.72; }
+      .metric-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .metric { padding: 11px; border: 1px solid var(--outline); border-radius: var(--radius-md); background: var(--surface); }
+      .metric strong, .metric span { display: block; }
+      .metric span { margin-top: 2px; color: var(--text-muted); font-size: 0.72rem; }
+      .validation-status { display: flex; align-items: center; gap: 8px; color: var(--success); font-size: 0.82rem; }
+      .validation-status.warning { color: var(--warning); }
+      .episode-panel .primary-button { width: 100%; }
+      .button-row { flex-wrap: wrap; gap: 8px; }
+
+      .audio-card { padding: clamp(18px, 4vw, 32px); border: 1px solid var(--outline); border-radius: var(--radius-xl); background: var(--surface-subtle); }
+      .audio-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+      .audio-header h2 { margin-top: 5px; }
+      .audio-header p { margin-top: 7px; color: var(--text-muted); }
+      .waveform-wrap { margin-top: 24px; padding: 12px; border: 1px solid var(--outline); border-radius: var(--radius-lg); background: var(--surface); }
+      #waveformCanvas { display: block; width: 100%; height: 120px; }
+      audio { width: 100%; margin-top: 14px; }
+      .voice-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+      .voice-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 11px; border: 1px solid var(--outline); border-radius: 999px; background: var(--surface); font-size: 0.8rem; }
+      .voice-chip b { color: var(--primary); }
+      .audio-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }
+      .audio-actions { flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+
+      dialog { width: min(680px, calc(100% - 24px)); max-height: min(88vh, 860px); overflow: auto; padding: 0; border: 1px solid var(--outline); border-radius: var(--radius-xl); color: var(--text); background: var(--surface); box-shadow: var(--shadow-2); }
+      dialog::backdrop { background: rgba(10, 8, 14, 0.54); backdrop-filter: blur(4px); }
+      .dialog-content { padding: 22px; }
+      .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+      .dialog-header p { margin-top: 5px; color: var(--text-muted); }
+      .dialog-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 22px; }
+      .dialog-actions-right { display: flex; gap: 8px; }
+    }
+  </style>
+  <style>
+@layer utilities {
+      .hidden { display: none !important; }
+      .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+      .warning-text { color: var(--warning); }
+      .success-text { color: var(--success); }
+      .full-width { width: 100%; }
+      .mt-10 { margin-top: 10px; }
+      .mt-12 { margin-top: 12px; }
+      .mt-14 { margin-top: 14px; }
+      .mt-24 { margin-top: 24px; }
+      .max-w-180 { max-width: 180px; }
+    }
+
+@layer responsive {
+      @media (max-width: 920px) {
+        .create-layout, .script-layout { grid-template-columns: 1fr; }
+        .speaker-column { order: 2; }
+        .episode-panel { position: static; }
+        .metric-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .audio-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 700px) {
+        .app-shell { width: min(100% - 20px, 1180px); padding-top: 8px; }
+        .app-bar { min-height: 62px; }
+        .brand-mark { width: 34px; height: 34px; }
+        .brand-copy p, .save-state { display: none; }
+        .connection-chip { width: 40px; min-height: 40px; justify-content: center; padding: 0; }
+        .connection-chip span:not(.connection-dot) { display: none; }
+        .stepper-shell { margin-top: 2px; }
+        .step-item:not(:last-child)::after { left: calc(50% + 28px); right: calc(-50% + 28px); }
+        .step-button { gap: 5px; padding-inline: 4px; font-size: 0.74rem; }
+        .step-number { width: 24px; height: 24px; }
+        .stage-inner { padding: 18px; }
+        .stage-heading { display: block; }
+        .field-grid, .field-grid.three { grid-template-columns: 1fr; }
+        .field.full { grid-column: auto; }
+        .action-dock { align-items: stretch; flex-direction: column; margin: 22px -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); }
+        .action-dock .primary-button, .action-dock .secondary-button { width: 100%; }
+        .speaker-card-head { grid-template-columns: auto minmax(0, 1fr); }
+        .speaker-actions { grid-column: 1 / -1; justify-content: flex-end; }
+        .section-title-row { display: block; }
+        .section-title-row > button { margin-top: 12px; width: 100%; }
+        .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .tablist { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+        .tab-button { padding-inline: 5px; }
+        .segment-header { grid-template-columns: minmax(0, 1fr) auto; }
+        .drag-handle { display: none; }
+        .performance-input { width: 100%; }
+        .segment-identity { align-items: stretch; flex-direction: column; }
+        .segment-speaker { width: fit-content; }
+        .audio-header { display: block; }
+        .audio-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .audio-actions > * { flex: 1 1 100%; }
+        .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
+        .dialog-actions-right { display: grid; }
+      }
+
+      @media (max-width: 370px) {
+        .app-shell { width: min(100% - 12px, 1180px); }
+        .brand-copy h1 { font-size: 1.1rem; }
+        .app-actions { gap: 4px; }
+        .icon-button { width: 40px; min-height: 40px; }
+        .step-button { font-size: 0.68rem; }
+        .choice-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .chip-label { width: 100%; }
+        .metric-list, .audio-meta { grid-template-columns: 1fr 1fr; }
+      }
+
+      @media (forced-colors: active) {
+        .speaker-card::before { width: 6px; }
+        .choice-input:checked + .chip-label { border: 2px solid ButtonText; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+      }
+    }
+  </style>
+
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-bar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 12v3M8 8v11M12 5v14M16 8v11M20 12v3"/></svg>
+        </div>
+        <div class="brand-copy">
+          <h1>Podcast Studio</h1>
+          <p>A calm Gemini production workspace</p>
+        </div>
+      </div>
+      <div class="app-actions" aria-label="Application controls">
+        <span id="saveState" class="save-state" aria-live="polite">Ready</span>
+        <button id="connectionChip" class="connection-chip" type="button" aria-label="Open Gemini connection settings">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span><strong id="connectionLabel">Gemini not connected</strong><span id="connectionModels"></span></span>
+        </button>
+        <button id="themeButton" class="icon-button" type="button" aria-label="Switch to dark theme" title="Switch theme"></button>
+        <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings"></button>
+      </div>
+    </header>
+
+    <nav class="stepper-shell" aria-label="Podcast creation progress">
+      <ol class="stepper">
+        <li class="step-item"><button class="step-button" type="button" data-stage="create" aria-current="step"><span class="step-number">1</span><span>Create</span></button></li>
+        <li class="step-item"><button class="step-button" type="button" data-stage="script" disabled><span class="step-number">2</span><span>Script</span></button></li>
+        <li class="step-item"><button class="step-button" type="button" data-stage="audio" disabled><span class="step-number">3</span><span>Audio</span></button></li>
+      </ol>
+    </nav>
+
+    <section class="workspace">
+      <section id="createStage" class="stage active" aria-labelledby="createStageTitle">
+        <form id="createForm" class="stage-inner" novalidate>
+          <div class="stage-heading">
+            <div>
+              <p class="eyebrow">Create</p>
+              <h2 id="createStageTitle" tabindex="-1">Create your episode</h2>
+              <p>Describe the conversation, confirm the speakers, then let Gemini draft it.</p>
+            </div>
+          </div>
+
+          <div id="createErrorSummary" class="error-summary hidden" tabindex="-1" role="alert" aria-labelledby="createErrorTitle">
+            <h3 id="createErrorTitle">There are problems with the episode setup</h3>
+            <ul id="createErrorList"></ul>
+          </div>
+
+          <div id="connectionSetup" class="section-card subtle hidden" aria-labelledby="connectionSetupTitle">
+            <div class="section-title-row">
+              <div>
+                <h3 id="connectionSetupTitle">Connect Gemini</h3>
+                <p>Add an API key once. Model choices stay tucked under advanced setup where they belong.</p>
+              </div>
+            </div>
+            <div id="connectionSetupForm"></div>
+          </div>
+
+          <div class="create-layout">
+            <div class="brief-column section-stack">
+              <section class="section-card" aria-labelledby="briefTitle">
+                <div class="section-title-row">
+                  <div>
+                    <h3 id="briefTitle">Episode brief</h3>
+                    <p>Start with the question or idea the episode should explore.</p>
+                  </div>
+                </div>
+
+                <div class="field-grid">
+                  <div class="field full">
+                    <label for="topic">What should this episode be about?</label>
+                    <textarea id="topic" class="topic-input" placeholder="Could humans establish a permanent settlement on Mars?" required aria-describedby="topicHelp"></textarea>
+                    <p id="topicHelp" class="field-help">A focused question usually produces a better conversation than a broad keyword.</p>
+                  </div>
+
+                  <fieldset class="field full">
+                    <legend>Duration</legend>
+                    <div id="durationChoices" class="choice-group">
+                      <input class="choice-input" id="duration2" type="radio" name="duration" value="2" />
+                      <label class="chip-label" for="duration2">2 minutes</label>
+                      <input class="choice-input" id="duration3" type="radio" name="duration" value="3" />
+                      <label class="chip-label" for="duration3">3 minutes</label>
+                      <input class="choice-input" id="duration5" type="radio" name="duration" value="5" checked />
+                      <label class="chip-label" for="duration5">5 minutes</label>
+                      <input class="choice-input" id="duration7" type="radio" name="duration" value="7" />
+                      <label class="chip-label" for="duration7">7 minutes</label>
+                      <input class="choice-input" id="durationCustom" type="radio" name="duration" value="custom" />
+                      <label class="chip-label" for="durationCustom">Custom</label>
+                    </div>
+                    <div id="customDurationField" class="field hidden mt-10 max-w-180">
+                      <label for="customDuration">Minutes</label>
+                      <input id="customDuration" type="number" min="1" max="10" step="0.5" value="5" />
+                    </div>
+                    <div class="target-summary">
+                      <span>Target: <strong id="targetWords">approximately 700 spoken words</strong></span>
+                      <span>Estimated: <strong id="estimatedDuration">5:00</strong></span>
+                    </div>
+                  </fieldset>
+
+                  <div class="field">
+                    <label for="language">Language</label>
+                    <select id="language">
+                      <option>English</option><option>Russian</option><option>Estonian</option><option>Lithuanian</option>
+                      <option>German</option><option>French</option><option>Spanish</option><option value="custom">Custom…</option>
+                    </select>
+                    <input id="customLanguage" class="hidden mt-10" type="text" placeholder="Language name" />
+                  </div>
+
+                  <div class="field">
+                    <label for="podcastFormat">Format</label>
+                    <select id="podcastFormat">
+                      <option>Friendly conversation</option><option>Interview</option><option>Debate</option>
+                      <option>Educational explainer</option><option>Documentary discussion</option>
+                      <option>Comedy conversation</option><option>Mystery storytelling</option><option value="custom">Custom…</option>
+                    </select>
+                    <input id="customFormat" class="hidden mt-10" type="text" placeholder="Describe the format" />
+                  </div>
+
+                  <fieldset class="field full">
+                    <legend>Tone</legend>
+                    <div id="toneChoices" class="choice-group">
+                      <input class="choice-input" id="toneInformative" type="checkbox" value="Informative" checked /><label class="chip-label" for="toneInformative">Informative</label>
+                      <input class="choice-input" id="toneCasual" type="checkbox" value="Casual" checked /><label class="chip-label" for="toneCasual">Casual</label>
+                      <input class="choice-input" id="toneSerious" type="checkbox" value="Serious" /><label class="chip-label" for="toneSerious">Serious</label>
+                      <input class="choice-input" id="toneCurious" type="checkbox" value="Curious" /><label class="chip-label" for="toneCurious">Curious</label>
+                      <input class="choice-input" id="toneHumorous" type="checkbox" value="Humorous" /><label class="chip-label" for="toneHumorous">Humorous</label>
+                      <input class="choice-input" id="toneDramatic" type="checkbox" value="Dramatic" /><label class="chip-label" for="toneDramatic">Dramatic</label>
+                      <input class="choice-input" id="toneCalm" type="checkbox" value="Calm" /><label class="chip-label" for="toneCalm">Calm</label>
+                      <input class="choice-input" id="toneEnergetic" type="checkbox" value="Energetic" /><label class="chip-label" for="toneEnergetic">Energetic</label>
+                    </div>
+                  </fieldset>
+
+                  <div class="field full">
+                    <details class="disclosure">
+                      <summary>Advanced episode instructions</summary>
+                      <div class="disclosure-content">
+                        <label for="instructions">Additional instructions</label>
+                        <textarea id="instructions" placeholder="Keep the science accurate. Use light humour. Avoid technical jargon."></textarea>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </section>
+
+              <div id="createLoading" class="inline-status" role="status" aria-live="polite" aria-atomic="true">
+                <div class="inline-status-row"><div><strong>Generating podcast script</strong><p id="createLoadingMessage">Planning the episode…</p></div><span id="createElapsed" class="elapsed">0:00</span></div>
+                <div class="indeterminate" aria-hidden="true"></div>
+              </div>
+            </div>
+
+            <aside class="speaker-column">
+              <section class="section-card subtle" aria-labelledby="speakersTitle">
+                <div class="section-title-row">
+                  <div><h3 id="speakersTitle">Speakers</h3><p>Two distinct voices, collapsed until you need the details.</p></div>
+                  <button id="swapCharacters" class="secondary-button compact-button" type="button">Swap</button>
+                </div>
+                <div id="speakerList" class="speaker-list"></div>
+              </section>
+            </aside>
+          </div>
+
+          <div class="action-dock">
+            <div class="action-dock-copy"><strong>Ready to write the episode</strong><span id="createActionHint">Approx. 700 words · 5:00</span></div>
+            <button id="generateScriptButton" class="primary-button" type="submit"><span>Generate script</span></button>
+          </div>
+        </form>
+      </section>
+
+      <section id="scriptStage" class="stage" aria-labelledby="scriptStageTitle">
+        <div class="stage-inner">
+          <div class="script-layout">
+            <div class="script-main">
+              <div class="stage-heading">
+                <div>
+                  <p class="eyebrow">Script</p>
+                  <h2 id="scriptStageTitle" class="episode-title" tabindex="-1">Dialogue editor</h2>
+                  <p id="scriptSummaryText" class="episode-summary">Edit the conversation before generating audio.</p>
+                </div>
+              </div>
+
+              <div id="scriptTabs" class="tablist" role="tablist" aria-label="Script view">
+                <button id="editorTab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="scriptPanel" tabindex="0" data-script-view="editor">Editor</button>
+                <button id="transcriptTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="scriptPanel" tabindex="-1" data-script-view="transcript">Transcript</button>
+                <button id="ttsTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="scriptPanel" tabindex="-1" data-script-view="tts">TTS preview</button>
+              </div>
+
+              <div id="scriptPanel" class="script-content" role="tabpanel" aria-labelledby="editorTab"></div>
+              <p id="reorderStatus" class="visually-hidden" aria-live="polite"></p>
+            </div>
+
+            <aside class="episode-panel" aria-labelledby="episodePanelTitle">
+              <h3 id="episodePanelTitle">Episode</h3>
+              <div id="scriptMetrics" class="metric-list"></div>
+              <div id="scriptValidation" class="validation-status"></div>
+
+              <details id="refineMenu" class="menu">
+                <summary class="menu-summary full-width"><span>Refine script</span><span aria-hidden="true">▾</span></summary>
+                <div class="menu-popover">
+                  <button class="menu-item" type="button" data-script-action="shorten">Shorten</button>
+                  <button class="menu-item" type="button" data-script-action="expand">Expand</button>
+                  <button class="menu-item" type="button" data-script-action="conversational">More conversational</button>
+                  <button class="menu-item" type="button" data-script-action="serious">More serious</button>
+                  <button class="menu-item" type="button" data-script-action="humour">Add humour</button>
+                </div>
+              </details>
+
+              <div class="button-row">
+                <button id="undoButton" class="secondary-button compact-button" type="button">Undo</button>
+                <button id="redoButton" class="secondary-button compact-button" type="button">Redo</button>
+                <details id="scriptMoreMenu" class="menu icon-menu">
+                  <summary class="menu-summary" aria-label="More script actions" title="More actions"></summary>
+                  <div class="menu-popover">
+                    <button class="menu-item" type="button" data-script-action="regenerate">Regenerate</button>
+                    <button class="menu-item" type="button" data-script-action="reset">Reset changes</button>
+                    <button class="menu-item" type="button" data-script-action="copy">Copy transcript</button>
+                    <button class="menu-item" type="button" data-script-action="download-json">Download JSON</button>
+                  </div>
+                </details>
+              </div>
+
+              <div id="scriptLoading" class="inline-status" role="status" aria-live="polite" aria-atomic="true">
+                <div class="inline-status-row"><div><strong id="scriptLoadingTitle">Working on script</strong><p id="scriptLoadingMessage">Preparing…</p></div><span id="scriptElapsed" class="elapsed">0:00</span></div>
+                <div class="indeterminate" aria-hidden="true"></div>
+              </div>
+
+              <button id="generateAudioButton" class="primary-button" type="button"><span>Generate audio</span></button>
+              <button id="backToCreateButton" class="ghost-button" type="button">Back to create</button>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="audioStage" class="stage" aria-labelledby="audioStageTitle">
+        <div class="stage-inner audio-layout">
+          <div id="audioContent"></div>
+        </div>
+      </section>
+    </section>
+
+    <section id="serviceError" class="service-error" role="alert">
+      <h3 id="serviceErrorTitle">Generation failed</h3>
+      <p id="serviceErrorMessage"></p>
+      <p><strong>Suggested action:</strong> <span id="serviceErrorSuggestion"></span></p>
+      <div class="button-row mt-14">
+        <button id="retryButton" class="secondary-button" type="button">Try again</button>
+        <button id="dismissErrorButton" class="ghost-button" type="button">Dismiss</button>
+      </div>
+      <details><summary>View technical details</summary><pre id="serviceErrorDetails">No details available.</pre></details>
+    </section>
+
+    <p id="liveStatus" class="visually-hidden" aria-live="polite"></p>
+    <footer>Personal testing tool. API keys are never written into exported scripts, downloaded audio or debug output.</footer>
+  </main>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <div><h2 id="settingsTitle">Settings</h2><p>Connection and generation preferences are stored locally. The API key is only stored when explicitly enabled.</p></div>
+        <button id="closeSettingsIcon" class="icon-button" type="button" aria-label="Close settings"></button>
+      </div>
+      <section aria-labelledby="connectionSettingsTitle">
+        <h3 id="connectionSettingsTitle">Gemini connection</h3>
+        <div id="connectionSettingsForm" class="mt-14"></div>
+      </section>
+      <section class="mt-24" aria-labelledby="generationSettingsTitle">
+        <h3 id="generationSettingsTitle">Generation</h3>
+        <div class="field-grid mt-14">
+          <div class="field"><label for="maxTtsCharacters">TTS character warning threshold</label><input id="maxTtsCharacters" type="number" min="2000" max="30000" step="500" value="12000" /></div>
+          <div class="field"><label for="speakingRate">Words per minute</label><input id="speakingRate" type="number" min="100" max="200" step="5" value="140" /></div>
+        </div>
+      </section>
+      <div class="dialog-actions">
+        <button id="clearStoredDataButton" class="danger-button" type="button">Clear stored data</button>
+        <div class="dialog-actions-right"><button id="closeSettingsButton" class="primary-button" type="button">Done</button></div>
+      </div>
+    </div>
+  </dialog>
+  <script>
+'use strict';
+
+const STORAGE_KEY = 'geminiPodcastStudio.preferences.v2';
+const API_KEY_STORAGE_KEY = 'geminiPodcastStudio.apiKey.v1';
+const SESSION_KEY = 'geminiPodcastStudio.sessionKey.v1';
+const DEFAULT_MAX_TTS_CHARACTERS = 12000;
+const MAX_HISTORY = 30;
+
+const SCRIPT_PROGRESS_MESSAGES = [
+  'Planning the episode…',
+  'Defining the discussion…',
+  'Writing the dialogue…',
+  'Checking the structure…'
+];
+const AUDIO_PROGRESS_MESSAGES = [
+  'Preparing the transcript…',
+  'Assigning character voices…',
+  'Generating the conversation…',
+  'Processing the audio…'
+];
+
+const CHARACTER_TEMPLATES = [
+  { name: 'Anna', role: 'Astrophysicist', personality: 'Enthusiastic, intelligent and optimistic', direction: 'Speak warmly and clearly with lively pacing', accent: '' },
+  { name: 'Mark', role: 'Sceptical journalist', personality: 'Dry, curious and politely challenging', direction: 'Speak calmly with restrained humour', accent: '' },
+  { name: 'Maya', role: 'Science presenter', personality: 'Curious, precise and approachable', direction: 'Speak clearly with confident conversational energy', accent: '' },
+  { name: 'Jonas', role: 'Critical analyst', personality: 'Thoughtful, pragmatic and mildly witty', direction: 'Speak evenly with deliberate pacing', accent: '' },
+  { name: 'Elena', role: 'Historian', personality: 'Reflective, vivid and intellectually playful', direction: 'Speak warmly with measured emphasis', accent: '' },
+  { name: 'David', role: 'Investigative host', personality: 'Direct, sceptical and fair-minded', direction: 'Speak calmly with crisp articulation', accent: '' }
+];
+
+const VOICES = [
+  ['Zephyr', 'Bright'], ['Puck', 'Upbeat'], ['Charon', 'Informative'],
+  ['Kore', 'Firm'], ['Fenrir', 'Excitable'], ['Leda', 'Youthful'],
+  ['Orus', 'Firm'], ['Aoede', 'Breezy'], ['Callirrhoe', 'Easy-going'],
+  ['Autonoe', 'Bright'], ['Enceladus', 'Breathy'], ['Iapetus', 'Clear'],
+  ['Umbriel', 'Easy-going'], ['Algieba', 'Smooth'], ['Despina', 'Smooth'],
+  ['Erinome', 'Clear'], ['Algenib', 'Gravelly'], ['Rasalgethi', 'Informative'],
+  ['Laomedeia', 'Upbeat'], ['Achernar', 'Soft'], ['Alnilam', 'Firm'],
+  ['Schedar', 'Even'], ['Gacrux', 'Mature'], ['Pulcherrima', 'Forward'],
+  ['Achird', 'Friendly'], ['Zubenelgenubi', 'Casual'], ['Vindemiatrix', 'Gentle'],
+  ['Sadachbia', 'Lively'], ['Sadaltager', 'Knowledgeable'], ['Sulafat', 'Warm']
+];
+
+const ICONS = {
+  settings: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.04.08V22h-4v-1.92l-.04-.08a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.08-.04H2v-4h1.92L4 9.92a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.04-.08V2h4v1.92l.04.08a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.4.33.75.6 1l.08.04H22v4h-1.92L20 14.08a1.7 1.7 0 0 0-.6.92Z"/></svg>',
+  sun: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>',
+  moon: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>',
+  close: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg>',
+  more: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+  grip: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="5" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="19" r="1"/></svg>',
+  chevron: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'
+};
+  </script>
+  <script>
+const appState = {
+  currentStage: 'create',
+  scriptView: 'editor',
+  busy: false,
+  lastAction: null,
+  connection: {
+    apiKey: '', rememberKey: false,
+    textModel: 'gemini-3.6-flash', customTextModel: '',
+    ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: ''
+  },
+  podcast: {
+    topic: '', durationMinutes: 5, language: 'English', customLanguage: '',
+    format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: ''
+  },
+  characters: [
+    { id: 'speaker-a', ...CHARACTER_TEMPLATES[0], voice: 'Aoede' },
+    { id: 'speaker-b', ...CHARACTER_TEMPLATES[1], voice: 'Charon' }
+  ],
+  expandedSpeakers: new Set(),
+  script: null,
+  originalScript: null,
+  history: [],
+  historyIndex: -1,
+  audio: { blob: null, url: '', sampleRate: 24000, generationSeconds: 0, durationSeconds: 0, createdAt: null },
+  settings: { theme: 'light', maxTtsCharacters: DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
+};
+
+const els = Object.fromEntries([
+  'saveState','connectionChip','connectionLabel','connectionModels','themeButton','settingsButton',
+  'createStage','createForm','createStageTitle','createErrorSummary','createErrorList','connectionSetup','connectionSetupForm',
+  'topic','durationChoices','customDurationField','customDuration','targetWords','estimatedDuration','language','customLanguage',
+  'podcastFormat','customFormat','toneChoices','instructions','createLoading','createLoadingMessage','createElapsed','speakerList',
+  'swapCharacters','createActionHint','generateScriptButton','scriptStage','scriptStageTitle','scriptSummaryText','scriptTabs',
+  'scriptPanel','reorderStatus','scriptMetrics','scriptValidation','refineMenu','undoButton','redoButton','scriptMoreMenu',
+  'scriptLoading','scriptLoadingTitle','scriptLoadingMessage','scriptElapsed','generateAudioButton','backToCreateButton',
+  'audioStage','audioContent','serviceError','serviceErrorTitle','serviceErrorMessage','serviceErrorSuggestion','serviceErrorDetails',
+  'retryButton','dismissErrorButton','liveStatus','settingsDialog','closeSettingsIcon','connectionSettingsForm','maxTtsCharacters',
+  'speakingRate','clearStoredDataButton','closeSettingsButton'
+].map(id => [id, document.getElementById(id)]));
+
+let progressTimer = null;
+let progressMessageTimer = null;
+let progressStartedAt = 0;
+let saveTimer = null;
+let typingHistoryTimer = null;
+let dragIndex = null;
+  </script>
+  <script>
+function deepClone(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
+function escapeHtml(value) {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+function normaliseWhitespace(value) { return String(value ?? '').replace(/\s+/g, ' ').trim(); }
+function normalisePerformanceTag(value) { return normaliseWhitespace(value).replace(/^\[+|\]+$/g, '').slice(0, 80).trim(); }
+function formatDuration(seconds) {
+  const safe = Math.max(0, Math.round(Number(seconds) || 0));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+function getTextModel() { return appState.connection.textModel === 'custom' ? appState.connection.customTextModel.trim() : appState.connection.textModel; }
+function getTtsModel() { return appState.connection.ttsModel === 'custom' ? appState.connection.customTtsModel.trim() : appState.connection.ttsModel; }
+function getLanguage() { return appState.podcast.language === 'custom' ? appState.podcast.customLanguage.trim() : appState.podcast.language; }
+function getPodcastFormat() { return appState.podcast.format === 'custom' ? appState.podcast.customFormat.trim() : appState.podcast.format; }
+function getWordCount(script = appState.script) {
+  return script?.segments?.reduce((total, segment) => total + (normaliseWhitespace(segment.text).match(/\S+/g) || []).length, 0) || 0;
+}
+function getEstimatedSeconds(words = getWordCount()) { return (words / Math.max(1, appState.settings.speakingRate)) * 60; }
+function getTargetWords() { return Math.round(appState.podcast.durationMinutes * appState.settings.speakingRate); }
+function voiceDescription(name) { return VOICES.find(([voice]) => voice === name)?.[1] || ''; }
+function buildEpisodeFilename(extension) {
+  const base = normaliseWhitespace(appState.script?.title || 'gemini-podcast').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'gemini-podcast';
+  return `${base}-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
+}
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function copyText(value, message = 'Copied to clipboard.') {
+  await navigator.clipboard.writeText(value);
+  announce(message);
+}
+function announce(message) { els.liveStatus.textContent = ''; requestAnimationFrame(() => { els.liveStatus.textContent = message; }); }
+function autoSize(textarea) { textarea.style.height = 'auto'; textarea.style.height = `${Math.max(92, textarea.scrollHeight)}px`; }
+function revokeAudioUrl() {
+  if (appState.audio.url) URL.revokeObjectURL(appState.audio.url);
+  appState.audio = { blob: null, url: '', sampleRate: 24000, generationSeconds: 0, durationSeconds: 0, createdAt: null };
+}
+  </script>
+  <script>
+function queueSave() {
+  els.saveState.textContent = 'Saving…';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { savePreferences(); els.saveState.textContent = 'Saved locally'; }, 260);
+}
+function savePreferences() {
+  const payload = {
+    theme: appState.settings.theme,
+    maxTtsCharacters: appState.settings.maxTtsCharacters,
+    speakingRate: appState.settings.speakingRate,
+    textModel: appState.connection.textModel,
+    customTextModel: appState.connection.customTextModel,
+    ttsModel: appState.connection.ttsModel,
+    customTtsModel: appState.connection.customTtsModel,
+    podcast: appState.podcast,
+    characters: appState.characters,
+    script: appState.script
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  if (appState.connection.rememberKey && appState.connection.apiKey) {
+    localStorage.setItem(API_KEY_STORAGE_KEY, appState.connection.apiKey);
+    sessionStorage.removeItem(SESSION_KEY);
+  } else {
+    localStorage.removeItem(API_KEY_STORAGE_KEY);
+    if (appState.connection.apiKey) sessionStorage.setItem(SESSION_KEY, appState.connection.apiKey);
+    else sessionStorage.removeItem(SESSION_KEY);
+  }
+}
+function loadPreferences() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { saved = {}; }
+  appState.settings.theme = saved.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  appState.settings.maxTtsCharacters = Number(saved.maxTtsCharacters) || DEFAULT_MAX_TTS_CHARACTERS;
+  appState.settings.speakingRate = Number(saved.speakingRate) || 140;
+  appState.connection.textModel = saved.textModel || appState.connection.textModel;
+  appState.connection.customTextModel = saved.customTextModel || '';
+  appState.connection.ttsModel = saved.ttsModel || appState.connection.ttsModel;
+  appState.connection.customTtsModel = saved.customTtsModel || '';
+  appState.podcast = { ...appState.podcast, ...(saved.podcast || {}) };
+  if (Array.isArray(saved.characters) && saved.characters.length === 2) appState.characters = saved.characters;
+  if (saved.script?.segments?.length) {
+    appState.script = saved.script;
+    appState.originalScript = deepClone(saved.script);
+  }
+  const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+  appState.connection.apiKey = storedApiKey || sessionStorage.getItem(SESSION_KEY) || '';
+  appState.connection.rememberKey = Boolean(storedApiKey);
+}
+
+function connectionFormMarkup(prefix) {
+  const textModel = appState.connection.textModel;
+  const ttsModel = appState.connection.ttsModel;
+  return `
+    <div class="field-grid three" data-connection-form="${prefix}">
+      <div class="field full">
+        <label for="${prefix}ApiKey">Gemini API key</label>
+        <div class="key-wrap">
+          <input id="${prefix}ApiKey" type="password" data-connection-field="apiKey" value="${escapeHtml(appState.connection.apiKey)}" placeholder="Paste Google AI Studio API key" autocomplete="off" spellcheck="false" />
+          <button class="key-toggle" type="button" data-toggle-key aria-label="Show API key">Show</button>
+        </div>
+        <label class="check-row" for="${prefix}RememberKey"><input id="${prefix}RememberKey" type="checkbox" data-connection-field="rememberKey"${appState.connection.rememberKey ? ' checked' : ''} /><span><strong>Remember on this device.</strong> Off by default.</span></label>
+      </div>
+      <div class="field">
+        <label for="${prefix}TextModel">Text model</label>
+        <select id="${prefix}TextModel" data-connection-field="textModel">
+          <option value="gemini-3.6-flash"${textModel === 'gemini-3.6-flash' ? ' selected' : ''}>Gemini 3.6 Flash</option>
+          <option value="gemini-3.5-flash"${textModel === 'gemini-3.5-flash' ? ' selected' : ''}>Gemini 3.5 Flash</option>
+          <option value="gemini-2.5-flash"${textModel === 'gemini-2.5-flash' ? ' selected' : ''}>Gemini 2.5 Flash</option>
+          <option value="custom"${textModel === 'custom' ? ' selected' : ''}>Custom model ID…</option>
+        </select>
+      </div>
+      <div class="field${textModel === 'custom' ? '' : ' hidden'}" data-custom-model="textModel">
+        <label for="${prefix}CustomTextModel">Custom text model ID</label>
+        <input id="${prefix}CustomTextModel" data-connection-field="customTextModel" value="${escapeHtml(appState.connection.customTextModel)}" placeholder="gemini-…" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="${prefix}TtsModel">TTS model</label>
+        <select id="${prefix}TtsModel" data-connection-field="ttsModel">
+          <option value="gemini-3.1-flash-tts-preview"${ttsModel === 'gemini-3.1-flash-tts-preview' ? ' selected' : ''}>Gemini 3.1 Flash TTS Preview</option>
+          <option value="gemini-2.5-flash-preview-tts"${ttsModel === 'gemini-2.5-flash-preview-tts' ? ' selected' : ''}>Gemini 2.5 Flash Preview TTS</option>
+          <option value="gemini-2.5-pro-preview-tts"${ttsModel === 'gemini-2.5-pro-preview-tts' ? ' selected' : ''}>Gemini 2.5 Pro Preview TTS</option>
+          <option value="custom"${ttsModel === 'custom' ? ' selected' : ''}>Custom model ID…</option>
+        </select>
+      </div>
+      <div class="field${ttsModel === 'custom' ? '' : ' hidden'}" data-custom-model="ttsModel">
+        <label for="${prefix}CustomTtsModel">Custom TTS model ID</label>
+        <input id="${prefix}CustomTtsModel" data-connection-field="customTtsModel" value="${escapeHtml(appState.connection.customTtsModel)}" placeholder="gemini-…-tts-preview" spellcheck="false" />
+      </div>
+    </div>
+    <p class="hint mt-12"><strong>Private testing mode.</strong> A public deployment should route requests through a secure backend.</p>`;
+}
+function renderConnectionForms() {
+  els.connectionSetupForm.innerHTML = connectionFormMarkup('setup');
+  els.connectionSettingsForm.innerHTML = connectionFormMarkup('settings');
+  els.connectionSetup.classList.toggle('hidden', Boolean(appState.connection.apiKey));
+  renderConnectionStatus();
+}
+function renderConnectionStatus() {
+  const connected = Boolean(appState.connection.apiKey && getTextModel() && getTtsModel());
+  els.connectionChip.classList.toggle('connected', connected);
+  els.connectionLabel.textContent = connected ? 'Gemini connected' : 'Gemini not connected';
+  els.connectionModels.textContent = connected ? `${getTextModel()} · ${getTtsModel()}` : 'Add API key';
+}
+function syncConnectionForm(form) {
+  for (const control of form.querySelectorAll('[data-connection-field]')) {
+    const field = control.dataset.connectionField;
+    appState.connection[field] = control.type === 'checkbox' ? control.checked : control.value.trim();
+  }
+  renderConnectionForms();
+  queueSave();
+}
+  </script>
+  <script>
+function applyTheme() {
+  document.documentElement.dataset.theme = appState.settings.theme;
+  const dark = appState.settings.theme === 'dark';
+  els.themeButton.innerHTML = dark ? ICONS.sun : ICONS.moon;
+  els.themeButton.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+  els.settingsButton.innerHTML = ICONS.settings;
+  els.closeSettingsIcon.innerHTML = ICONS.close;
+}
+function populateInputsFromState() {
+  els.topic.value = appState.podcast.topic;
+  const preset = [2, 3, 5, 7].includes(Number(appState.podcast.durationMinutes));
+  const durationInput = document.querySelector(`input[name="duration"][value="${preset ? appState.podcast.durationMinutes : 'custom'}"]`);
+  if (durationInput) durationInput.checked = true;
+  els.customDuration.value = appState.podcast.durationMinutes;
+  els.customDurationField.classList.toggle('hidden', preset);
+  els.language.value = appState.podcast.language;
+  els.customLanguage.value = appState.podcast.customLanguage;
+  els.customLanguage.classList.toggle('hidden', appState.podcast.language !== 'custom');
+  els.podcastFormat.value = appState.podcast.format;
+  els.customFormat.value = appState.podcast.customFormat;
+  els.customFormat.classList.toggle('hidden', appState.podcast.format !== 'custom');
+  els.instructions.value = appState.podcast.instructions;
+  for (const input of els.toneChoices.querySelectorAll('input[type="checkbox"]')) input.checked = appState.podcast.tones.includes(input.value);
+  els.maxTtsCharacters.value = appState.settings.maxTtsCharacters;
+  els.speakingRate.value = appState.settings.speakingRate;
+  updateTargetSummary();
+}
+function syncCreateInputs() {
+  appState.podcast.topic = els.topic.value.trim();
+  const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || '5';
+  appState.podcast.durationMinutes = selectedDuration === 'custom' ? Math.min(10, Math.max(1, Number(els.customDuration.value) || 1)) : Number(selectedDuration);
+  appState.podcast.language = els.language.value;
+  appState.podcast.customLanguage = els.customLanguage.value.trim();
+  appState.podcast.format = els.podcastFormat.value;
+  appState.podcast.customFormat = els.customFormat.value.trim();
+  appState.podcast.tones = [...els.toneChoices.querySelectorAll('input:checked')].map(input => input.value);
+  appState.podcast.instructions = els.instructions.value.trim();
+  queueSave();
+  updateTargetSummary();
+}
+function updateTargetSummary() {
+  const target = getTargetWords();
+  const duration = formatDuration((target / appState.settings.speakingRate) * 60);
+  els.targetWords.textContent = `approximately ${target.toLocaleString('en-GB')} spoken words`;
+  els.estimatedDuration.textContent = duration;
+  els.createActionHint.textContent = `Approx. ${target.toLocaleString('en-GB')} words · ${duration}`;
+}
+
+function renderSpeakerCards() {
+  els.speakerList.innerHTML = appState.characters.map((character, index) => {
+    const expanded = appState.expandedSpeakers.has(index);
+    const options = VOICES.map(([name, description]) => `<option value="${name}"${character.voice === name ? ' selected' : ''}>${name} — ${description}</option>`).join('');
+    return `<article class="speaker-card${expanded ? ' expanded' : ''}" data-speaker-index="${index}">
+      <div class="speaker-card-head">
+        <span class="speaker-id">${index === 0 ? 'A' : 'B'}</span>
+        <div class="speaker-copy">
+          <div class="speaker-name-line"><h3>${escapeHtml(character.name || `Speaker ${index + 1}`)}</h3><span class="voice-label">${escapeHtml(character.voice)}</span></div>
+          <p class="speaker-description">${escapeHtml(character.role || 'Podcast participant')} · ${escapeHtml(character.personality || 'Natural and engaging')}</p>
+        </div>
+        <div class="speaker-actions">
+          <button class="ghost-button compact-button" type="button" data-speaker-action="voice-test">Test voice</button>
+          <button class="secondary-button compact-button" type="button" data-speaker-action="toggle" aria-expanded="${expanded}">${expanded ? 'Done' : 'Edit'}</button>
+          <details class="menu icon-menu">
+            <summary class="menu-summary" aria-label="More speaker actions">${ICONS.more}</summary>
+            <div class="menu-popover"><button class="menu-item" type="button" data-speaker-action="randomise">Randomise</button><button class="menu-item" type="button" data-speaker-action="reset">Reset</button></div>
+          </details>
+        </div>
+      </div>
+      <div class="speaker-editor${expanded ? '' : ' hidden'}">
+        <div class="field-grid">
+          <div class="field"><label for="speakerName${index}">Name</label><input id="speakerName${index}" data-speaker-field="name" value="${escapeHtml(character.name)}" maxlength="40" /></div>
+          <div class="field"><label for="speakerRole${index}">Role</label><input id="speakerRole${index}" data-speaker-field="role" value="${escapeHtml(character.role)}" placeholder="Host, scientist, journalist…" /></div>
+          <div class="field"><label for="speakerVoice${index}">Gemini voice</label><select id="speakerVoice${index}" data-speaker-field="voice">${options}</select><p class="voice-description">${escapeHtml(character.voice)} · ${escapeHtml(voiceDescription(character.voice))}</p></div>
+          <div class="field"><label for="speakerAccent${index}">Accent or language note</label><input id="speakerAccent${index}" data-speaker-field="accent" value="${escapeHtml(character.accent)}" placeholder="Optional pronunciation note" /></div>
+          <div class="field full"><label for="speakerPersonality${index}">Personality</label><textarea id="speakerPersonality${index}" data-speaker-field="personality">${escapeHtml(character.personality)}</textarea></div>
+          <div class="field full"><label for="speakerDirection${index}">Performance direction</label><textarea id="speakerDirection${index}" data-speaker-field="direction">${escapeHtml(character.direction)}</textarea></div>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+function resetCharacter(index) {
+  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...(index ? CHARACTER_TEMPLATES[1] : CHARACTER_TEMPLATES[0]), voice: index ? 'Charon' : 'Aoede' };
+  renderSpeakerCards(); queueSave();
+}
+function randomiseCharacter(index) {
+  const other = appState.characters[index ? 0 : 1];
+  const templates = CHARACTER_TEMPLATES.filter(template => template.name !== other.name);
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  const voices = VOICES.filter(([name]) => name !== other.voice);
+  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...template, voice: voices[Math.floor(Math.random() * voices.length)][0] };
+  renderSpeakerCards(); queueSave();
+}
+
+function clearValidation() {
+  els.createErrorSummary.classList.add('hidden');
+  els.createErrorList.innerHTML = '';
+  for (const node of els.createForm.querySelectorAll('[aria-invalid="true"]')) node.removeAttribute('aria-invalid');
+  for (const node of els.createForm.querySelectorAll('.field-error')) node.remove();
+}
+function validatePodcastBrief() {
+  const errors = [];
+  const names = appState.characters.map(character => normaliseWhitespace(character.name));
+  if (!appState.connection.apiKey.trim()) errors.push({ id: 'setupApiKey', field: document.getElementById('setupApiKey') || els.connectionChip, message: 'Enter a Gemini API key.' });
+  if (!getTextModel()) errors.push({ id: 'setupCustomTextModel', field: document.getElementById('setupCustomTextModel'), message: 'Enter a valid text model ID.' });
+  if (!getTtsModel()) errors.push({ id: 'setupCustomTtsModel', field: document.getElementById('setupCustomTtsModel'), message: 'Enter a valid TTS model ID.' });
+  if (!appState.podcast.topic.trim()) errors.push({ id: 'topic', field: els.topic, message: 'Enter a podcast topic.' });
+  if (!getLanguage()) errors.push({ id: 'customLanguage', field: els.customLanguage, message: 'Enter a language.' });
+  if (!getPodcastFormat()) errors.push({ id: 'customFormat', field: els.customFormat, message: 'Enter a podcast format.' });
+  if (!(appState.podcast.durationMinutes > 0 && appState.podcast.durationMinutes <= 10)) errors.push({ id: 'customDuration', field: els.customDuration, message: 'Choose a duration between 1 and 10 minutes.' });
+  if (names.some(name => !name)) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Both speakers need names.' });
+  if (names[0]?.toLocaleLowerCase() === names[1]?.toLocaleLowerCase()) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Speaker names must be different.' });
+  if (appState.characters.some(character => !character.voice)) errors.push({ id: 'speakerList', field: els.speakerList, message: 'Select a voice for both speakers.' });
+  return errors;
+}
+function showValidationErrors(errors) {
+  clearValidation();
+  els.createErrorList.innerHTML = errors.map(error => `<li><a href="#${escapeHtml(error.id)}">${escapeHtml(error.message)}</a></li>`).join('');
+  els.createErrorSummary.classList.remove('hidden');
+  for (const error of errors) {
+    if (error.field?.setAttribute) error.field.setAttribute('aria-invalid', 'true');
+    if (error.field?.parentElement && !error.field.parentElement.querySelector('.field-error')) {
+      const message = document.createElement('p'); message.className = 'field-error'; message.textContent = error.message; error.field.parentElement.appendChild(message);
+    }
+  }
+  els.createErrorSummary.focus();
+}
+  </script>
+  <script>
+function snapshotScript({ force = false } = {}) {
+  if (!appState.script) return;
+  const serialised = JSON.stringify(appState.script);
+  const current = appState.history[appState.historyIndex];
+  if (!force && current && JSON.stringify(current) === serialised) return;
+  appState.history = appState.history.slice(0, appState.historyIndex + 1);
+  appState.history.push(deepClone(appState.script));
+  if (appState.history.length > MAX_HISTORY) appState.history.shift();
+  appState.historyIndex = appState.history.length - 1;
+  updateUndoRedo();
+}
+function resetHistory() { appState.history = []; appState.historyIndex = -1; snapshotScript({ force: true }); }
+function undo() {
+  if (appState.historyIndex <= 0) return;
+  appState.historyIndex -= 1; appState.script = deepClone(appState.history[appState.historyIndex]);
+  renderScriptStage(); queueSave(); announce('Undid the last script change.');
+}
+function redo() {
+  if (appState.historyIndex >= appState.history.length - 1) return;
+  appState.historyIndex += 1; appState.script = deepClone(appState.history[appState.historyIndex]);
+  renderScriptStage(); queueSave(); announce('Redid the script change.');
+}
+function updateUndoRedo() {
+  els.undoButton.disabled = appState.historyIndex <= 0 || appState.busy;
+  els.redoButton.disabled = appState.historyIndex >= appState.history.length - 1 || appState.busy;
+}
+
+function renderCurrentStage({ focus = true } = {}) {
+  const stageMap = { create: els.createStage, script: els.scriptStage, audio: els.audioStage };
+  for (const [stage, node] of Object.entries(stageMap)) node.classList.toggle('active', stage === appState.currentStage);
+  const order = ['create', 'script', 'audio'];
+  const currentIndex = order.indexOf(appState.currentStage);
+  for (const button of document.querySelectorAll('.step-button')) {
+    const stage = button.dataset.stage;
+    const available = stage === 'create' || (stage === 'script' && appState.script) || (stage === 'audio' && appState.audio.url);
+    button.disabled = !available || appState.busy;
+    button.classList.toggle('completed', order.indexOf(stage) < currentIndex || (stage === 'script' && appState.audio.url));
+    if (stage === appState.currentStage) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
+    button.querySelector('.step-number').textContent = button.classList.contains('completed') ? '✓' : String(order.indexOf(stage) + 1);
+  }
+  if (appState.currentStage === 'script') renderScriptStage();
+  if (appState.currentStage === 'audio') renderAudioStage();
+  if (focus) {
+    const heading = stageMap[appState.currentStage].querySelector('h2[tabindex="-1"]');
+    requestAnimationFrame(() => heading?.focus({ preventScroll: true }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+function setStage(stage) {
+  if (stage === 'script' && !appState.script) return;
+  if (stage === 'audio' && !appState.audio.url) return;
+  appState.currentStage = stage; renderCurrentStage();
+}
+
+function renderScriptStage() {
+  if (!appState.script) return;
+  els.scriptStageTitle.textContent = appState.script.title || 'Untitled podcast';
+  els.scriptSummaryText.textContent = appState.script.summary || 'Edit the conversation before generating audio.';
+  renderScriptTabs();
+  renderScriptMetrics();
+  updateUndoRedo();
+}
+function renderScriptTabs() {
+  for (const tab of els.scriptTabs.querySelectorAll('[role="tab"]')) {
+    const active = tab.dataset.scriptView === appState.scriptView;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+  }
+  const activeTab = els.scriptTabs.querySelector(`[data-script-view="${appState.scriptView}"]`);
+  els.scriptPanel.setAttribute('aria-labelledby', activeTab.id);
+  if (appState.scriptView === 'transcript') {
+    els.scriptPanel.innerHTML = `<div class="preview-block">${escapeHtml(buildCleanTranscript())}</div>`;
+  } else if (appState.scriptView === 'tts') {
+    els.scriptPanel.innerHTML = `<div class="preview-block">${escapeHtml(buildTtsTranscript())}</div>`;
+  } else {
+    renderSegmentList();
+  }
+}
+function renderScriptMetrics() {
+  if (!appState.script) return;
+  const words = getWordCount();
+  const seconds = getEstimatedSeconds(words);
+  const ttsChars = buildTtsTranscript().length;
+  els.scriptMetrics.innerHTML = `
+    <div class="metric"><strong>${words.toLocaleString('en-GB')}</strong><span>spoken words</span></div>
+    <div class="metric"><strong>${formatDuration(seconds)}</strong><span>estimated</span></div>
+    <div class="metric"><strong>${appState.script.segments.length.toLocaleString('en-GB')}</strong><span>segments</span></div>
+    <div class="metric"><strong>${ttsChars.toLocaleString('en-GB')}</strong><span>TTS characters</span></div>`;
+  const tooLong = ttsChars > appState.settings.maxTtsCharacters;
+  els.scriptValidation.className = `validation-status${tooLong ? ' warning' : ''}`;
+  els.scriptValidation.textContent = tooLong ? `Transcript exceeds the ${appState.settings.maxTtsCharacters.toLocaleString('en-GB')} character threshold.` : 'Script is ready for audio generation.';
+  els.generateAudioButton.disabled = tooLong || appState.busy;
+}
+function segmentMenu(index) {
+  return `<details class="menu icon-menu"><summary class="menu-summary" aria-label="Segment ${index + 1} actions">${ICONS.more}</summary><div class="menu-popover">
+    <button class="menu-item" type="button" data-segment-action="up">Move up</button>
+    <button class="menu-item" type="button" data-segment-action="down">Move down</button>
+    <button class="menu-item" type="button" data-segment-action="insert">Insert below</button>
+    <button class="menu-item" type="button" data-segment-action="duplicate">Duplicate</button>
+    <button class="menu-item danger" type="button" data-segment-action="delete">Delete</button>
+  </div></details>`;
+}
+function renderSegmentList() {
+  els.scriptPanel.innerHTML = `<div class="segment-list">${appState.script.segments.map((segment, index) => {
+    const speakerIndex = Math.max(0, appState.characters.findIndex(character => character.name === segment.speaker));
+    const speakerOptions = appState.characters.map(character => `<option value="${escapeHtml(character.name)}"${character.name === segment.speaker ? ' selected' : ''}>${escapeHtml(character.name)}</option>`).join('');
+    return `<article class="segment-card" draggable="true" data-segment-index="${index}" data-speaker-index="${speakerIndex}">
+      <div class="segment-header">
+        <button class="drag-handle" type="button" aria-label="Drag segment ${index + 1} to reorder" title="Drag to reorder">${ICONS.grip}</button>
+        <div class="segment-identity">
+          <select class="segment-speaker" data-segment-field="speaker" aria-label="Speaker for segment ${index + 1}">${speakerOptions}</select>
+          <input class="performance-input" data-segment-field="direction" value="${escapeHtml(segment.direction || '')}" placeholder="Optional performance cue" aria-label="Performance cue for segment ${index + 1}" />
+        </div>
+        ${segmentMenu(index)}
+      </div>
+      <div class="segment-body"><textarea data-segment-field="text" aria-label="Spoken text for segment ${index + 1}">${escapeHtml(segment.text)}</textarea></div>
+    </article>`;
+  }).join('')}</div>`;
+  for (const textarea of els.scriptPanel.querySelectorAll('textarea')) autoSize(textarea);
+}
+function updateSegmentFromControl(control) {
+  const card = control.closest('[data-segment-index]');
+  const segment = appState.script?.segments?.[Number(card?.dataset.segmentIndex)];
+  if (!segment) return;
+  segment[control.dataset.segmentField] = control.dataset.segmentField === 'direction' ? normalisePerformanceTag(control.value) : control.value;
+  if (control.dataset.segmentField === 'speaker') {
+    card.dataset.speakerIndex = String(Math.max(0, appState.characters.findIndex(character => character.name === control.value)));
+  }
+  appState.script.estimatedWords = getWordCount();
+  renderScriptMetrics(); queueSave();
+  clearTimeout(typingHistoryTimer);
+  typingHistoryTimer = setTimeout(() => snapshotScript(), 650);
+}
+function performSegmentAction(index, action) {
+  const segments = appState.script?.segments;
+  if (!segments) return;
+  snapshotScript();
+  if (action === 'up' && index > 0) [segments[index - 1], segments[index]] = [segments[index], segments[index - 1]];
+  if (action === 'down' && index < segments.length - 1) [segments[index + 1], segments[index]] = [segments[index], segments[index + 1]];
+  if (action === 'duplicate') segments.splice(index + 1, 0, deepClone(segments[index]));
+  if (action === 'delete' && segments.length > 2) segments.splice(index, 1);
+  if (action === 'insert') {
+    const nextSpeaker = appState.characters.find(character => character.name !== segments[index].speaker)?.name || appState.characters[0].name;
+    segments.splice(index + 1, 0, { speaker: nextSpeaker, direction: '', text: '' });
+  }
+  appState.script.estimatedWords = getWordCount(); snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  const focusIndex = action === 'delete' ? Math.min(index, segments.length - 1) : action === 'up' ? Math.max(0, index - 1) : action === 'down' ? Math.min(segments.length - 1, index + 1) : index + 1;
+  requestAnimationFrame(() => els.scriptPanel.querySelector(`[data-segment-index="${focusIndex}"] textarea`)?.focus());
+  announce(`Segment ${index + 1} ${action === 'delete' ? 'deleted' : action === 'duplicate' ? 'duplicated' : action === 'insert' ? 'inserted' : `moved ${action}`}.`);
+}
+function reorderSegments(from, to) {
+  if (from === to || from == null || to == null) return;
+  const [segment] = appState.script.segments.splice(from, 1);
+  appState.script.segments.splice(to, 0, segment);
+  snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  els.reorderStatus.textContent = `Segment moved to position ${to + 1} of ${appState.script.segments.length}.`;
+}
+function buildCleanTranscript() { return appState.script?.segments?.map(segment => `${segment.speaker}: ${segment.text}`).join('\n\n') || ''; }
+function buildTtsTranscript(script = appState.script) {
+  if (!script) return '';
+  const [a, b] = appState.characters;
+  const speakerInstructions = appState.characters.map(character => {
+    const details = [character.personality, character.direction, character.accent ? `Accent or language note: ${character.accent}` : ''].filter(Boolean).join('. ');
+    return `${character.name} should sound ${details || 'natural and conversational'}.`;
+  }).join('\n');
+  let previousTag = '';
+  const dialogue = script.segments.map(segment => {
+    const tag = normalisePerformanceTag(segment.direction);
+    const cue = tag && tag.toLocaleLowerCase() !== previousTag.toLocaleLowerCase() ? ` [${tag}]` : '';
+    previousTag = tag || '';
+    return `${segment.speaker}:${cue} ${segment.text}`;
+  }).join('\n\n');
+  return `Create a natural podcast conversation between ${a.name} and ${b.name}.\n\n${speakerInstructions}\n\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Bracketed cues are silent, subtle performance directions that apply only to the line immediately following them. Do not exaggerate them. Keep the delivery conversational and preserve every spoken word exactly.\n\n${dialogue}`;
+}
+  </script>
+  <script>
+function buildScriptSchema() {
+  return {
+    type: 'object',
+    properties: {
+      title: { type: 'string' }, summary: { type: 'string' }, language: { type: 'string' }, estimatedWords: { type: 'integer' },
+      segments: { type: 'array', items: { type: 'object', properties: {
+        speaker: { type: 'string', enum: appState.characters.map(character => character.name) },
+        direction: { type: 'string' }, text: { type: 'string' }
+      }, required: ['speaker', 'direction', 'text'] } }
+    }, required: ['title', 'summary', 'language', 'estimatedWords', 'segments']
+  };
+}
+function buildScriptPrompt() {
+  const [a, b] = appState.characters;
+  return `Create a polished two-person podcast script.\n\nTOPIC\n${appState.podcast.topic.trim()}\n\nEPISODE SETTINGS\nLanguage: ${getLanguage()}\nTarget length: approximately ${getTargetWords()} spoken words, staying within plus or minus 10 percent\nFormat: ${getPodcastFormat()}\nTone: ${appState.podcast.tones.join(', ') || 'Natural'}\nAdditional instructions: ${appState.podcast.instructions.trim() || 'None'}\n\nSPEAKER 1\nName: ${a.name}\nRole: ${a.role || 'Podcast participant'}\nPersonality: ${a.personality || 'Natural and engaging'}\nSpeaking direction: ${a.direction || 'Natural conversational delivery'}\nAccent or language note: ${a.accent || 'None'}\n\nSPEAKER 2\nName: ${b.name}\nRole: ${b.role || 'Podcast participant'}\nPersonality: ${b.personality || 'Natural and engaging'}\nSpeaking direction: ${b.direction || 'Natural conversational delivery'}\nAccent or language note: ${b.accent || 'None'}\n\nRULES\n- Use exactly the configured names: ${a.name} and ${b.name}.\n- Alternate naturally and avoid long monologues.\n- Keep each segment short and speakable.\n- Spoken text must not contain markdown, URLs, citations, sound-effect labels, or stage directions.\n- Use the direction field only for sparse, subtle English performance cues without brackets.\n- Include an opening hook, substantive discussion, contrasting viewpoints, a useful conclusion, and a natural closing line.\n- Output only JSON matching the supplied schema.`;
+}
+function validateScript(script) {
+  if (!script || typeof script !== 'object') throw new Error('Gemini returned an invalid script object.');
+  if (!normaliseWhitespace(script.title)) throw new Error('The generated script has no title.');
+  if (!Array.isArray(script.segments) || script.segments.length < 2) throw new Error('The generated script contains too few dialogue segments.');
+  const allowed = new Set(appState.characters.map(character => normaliseWhitespace(character.name)));
+  for (const [index, segment] of script.segments.entries()) {
+    if (!allowed.has(normaliseWhitespace(segment.speaker))) throw new Error(`Segment ${index + 1} uses an unexpected speaker.`);
+    if (!normaliseWhitespace(segment.text)) throw new Error(`Segment ${index + 1} has no spoken text.`);
+  }
+  return {
+    title: normaliseWhitespace(script.title), summary: normaliseWhitespace(script.summary),
+    language: normaliseWhitespace(script.language) || getLanguage(), estimatedWords: Number(script.estimatedWords) || getWordCount(script),
+    segments: script.segments.map(segment => ({ speaker: normaliseWhitespace(segment.speaker), direction: normalisePerformanceTag(segment.direction), text: normaliseWhitespace(segment.text) }))
+  };
+}
+function stripJsonFence(value) { return String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); }
+function extractTextResponse(data) { return (data?.candidates?.flatMap(candidate => candidate?.content?.parts || []) || []).map(part => part?.text || '').join('').trim(); }
+async function callGeminiText({ prompt, schema, actionLabel }) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTextModel())}:generateContent`;
+  const response = await fetch(endpoint, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey },
+    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: schema } })
+  });
+  const raw = await response.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { throw createApiError(response.status, `Gemini returned non-JSON data while ${actionLabel}.`, raw); }
+  if (!response.ok) throw createApiError(response.status, data?.error?.message || `Gemini request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
+  const text = extractTextResponse(data);
+  if (!text) throw new Error('Gemini returned no script text.');
+  try { return JSON.parse(stripJsonFence(text)); } catch { throw new Error('Gemini returned script data that could not be parsed as JSON.'); }
+}
+async function generatePodcastScript() {
+  syncCreateInputs();
+  const errors = validatePodcastBrief();
+  if (errors.length) return showValidationErrors(errors);
+  clearValidation(); hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-script';
+  setBusy(true, 'script', SCRIPT_PROGRESS_MESSAGES);
+  try {
+    appState.script = validateScript(await callGeminiText({ prompt: buildScriptPrompt(), schema: buildScriptSchema(), actionLabel: 'generating the podcast script' }));
+    appState.originalScript = deepClone(appState.script); resetHistory(); queueSave(); setStage('script');
+  } catch (error) {
+    handleGenerationError(error, 'Script generation failed', 'Try a clearer topic or select a different text model.', generatePodcastScript);
+  } finally { setBusy(false); }
+}
+async function refineScript(action) {
+  if (!appState.script) return;
+  const instructions = {
+    regenerate: 'Rewrite the entire script while keeping the same topic, settings, speakers, and target length. Improve flow and originality.',
+    shorten: 'Shorten the script by about 25 percent while preserving the key ideas and natural conclusion.',
+    expand: 'Expand the script by about 25 percent with useful substance, not filler, while remaining under 10 minutes.',
+    conversational: 'Make the dialogue more spontaneous and conversational. Use shorter turns and natural reactions.',
+    serious: 'Make the tone more serious, measured, and analytical without becoming stiff.',
+    humour: 'Add light, intelligent humour without undermining accuracy or turning the episode into a comedy sketch.'
+  };
+  if (!instructions[action]) return;
+  appState.lastAction = `refine:${action}`; hideServiceError(); setBusy(true, 'refine', SCRIPT_PROGRESS_MESSAGES);
+  const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these speaker names: ${appState.characters.map(character => character.name).join(' and ')}.\nKeep all dialogue in ${getLanguage()}.\nKeep performance tags sparse and subtle.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(appState.script)}`;
+  try {
+    snapshotScript(); appState.script = validateScript(await callGeminiText({ prompt, schema: buildScriptSchema(), actionLabel: 'refining the podcast script' }));
+    snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  } catch (error) {
+    handleGenerationError(error, 'Script refinement failed', 'Try again or edit the script manually.', () => refineScript(action));
+  } finally { setBusy(false); }
+}
+  </script>
+  <script>
+function base64ToBytes(base64) {
+  const clean = String(base64 || '').replace(/\s/g, '');
+  if (!clean) throw new Error('Gemini returned empty base64 audio.');
+  let binary;
+  try { binary = atob(clean); } catch { throw new Error('Gemini returned invalid base64 audio.'); }
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+function writeAscii(view, offset, text) { [...text].forEach((character, index) => view.setUint8(offset + index, character.charCodeAt(0))); }
+function pcm16ToWavBlob(pcmBytes, sampleRate = 24000, channels = 1) {
+  const buffer = new ArrayBuffer(44 + pcmBytes.byteLength); const view = new DataView(buffer);
+  const blockAlign = channels * 2; const byteRate = sampleRate * blockAlign;
+  writeAscii(view, 0, 'RIFF'); view.setUint32(4, 36 + pcmBytes.byteLength, true); writeAscii(view, 8, 'WAVE'); writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true); view.setUint16(32, blockAlign, true); view.setUint16(34, 16, true); writeAscii(view, 36, 'data'); view.setUint32(40, pcmBytes.byteLength, true);
+  new Uint8Array(buffer, 44).set(pcmBytes); return new Blob([buffer], { type: 'audio/wav' });
+}
+function sampleRateFromMimeType(mimeType) { return Number(String(mimeType || '').match(/rate=(\d+)/i)?.[1]) || 24000; }
+async function generatePodcastAudio() {
+  if (!appState.script?.segments?.length) return;
+  const transcript = buildTtsTranscript();
+  if (transcript.length > appState.settings.maxTtsCharacters) return showServiceError({ title: 'Script is too long', message: `The TTS transcript contains ${transcript.length.toLocaleString('en-GB')} characters.`, suggestion: 'Shorten the script or increase the threshold in settings.', details: '', retry: null });
+  hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
+  const startedAt = performance.now();
+  const requestBody = { contents: [{ role: 'user', parts: [{ text: transcript }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: appState.characters.map(character => ({ speaker: character.name, voiceConfig: { prebuiltVoiceConfig: { voiceName: character.voice } } })) } } } };
+  try {
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify(requestBody) });
+    const raw = await response.text(); let data;
+    try { data = JSON.parse(raw); } catch { throw createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw); }
+    if (!response.ok) throw createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
+    const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
+    if (!audioPart) throw createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
+    const pcmBytes = base64ToBytes(audioPart.inlineData.data); const sampleRate = sampleRateFromMimeType(audioPart.inlineData.mimeType); const wavBlob = pcm16ToWavBlob(pcmBytes, sampleRate, 1);
+    appState.audio = { blob: wavBlob, url: URL.createObjectURL(wavBlob), sampleRate, generationSeconds: (performance.now() - startedAt) / 1000, durationSeconds: pcmBytes.byteLength / (sampleRate * 2), createdAt: new Date().toISOString() };
+    setStage('audio');
+  } catch (error) {
+    handleGenerationError(error, 'Audio generation failed', 'Try a shorter script or select a different TTS model.', generatePodcastAudio);
+  } finally { setBusy(false); }
+}
+async function generateVoiceTest(index) {
+  const character = appState.characters[index];
+  if (!appState.connection.apiKey.trim()) return showServiceError({ title: 'API key required', message: 'Add a Gemini API key before generating a voice test.', suggestion: 'Open connection settings.', details: '', retry: null });
+  hideServiceError(); setBusy(true, 'voice', AUDIO_PROGRESS_MESSAGES);
+  const prompt = `${character.direction || 'Speak naturally and clearly.'}\n${character.accent || ''}\nRead exactly: Hello, I am ${character.name}. This is a short voice preview for the podcast.`;
+  try {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: character.voice } } } } }) });
+    const data = await response.json();
+    if (!response.ok) throw createApiError(response.status, data?.error?.message || 'Voice test failed.', JSON.stringify(data, null, 2));
+    const part = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData?.data);
+    if (!part) throw new Error('Gemini returned no voice-test audio.');
+    const url = URL.createObjectURL(pcm16ToWavBlob(base64ToBytes(part.inlineData.data), sampleRateFromMimeType(part.inlineData.mimeType), 1));
+    const audio = new Audio(url); audio.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true }); await audio.play();
+  } catch (error) { handleGenerationError(error, 'Voice test failed', 'Try another voice or TTS model.', () => generateVoiceTest(index)); }
+  finally { setBusy(false); }
+}
+
+function renderAudioStage() {
+  if (!appState.audio.url || !appState.audio.blob) return;
+  els.audioContent.innerHTML = `<article class="audio-card">
+    <div class="audio-header"><div><p class="eyebrow">Generated episode</p><h2 id="audioStageTitle" tabindex="-1">${escapeHtml(appState.script?.title || 'Podcast')}</h2><p>${escapeHtml(appState.script?.summary || '')}</p></div></div>
+    <div class="waveform-wrap"><canvas id="waveformCanvas" aria-label="Waveform for generated episode"></canvas><audio id="audioPlayer" controls preload="metadata" src="${escapeHtml(appState.audio.url)}"></audio></div>
+    <div class="voice-chips">${appState.characters.map((character, index) => `<span class="voice-chip"><b>${index ? 'B' : 'A'}</b>${escapeHtml(character.name)} · ${escapeHtml(character.voice)}</span>`).join('')}</div>
+    <div class="audio-meta">
+      <div class="metric"><strong>${formatDuration(appState.audio.durationSeconds)}</strong><span>duration</span></div>
+      <div class="metric"><strong>${formatBytes(appState.audio.blob.size)}</strong><span>file size</span></div>
+      <div class="metric"><strong>${appState.audio.sampleRate.toLocaleString('en-GB')} Hz</strong><span>sample rate</span></div>
+      <div class="metric"><strong>${appState.audio.generationSeconds.toFixed(1)} s</strong><span>generated in</span></div>
+    </div>
+    <div class="audio-actions">
+      <button class="primary-button" type="button" data-audio-action="download">Download WAV</button>
+      <button class="secondary-button" type="button" data-audio-action="regenerate">Regenerate</button>
+      <button class="ghost-button" type="button" data-audio-action="script">Return to script</button>
+      <button class="ghost-button" type="button" data-audio-action="copy">Copy transcript</button>
+      <button class="ghost-button" type="button" data-audio-action="new">Start new podcast</button>
+    </div>
+  </article>`;
+  requestAnimationFrame(() => drawWaveform(appState.audio.blob));
+}
+async function drawWaveform(blob) {
+  const canvas = document.getElementById('waveformCanvas');
+  if (!canvas || !blob) return;
+  const ratio = Math.max(1, window.devicePixelRatio || 1); const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width * ratio)); canvas.height = Math.max(1, Math.round(rect.height * ratio));
+  const context = canvas.getContext('2d'); context.scale(ratio, ratio);
+  try {
+    const audioContext = new AudioContext(); const audioBuffer = await audioContext.decodeAudioData(await blob.arrayBuffer()); const data = audioBuffer.getChannelData(0);
+    const bars = Math.max(60, Math.floor(rect.width / 5)); const step = Math.max(1, Math.floor(data.length / bars));
+    context.clearRect(0, 0, rect.width, rect.height); context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim(); context.lineWidth = 2; context.lineCap = 'round';
+    for (let index = 0; index < bars; index += 1) {
+      let peak = 0; for (let sample = 0; sample < step; sample += 1) peak = Math.max(peak, Math.abs(data[index * step + sample] || 0));
+      const x = (index / Math.max(1, bars - 1)) * rect.width; const height = Math.max(3, peak * (rect.height - 16));
+      context.beginPath(); context.moveTo(x, (rect.height - height) / 2); context.lineTo(x, (rect.height + height) / 2); context.stroke();
+    }
+    await audioContext.close();
+  } catch {
+    context.clearRect(0, 0, rect.width, rect.height); context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim(); context.font = '14px system-ui'; context.fillText('Waveform unavailable. Native playback remains available.', 12, rect.height / 2);
+  }
+}
+  </script>
+  <script>
+function setBusy(busy, kind = '', messages = []) {
+  appState.busy = busy;
+  els.createStage.setAttribute('aria-busy', String(busy && kind === 'script'));
+  els.scriptStage.setAttribute('aria-busy', String(busy && ['refine', 'audio'].includes(kind)));
+  clearInterval(progressTimer); clearInterval(progressMessageTimer);
+  const status = kind === 'script' ? { shell: els.createLoading, message: els.createLoadingMessage, elapsed: els.createElapsed } : { shell: els.scriptLoading, message: els.scriptLoadingMessage, elapsed: els.scriptElapsed };
+  els.createLoading.classList.remove('visible'); els.scriptLoading.classList.remove('visible');
+  els.generateScriptButton.disabled = busy; els.generateAudioButton.disabled = busy;
+  if (!busy) { restoreActionLabels(); renderConnectionStatus(); renderCurrentStage({ focus: false }); return; }
+  const safeMessages = messages.length ? messages : ['Working…']; let index = 0; progressStartedAt = performance.now();
+  status.message.textContent = safeMessages[0]; status.elapsed.textContent = '0:00'; status.shell.classList.add('visible');
+  if (kind === 'audio') els.scriptLoadingTitle.textContent = 'Generating podcast audio';
+  else if (kind === 'voice') els.scriptLoadingTitle.textContent = 'Generating voice preview';
+  else els.scriptLoadingTitle.textContent = 'Refining script';
+  const activeButton = kind === 'script' ? els.generateScriptButton : els.generateAudioButton;
+  activeButton.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${kind === 'audio' ? 'Generating audio…' : kind === 'script' ? 'Generating script…' : 'Working…'}</span>`;
+  progressTimer = setInterval(() => { status.elapsed.textContent = formatDuration((performance.now() - progressStartedAt) / 1000); }, 250);
+  progressMessageTimer = setInterval(() => { index = (index + 1) % safeMessages.length; status.message.textContent = safeMessages[index]; }, 2600);
+}
+function restoreActionLabels() {
+  els.generateScriptButton.innerHTML = '<span>Generate script</span>';
+  els.generateAudioButton.innerHTML = '<span>Generate audio</span>';
+}
+function createApiError(status, message, details = '') { const error = new Error(message); error.status = status; error.details = details; return error; }
+function mapError(error) {
+  const status = Number(error?.status || 0); const message = String(error?.message || 'Unknown error.');
+  if (status === 400) return { message, suggestion: 'Check the model IDs and generation settings.' };
+  if (status === 401 || status === 403) return { message, suggestion: 'Verify the API key and confirm that Gemini API access is enabled.' };
+  if (status === 429) return { message, suggestion: 'The key may have reached a quota or rate limit. Retry later.' };
+  if (status >= 500) return { message, suggestion: 'The Gemini service may be temporarily unavailable.' };
+  if (error instanceof TypeError && /fetch/i.test(message)) return { message: 'The browser could not reach the Gemini API.', suggestion: 'Check the network or serve this file from localhost.' };
+  return { message, suggestion: 'Review the technical details, adjust the request, and retry.' };
+}
+function showServiceError({ title, message, suggestion, details = '', retry = null }) {
+  els.serviceErrorTitle.textContent = title; els.serviceErrorMessage.textContent = message; els.serviceErrorSuggestion.textContent = suggestion;
+  els.serviceErrorDetails.textContent = details || 'No additional technical details.'; els.retryButton.classList.toggle('hidden', typeof retry !== 'function'); els.retryButton.onclick = typeof retry === 'function' ? retry : null;
+  els.serviceError.classList.add('visible'); els.serviceError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function hideServiceError() { els.serviceError.classList.remove('visible'); els.retryButton.onclick = null; }
+function handleGenerationError(error, title, fallbackSuggestion, retry) {
+  console.error(error); const mapped = mapError(error);
+  showServiceError({ title, message: mapped.message, suggestion: mapped.suggestion || fallbackSuggestion, details: error?.details || error?.stack || String(error), retry });
+}
+
+function resetProject({ preserveConnection = true, preservePreferences = true } = {}) {
+  revokeAudioUrl(); appState.currentStage = 'create'; appState.script = null; appState.originalScript = null; appState.history = []; appState.historyIndex = -1;
+  appState.podcast = { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' };
+  appState.characters = [{ id: 'speaker-a', ...CHARACTER_TEMPLATES[0], voice: 'Aoede' }, { id: 'speaker-b', ...CHARACTER_TEMPLATES[1], voice: 'Charon' }];
+  appState.expandedSpeakers.clear();
+  if (!preserveConnection) appState.connection = { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' };
+  if (!preservePreferences) appState.settings = { theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', maxTtsCharacters: DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 };
+  populateInputsFromState(); renderConnectionForms(); renderSpeakerCards(); applyTheme(); savePreferences(); renderCurrentStage(); hideServiceError(); clearValidation();
+}
+function clearStoredData() {
+  localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(API_KEY_STORAGE_KEY); sessionStorage.removeItem(SESSION_KEY);
+  els.settingsDialog.close(); resetProject({ preserveConnection: false, preservePreferences: false }); announce('Stored data cleared.');
+}
+  </script>
+  <script>
+function closeMenus(except) {
+  for (const menu of document.querySelectorAll('details.menu[open]')) if (menu !== except) menu.removeAttribute('open');
+}
+
+document.querySelector('.stepper').addEventListener('click', event => {
+  const button = event.target.closest('[data-stage]'); if (button && !button.disabled) setStage(button.dataset.stage);
+});
+els.createForm.addEventListener('submit', event => { event.preventDefault(); generatePodcastScript(); });
+els.createForm.addEventListener('input', event => {
+  if (event.target.matches('input[name="duration"]')) {
+    els.customDurationField.classList.toggle('hidden', event.target.value !== 'custom'); if (event.target.value === 'custom') els.customDuration.focus();
+  }
+  if (event.target === els.language) els.customLanguage.classList.toggle('hidden', els.language.value !== 'custom');
+  if (event.target === els.podcastFormat) els.customFormat.classList.toggle('hidden', els.podcastFormat.value !== 'custom');
+  syncCreateInputs();
+});
+els.speakerList.addEventListener('input', event => {
+  const card = event.target.closest('[data-speaker-index]'); const field = event.target.dataset.speakerField; if (!card || !field) return;
+  const index = Number(card.dataset.speakerIndex); appState.characters[index][field] = event.target.value;
+  if (field === 'voice') event.target.parentElement.querySelector('.voice-description').textContent = `${event.target.value} · ${voiceDescription(event.target.value)}`;
+  queueSave();
+});
+els.speakerList.addEventListener('click', event => {
+  const button = event.target.closest('[data-speaker-action]'); const card = event.target.closest('[data-speaker-index]'); if (!button || !card) return;
+  const index = Number(card.dataset.speakerIndex); const action = button.dataset.speakerAction;
+  if (action === 'toggle') { appState.expandedSpeakers.has(index) ? appState.expandedSpeakers.delete(index) : appState.expandedSpeakers.add(index); renderSpeakerCards(); }
+  if (action === 'randomise') randomiseCharacter(index);
+  if (action === 'reset') resetCharacter(index);
+  if (action === 'voice-test') generateVoiceTest(index);
+});
+els.swapCharacters.addEventListener('click', () => { appState.characters.reverse(); appState.characters[0].id = 'speaker-a'; appState.characters[1].id = 'speaker-b'; renderSpeakerCards(); queueSave(); });
+
+els.scriptTabs.addEventListener('click', event => { const tab = event.target.closest('[data-script-view]'); if (!tab) return; appState.scriptView = tab.dataset.scriptView; renderScriptTabs(); });
+els.scriptTabs.addEventListener('keydown', event => {
+  const tabs = [...els.scriptTabs.querySelectorAll('[role="tab"]')]; const current = tabs.indexOf(document.activeElement); if (current < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault(); let next = current;
+  if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+  if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+  if (event.key === 'Home') next = 0; if (event.key === 'End') next = tabs.length - 1;
+  tabs[next].focus(); tabs[next].click();
+});
+els.scriptPanel.addEventListener('input', event => { if (!event.target.dataset.segmentField) return; if (event.target.tagName === 'TEXTAREA') autoSize(event.target); updateSegmentFromControl(event.target); });
+els.scriptPanel.addEventListener('change', event => { if (event.target.dataset.segmentField) updateSegmentFromControl(event.target); });
+els.scriptPanel.addEventListener('click', event => { const button = event.target.closest('[data-segment-action]'); const card = event.target.closest('[data-segment-index]'); if (button && card) performSegmentAction(Number(card.dataset.segmentIndex), button.dataset.segmentAction); });
+els.scriptPanel.addEventListener('dragstart', event => { const card = event.target.closest('[data-segment-index]'); if (!card) return; dragIndex = Number(card.dataset.segmentIndex); card.classList.add('dragging'); event.dataTransfer.effectAllowed = 'move'; });
+els.scriptPanel.addEventListener('dragover', event => { const card = event.target.closest('[data-segment-index]'); if (!card) return; event.preventDefault(); for (const other of els.scriptPanel.querySelectorAll('.drag-over')) other.classList.remove('drag-over'); card.classList.add('drag-over'); });
+els.scriptPanel.addEventListener('drop', event => { const card = event.target.closest('[data-segment-index]'); if (!card) return; event.preventDefault(); reorderSegments(dragIndex, Number(card.dataset.segmentIndex)); });
+els.scriptPanel.addEventListener('dragend', () => { dragIndex = null; for (const card of els.scriptPanel.querySelectorAll('.dragging,.drag-over')) card.classList.remove('dragging', 'drag-over'); });
+
+for (const menu of [els.refineMenu, els.scriptMoreMenu]) menu.addEventListener('click', event => {
+  const button = event.target.closest('[data-script-action]'); if (!button) return; const action = button.dataset.scriptAction; menu.removeAttribute('open');
+  if (['regenerate','shorten','expand','conversational','serious','humour'].includes(action)) refineScript(action);
+  if (action === 'reset' && appState.originalScript) { snapshotScript(); appState.script = deepClone(appState.originalScript); snapshotScript({ force: true }); queueSave(); renderScriptStage(); }
+  if (action === 'copy') copyText(buildCleanTranscript(), 'Transcript copied.');
+  if (action === 'download-json') downloadBlob(new Blob([JSON.stringify(appState.script, null, 2)], { type: 'application/json' }), buildEpisodeFilename('json'));
+});
+els.undoButton.addEventListener('click', undo); els.redoButton.addEventListener('click', redo);
+els.generateAudioButton.addEventListener('click', generatePodcastAudio); els.backToCreateButton.addEventListener('click', () => setStage('create'));
+els.audioContent.addEventListener('click', event => {
+  const button = event.target.closest('[data-audio-action]'); if (!button) return; const action = button.dataset.audioAction;
+  if (action === 'download' && appState.audio.blob) downloadBlob(appState.audio.blob, buildEpisodeFilename('wav'));
+  if (action === 'regenerate') generatePodcastAudio(); if (action === 'script') setStage('script');
+  if (action === 'copy') copyText(buildCleanTranscript(), 'Transcript copied.'); if (action === 'new') resetProject({ preserveConnection: true, preservePreferences: true });
+});
+
+function openSettings() { renderConnectionForms(); els.settingsDialog.showModal(); }
+els.settingsButton.addEventListener('click', openSettings); els.connectionChip.addEventListener('click', openSettings);
+els.closeSettingsButton.addEventListener('click', () => { appState.settings.maxTtsCharacters = Math.max(2000, Number(els.maxTtsCharacters.value) || DEFAULT_MAX_TTS_CHARACTERS); appState.settings.speakingRate = Math.min(200, Math.max(100, Number(els.speakingRate.value) || 140)); queueSave(); els.settingsDialog.close(); if (appState.currentStage === 'script') renderScriptMetrics(); updateTargetSummary(); });
+els.closeSettingsIcon.addEventListener('click', () => els.settingsDialog.close());
+els.clearStoredDataButton.addEventListener('click', clearStoredData);
+for (const formHost of [els.connectionSetupForm, els.connectionSettingsForm]) {
+  formHost.addEventListener('change', event => { const form = event.target.closest('[data-connection-form]'); if (form) syncConnectionForm(form); });
+  formHost.addEventListener('click', event => { const button = event.target.closest('[data-toggle-key]'); if (!button) return; const input = button.parentElement.querySelector('input'); const showing = input.type === 'text'; input.type = showing ? 'password' : 'text'; button.textContent = showing ? 'Show' : 'Hide'; button.setAttribute('aria-label', showing ? 'Show API key' : 'Hide API key'); });
+}
+els.themeButton.addEventListener('click', () => { appState.settings.theme = appState.settings.theme === 'dark' ? 'light' : 'dark'; applyTheme(); queueSave(); if (appState.currentStage === 'audio') drawWaveform(appState.audio.blob); });
+els.dismissErrorButton.addEventListener('click', hideServiceError);
+document.addEventListener('click', event => { const menu = event.target.closest('details.menu'); closeMenus(menu); });
+document.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); appState.currentStage === 'create' ? generatePodcastScript() : appState.currentStage === 'script' ? generatePodcastAudio() : null; }
+  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z' && appState.currentStage === 'script') { event.preventDefault(); undo(); }
+  if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z')) && appState.currentStage === 'script') { event.preventDefault(); redo(); }
+});
+window.addEventListener('beforeunload', revokeAudioUrl);
+  </script>
+  <script>
+function initialiseApp() {
+  loadPreferences(); applyTheme(); populateInputsFromState(); renderConnectionForms(); renderSpeakerCards();
+  if (appState.script) resetHistory(); renderCurrentStage({ focus: false });
+  els.saveState.textContent = 'Saved locally';
+}
+initialiseApp();
+  </script>
+
+</body>
+</html>
