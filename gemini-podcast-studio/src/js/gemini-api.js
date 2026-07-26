@@ -49,7 +49,9 @@ async function generatePodcastScript() {
   syncCreateInputs();
   const errors = validatePodcastBrief();
   if (errors.length) return showValidationErrors(errors);
-  clearValidation(); hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-script';
+  clearValidation();
+  if (getDuplicateVoiceSignature() && !isDuplicateVoiceApproved()) return showDuplicateVoiceWarning();
+  hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-script';
   setBusy(true, 'script', SCRIPT_PROGRESS_MESSAGES);
   try {
     appState.script = validateScript(await callGeminiText({ prompt: buildScriptPrompt(), schema: buildScriptSchema(), actionLabel: 'generating the podcast script' }));
