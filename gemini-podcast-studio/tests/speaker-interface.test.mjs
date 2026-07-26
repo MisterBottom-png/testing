@@ -115,7 +115,7 @@ test('dependent controls expose clear disabled states and preview is disabled wi
 
 test('native labelled controls provide keyboard navigation semantics', () => {
   const html = renderWith();
-  assert.match(html, /<fieldset class="field full speaker-gender-field">/);
+  assert.match(html, /<fieldset[^>]*class="field full speaker-gender-field"[^>]*>/);
   assert.match(html, /<legend>Gender<\/legend>/);
   assert.equal((html.match(/type="radio"/g) || []).length, 4);
   assert.doesNotMatch(html, /tabindex="-1"/);
