@@ -27,11 +27,27 @@ els.speakerList.addEventListener('change', event => {
   const field = event.target.dataset.speakerField;
   if (!card || !['gender', 'voiceType', 'geminiVoiceName'].includes(field)) return;
   const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  resetDuplicateVoiceApproval();
   updateSpeakerField(speaker, field, event.target.value);
   renderSpeakerCards();
   queueSave();
 });
+els.speakerList.addEventListener('click', event => {
+  const button = event.target.closest('[data-duplicate-voice-action]');
+  if (!button) return;
+  if (button.dataset.duplicateVoiceAction === 'use-anyway') {
+    approveDuplicateVoice();
+    renderSpeakerCards();
+    generatePodcastScript();
+  }
+  if (button.dataset.duplicateVoiceAction === 'choose-another') {
+    duplicateVoiceWarningVisible = false;
+    renderSpeakerCards();
+    requestAnimationFrame(() => document.getElementById('speakerVoice1')?.focus());
+  }
+});
 els.swapCharacters.addEventListener('click', () => {
+  resetDuplicateVoiceApproval();
   appState.speakers.reverse();
   appState.speakers[0].id = 'host-1';
   appState.speakers[1].id = 'host-2';
