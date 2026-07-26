@@ -1238,6 +1238,14 @@
       return String(value ?? '').replace(/\s+/g, ' ').trim();
     }
 
+    function normalisePerformanceTag(value) {
+      return normaliseWhitespace(value)
+        .replace(/^\[+|\]+$/g, '')
+        .replace(/[\r\n]+/g, ' ')
+        .slice(0, 80)
+        .trim();
+    }
+
     function formatDuration(seconds) {
       const safe = Math.max(0, Math.round(Number(seconds) || 0));
       const minutes = Math.floor(safe / 60);
@@ -1662,7 +1670,7 @@
             <select data-segment-field="speaker" aria-label="Speaker for segment ${index + 1}">
               ${speakerOptions.replace(`value="${escapeHtml(segment.speaker)}"`, `value="${escapeHtml(segment.speaker)}" selected`)}
             </select>
-            <input type="text" data-segment-field="direction" value="${escapeHtml(segment.direction || '')}" placeholder="Delivery direction" aria-label="Direction for segment ${index + 1}" />
+            <input type="text" data-segment-field="direction" value="${escapeHtml(segment.direction || '')}" placeholder="Optional performance tag, e.g. curious" aria-label="Performance tag for segment ${index + 1}" />
             <div class="segment-actions" aria-label="Segment ${index + 1} actions">
               <button class="segment-action" type="button" data-segment-action="up" title="Move up" aria-label="Move segment up">↑</button>
               <button class="segment-action" type="button" data-segment-action="down" title="Move down" aria-label="Move segment down">↓</button>
@@ -1759,7 +1767,7 @@
         estimatedWords: Number(script.estimatedWords) || getWordCount(script),
         segments: script.segments.map(segment => ({
           speaker: normaliseWhitespace(segment.speaker),
-          direction: normaliseWhitespace(segment.direction),
+          direction: normalisePerformanceTag(segment.direction),
           text: normaliseWhitespace(segment.text)
         }))
       };
@@ -1793,7 +1801,7 @@
               type: 'object',
               properties: {
                 speaker: { type: 'string', enum: speakerNames },
-                direction: { type: 'string', description: 'Short delivery direction, without brackets.' },
+                direction: { type: 'string', description: 'Optional short English Gemini TTS performance tag without brackets. Use an empty string for most segments.' },
                 text: { type: 'string', description: 'Spoken dialogue only.' }
               },
               required: ['speaker', 'direction', 'text']
@@ -1839,7 +1847,12 @@ RULES
 - Alternate naturally. Avoid long monologues.
 - Keep each dialogue segment short, speakable, and useful.
 - Do not use markdown, URLs, spoken citations, sound-effect labels, or stage directions inside spoken text.
-- Put short performance guidance only in the direction field.
+- Use the direction field as an optional English Gemini TTS performance tag without brackets.
+- Keep tags sparse and natural: leave the direction field empty for most dialogue turns.
+- Add a tag only when delivery genuinely changes or a reaction materially improves the line.
+- Aim to tag roughly one quarter of the segments, never every line.
+- Prefer subtle cues such as curious, softly, dryly, more serious, brief pause, laughs softly, or sighs.
+- Avoid exaggerated acting, repeated tags, forced laughter, sound-effect labels, and tags that merely repeat a character's base personality.
 - Do not claim uncertain facts with unsupported certainty.
 - Include an opening hook, a clear topic introduction, substantive discussion, at least one disagreement or contrasting viewpoint, a useful conclusion, and a natural closing line.
 - Output only JSON matching the supplied schema.`;
@@ -1922,7 +1935,7 @@ RULES
       setBusy(true, 'script', SCRIPT_PROGRESS_MESSAGES);
       hideError();
 
-      const prompt = `Transform the existing podcast script according to this instruction:\n${instruction}\n\nKeep exactly these speaker names: ${appState.characters.map(character => character.name).join(' and ')}.\nKeep all dialogue in ${getLanguage()}.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(appState.script)}`;
+      const prompt = `Transform the existing podcast script according to this instruction:\n${instruction}\n\nKeep exactly these speaker names: ${appState.characters.map(character => character.name).join(' and ')}.\nKeep all dialogue in ${getLanguage()}.\nKeep performance tags sparse, subtle, and natural. Leave most direction fields empty, use English tags without brackets, and avoid repeating the same tag on nearby turns.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(appState.script)}`;
 
       try {
         const rawScript = await callGeminiText({ prompt, schema: buildScriptSchema(), actionLabel: 'refining the podcast script' });
@@ -1984,12 +1997,16 @@ RULES
         return `${character.name} should sound ${details || 'natural and conversational'}.`;
       }).join('\n');
 
+      let previousTag = '';
       const dialogue = script.segments.map(segment => {
-        const direction = segment.direction ? ` [${segment.direction}]` : '';
-        return `${segment.speaker}:${direction} ${segment.text}`;
+        const tag = normalisePerformanceTag(segment.direction);
+        const repeatedTag = tag && tag.toLocaleLowerCase() === previousTag.toLocaleLowerCase();
+        const performanceCue = tag && !repeatedTag ? ` [${tag}]` : '';
+        previousTag = tag || '';
+        return `${segment.speaker}:${performanceCue} ${segment.text}`;
       }).join('\n\n');
 
-      return `Create a natural podcast conversation between ${characterA.name} and ${characterB.name}.\n\n${speakerInstructions}\n\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Keep the delivery natural and preserve every spoken word exactly.\n\n${dialogue}`;
+      return `Create a natural podcast conversation between ${characterA.name} and ${characterB.name}.\n\n${speakerInstructions}\n\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Bracketed cues are silent, subtle performance directions that apply only to the line immediately following them. Do not exaggerate them. Keep the delivery conversational and preserve every spoken word exactly.\n\n${dialogue}`;
     }
 
     // 13. Gemini audio generation
