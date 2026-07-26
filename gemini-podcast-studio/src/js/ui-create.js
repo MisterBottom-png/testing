@@ -49,7 +49,7 @@ function updateTargetSummary() {
 function renderSpeakerCards() {
   els.speakerList.innerHTML = appState.characters.map((character, index) => {
     const expanded = appState.expandedSpeakers.has(index);
-    const options = VOICES.map(([name, description]) => `<option value="${name}"${character.voice === name ? ' selected' : ''}>${name} — ${description}</option>`).join('');
+    const options = getGeminiTtsVoices().map(({ apiName, description }) => `<option value="${apiName}"${character.voice === apiName ? ' selected' : ''}>${apiName} — ${description}</option>`).join('');
     return `<article class="speaker-card${expanded ? ' expanded' : ''}" data-speaker-index="${index}">
       <div class="speaker-card-head">
         <span class="speaker-id">${index === 0 ? 'A' : 'B'}</span>
@@ -87,8 +87,8 @@ function randomiseCharacter(index) {
   const other = appState.characters[index ? 0 : 1];
   const templates = CHARACTER_TEMPLATES.filter(template => template.name !== other.name);
   const template = templates[Math.floor(Math.random() * templates.length)];
-  const voices = VOICES.filter(([name]) => name !== other.voice);
-  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...template, voice: voices[Math.floor(Math.random() * voices.length)][0] };
+  const voices = getGeminiTtsVoices().filter(({ apiName }) => apiName !== other.voice);
+  appState.characters[index] = { id: `speaker-${index ? 'b' : 'a'}`, ...template, voice: voices[Math.floor(Math.random() * voices.length)]?.apiName || '' };
   renderSpeakerCards(); queueSave();
 }
 
