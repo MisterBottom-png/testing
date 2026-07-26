@@ -1645,12 +1645,12 @@ function resetHistory() { appState.history = []; appState.historyIndex = -1; sna
 function undo() {
   if (appState.historyIndex <= 0) return;
   appState.historyIndex -= 1; appState.script = deepClone(appState.history[appState.historyIndex]);
-  renderScriptStage(); queueSave(); announce('Undid the last script change.');
+  invalidatePodcastAudio('script-undo'); renderScriptStage(); queueSave(); announce('Undid the last script change.');
 }
 function redo() {
   if (appState.historyIndex >= appState.history.length - 1) return;
   appState.historyIndex += 1; appState.script = deepClone(appState.history[appState.historyIndex]);
-  renderScriptStage(); queueSave(); announce('Redid the script change.');
+  invalidatePodcastAudio('script-redo'); renderScriptStage(); queueSave(); announce('Redid the script change.');
 }
 function updateUndoRedo() {
   els.undoButton.disabled = appState.historyIndex <= 0 || appState.busy;
@@ -1718,10 +1718,16 @@ function renderScriptMetrics() {
     <div class="metric"><strong>${formatDuration(seconds)}</strong><span>estimated</span></div>
     <div class="metric"><strong>${appState.script.segments.length.toLocaleString('en-GB')}</strong><span>segments</span></div>
     <div class="metric"><strong>${ttsChars.toLocaleString('en-GB')}</strong><span>TTS characters</span></div>`;
-  const tooLong = ttsChars > appState.settings.maxTtsCharacters;
-  els.scriptValidation.className = `validation-status${tooLong ? ' warning' : ''}`;
-  els.scriptValidation.textContent = tooLong ? `Transcript exceeds the ${appState.settings.maxTtsCharacters.toLocaleString('en-GB')} character threshold.` : 'Script is ready for audio generation.';
-  els.generateAudioButton.disabled = tooLong || appState.busy;
+  let chunkCount = 1;
+  let chunkError = null;
+  try { chunkCount = Math.max(1, createTtsChunks().length); } catch (error) { chunkError = error; }
+  els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 ? ' warning' : ''}`;
+  els.scriptValidation.textContent = chunkError
+    ? chunkError.message
+    : chunkCount > 1
+      ? `Script is ready and will be generated in ${chunkCount} TTS chunks.`
+      : 'Script is ready for audio generation.';
+  els.generateAudioButton.disabled = Boolean(chunkError) || appState.busy;
 }
 function segmentMenu(index) {
   return `<details class="menu icon-menu"><summary class="menu-summary" aria-label="Segment ${index + 1} actions">${ICONS.more}</summary><div class="menu-popover">
@@ -1759,7 +1765,7 @@ function updateSegmentFromControl(control) {
     card.dataset.speakerIndex = String(Math.max(0, appState.speakers.findIndex(speaker => speaker.speakerName === control.value)));
   }
   appState.script.estimatedWords = getWordCount();
-  renderScriptMetrics(); queueSave();
+  invalidatePodcastAudio('script-edited'); renderScriptMetrics(); queueSave();
   clearTimeout(typingHistoryTimer);
   typingHistoryTimer = setTimeout(() => snapshotScript(), 650);
 }
@@ -1775,7 +1781,7 @@ function performSegmentAction(index, action) {
     const nextSpeaker = appState.speakers.find(speaker => speaker.speakerName !== segments[index].speaker)?.speakerName || appState.speakers[0].speakerName;
     segments.splice(index + 1, 0, { speaker: nextSpeaker, direction: '', text: '' });
   }
-  appState.script.estimatedWords = getWordCount(); snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  appState.script.estimatedWords = getWordCount(); invalidatePodcastAudio('script-structure-changed'); snapshotScript({ force: true }); queueSave(); renderScriptStage();
   const focusIndex = action === 'delete' ? Math.min(index, segments.length - 1) : action === 'up' ? Math.max(0, index - 1) : action === 'down' ? Math.min(segments.length - 1, index + 1) : index + 1;
   requestAnimationFrame(() => els.scriptPanel.querySelector(`[data-segment-index="${focusIndex}"] textarea`)?.focus());
   announce(`Segment ${index + 1} ${action === 'delete' ? 'deleted' : action === 'duplicate' ? 'duplicated' : action === 'insert' ? 'inserted' : `moved ${action}`}.`);
@@ -1784,7 +1790,7 @@ function reorderSegments(from, to) {
   if (from === to || from == null || to == null) return;
   const [segment] = appState.script.segments.splice(from, 1);
   appState.script.segments.splice(to, 0, segment);
-  snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  invalidatePodcastAudio('script-reordered'); snapshotScript({ force: true }); queueSave(); renderScriptStage();
   els.reorderStatus.textContent = `Segment moved to position ${to + 1} of ${appState.script.segments.length}.`;
 }
 function buildCleanTranscript() { return appState.script?.segments?.map(segment => `${segment.speaker}: ${segment.text}`).join('\n\n') || ''; }
@@ -1806,29 +1812,74 @@ function buildTtsTranscript(script = appState.script) {
 }
   </script>
   <script>
+function buildScriptCharacters(speakers = appState.speakers) {
+  return (Array.isArray(speakers) ? speakers : []).map(speaker => ({
+    name: normaliseWhitespace(speaker.speakerName),
+    personality: normaliseWhitespace(speaker.personality),
+    role: normaliseWhitespace(speaker.id)
+  }));
+}
+
 function buildScriptSchema() {
+  const scriptCharacters = buildScriptCharacters();
   return {
     type: 'object',
     properties: {
       title: { type: 'string' }, summary: { type: 'string' }, language: { type: 'string' }, estimatedWords: { type: 'integer' },
       segments: { type: 'array', items: { type: 'object', properties: {
-        speaker: { type: 'string', enum: appState.speakers.map(speaker => speaker.speakerName) },
+        speaker: { type: 'string', enum: scriptCharacters.map(character => character.name) },
         direction: { type: 'string' }, text: { type: 'string' }
       }, required: ['speaker', 'direction', 'text'] } }
     }, required: ['title', 'summary', 'language', 'estimatedWords', 'segments']
   };
 }
+
 function buildScriptPrompt() {
-  const [a, b] = appState.speakers;
-  return `Create a polished two-person podcast script.\n\nTOPIC\n${appState.podcast.topic.trim()}\n\nEPISODE SETTINGS\nLanguage: ${getLanguage()}\nTarget length: approximately ${getTargetWords()} spoken words, staying within plus or minus 10 percent\nFormat: ${getPodcastFormat()}\nTone: ${appState.podcast.tones.join(', ') || 'Natural'}\nAdditional instructions: ${appState.podcast.instructions.trim() || 'None'}\n\nSPEAKER 1\nName: ${a.speakerName}\nRole: ${a.role || 'Podcast participant'}\nPersonality: ${a.personality || 'Natural and engaging'}\nSpeaking direction: ${a.deliveryInstructions || 'Natural conversational delivery'}\nAccent or language note: ${a.accent || 'None'}\n\nSPEAKER 2\nName: ${b.speakerName}\nRole: ${b.role || 'Podcast participant'}\nPersonality: ${b.personality || 'Natural and engaging'}\nSpeaking direction: ${b.deliveryInstructions || 'Natural conversational delivery'}\nAccent or language note: ${b.accent || 'None'}\n\nRULES\n- Use exactly the configured names: ${a.speakerName} and ${b.speakerName}.\n- Alternate naturally and avoid long monologues.\n- Keep each segment short and speakable.\n- Spoken text must not contain markdown, URLs, citations, sound-effect labels, or stage directions.\n- Use the direction field only for sparse, subtle English performance cues without brackets.\n- Include an opening hook, substantive discussion, contrasting viewpoints, a useful conclusion, and a natural closing line.\n- Output only JSON matching the supplied schema.`;
+  const [a, b] = buildScriptCharacters();
+  return `Create a polished two-person podcast script.\n\nTOPIC\n${appState.podcast.topic.trim()}\n\nEPISODE SETTINGS\nLanguage: ${getLanguage()}\nTarget length: approximately ${getTargetWords()} spoken words, staying within plus or minus 10 percent\nFormat: ${getPodcastFormat()}\nTone: ${appState.podcast.tones.join(', ') || 'Natural'}\nAdditional instructions: ${appState.podcast.instructions.trim() || 'None'}\n\nSPEAKER 1\nName: ${a.name}\nRole: ${a.role || 'host-1'}\nPersonality: ${a.personality || 'Natural and engaging'}\n\nSPEAKER 2\nName: ${b.name}\nRole: ${b.role || 'host-2'}\nPersonality: ${b.personality || 'Natural and engaging'}\n\nRULES\n- Use exactly the configured human names: ${a.name} and ${b.name}.\n- Never use Gemini voice identifiers as character names.\n- Alternate naturally and avoid long monologues.\n- Keep each segment short and speakable.\n- Spoken text must not contain markdown, URLs, citations, sound-effect labels, or stage directions.\n- Use the direction field only for sparse, subtle English performance cues without brackets.\n- Include an opening hook, substantive discussion, contrasting viewpoints, a useful conclusion, and a natural closing line.\n- Output only JSON matching the supplied schema.`;
 }
+
+function validateScriptSpeakers(script, speakers = appState.speakers) {
+  if (!Array.isArray(script?.segments)) return [];
+  const configuredNames = new Set((Array.isArray(speakers) ? speakers : []).map(speaker => normaliseWhitespace(speaker.speakerName)));
+  const issues = [];
+  script.segments.forEach((segment, index) => {
+    const visibleName = normaliseWhitespace(segment?.speaker);
+    if (!configuredNames.has(visibleName)) issues.push({ index, speaker: visibleName });
+  });
+  return issues;
+}
+
+function renameScriptSpeaker(oldName, newName, state = appState) {
+  const previousName = String(oldName ?? '');
+  const nextName = String(newName ?? '');
+  if (previousName === nextName) return false;
+  let changed = false;
+  const renameInScript = script => {
+    if (!Array.isArray(script?.segments)) return;
+    script.segments.forEach(segment => {
+      if (segment.speaker === previousName) {
+        segment.speaker = nextName;
+        changed = true;
+      }
+    });
+  };
+  renameInScript(state.script);
+  renameInScript(state.originalScript);
+  if (Array.isArray(state.history)) state.history.forEach(renameInScript);
+  return changed;
+}
+
 function validateScript(script) {
   if (!script || typeof script !== 'object') throw new Error('Gemini returned an invalid script object.');
   if (!normaliseWhitespace(script.title)) throw new Error('The generated script has no title.');
   if (!Array.isArray(script.segments) || script.segments.length < 2) throw new Error('The generated script contains too few dialogue segments.');
-  const allowed = new Set(appState.speakers.map(speaker => normaliseWhitespace(speaker.speakerName)));
+  const speakerIssues = validateScriptSpeakers(script);
+  if (speakerIssues.length) {
+    const issue = speakerIssues[0];
+    throw new Error(`Segment ${issue.index + 1} uses the unconfigured speaker “${issue.speaker || 'blank'}”.`);
+  }
   for (const [index, segment] of script.segments.entries()) {
-    if (!allowed.has(normaliseWhitespace(segment.speaker))) throw new Error(`Segment ${index + 1} uses an unexpected speaker.`);
     if (!normaliseWhitespace(segment.text)) throw new Error(`Segment ${index + 1} has no spoken text.`);
   }
   return {
@@ -1855,11 +1906,25 @@ async function callGeminiText({ prompt, schema, actionLabel }) {
 }
 async function generatePodcastScript() {
   syncCreateInputs();
+  const namesBeforeValidation = appState.speakers.map(speaker => speaker.speakerName);
   const errors = validatePodcastBrief();
+  appState.speakers.forEach((speaker, index) => {
+    const previousName = namesBeforeValidation[index];
+    if (previousName !== speaker.speakerName) {
+      renameScriptSpeaker(previousName, speaker.speakerName);
+      invalidateAudioForSpeakerMappingChange({
+        speakerId: speaker.id,
+        previousSpeakerName: previousName,
+        nextSpeakerName: speaker.speakerName,
+        previousVoiceName: speaker.geminiVoiceName,
+        nextVoiceName: speaker.geminiVoiceName
+      });
+    }
+  });
   if (errors.length) return showValidationErrors(errors);
   clearValidation();
   if (getDuplicateVoiceSignature() && !isDuplicateVoiceApproved()) return showDuplicateVoiceWarning();
-  hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-script';
+  hideServiceError(); revokeAudioUrl(); appState.audioCacheReferences = {}; appState.lastAction = 'generate-script';
   setBusy(true, 'script', SCRIPT_PROGRESS_MESSAGES);
   try {
     appState.script = validateScript(await callGeminiText({ prompt: buildScriptPrompt(), schema: buildScriptSchema(), actionLabel: 'generating the podcast script' }));
@@ -1881,10 +1946,10 @@ async function refineScript(action) {
   };
   if (!instructions[action]) return;
   appState.lastAction = `refine:${action}`; hideServiceError(); setBusy(true, 'refine', SCRIPT_PROGRESS_MESSAGES);
-  const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these speaker names: ${appState.speakers.map(speaker => speaker.speakerName).join(' and ')}.\nKeep all dialogue in ${getLanguage()}.\nKeep performance tags sparse and subtle.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(appState.script)}`;
+  const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these human speaker names: ${buildScriptCharacters().map(character => character.name).join(' and ')}.\nNever replace them with Gemini voice identifiers.\nKeep all dialogue in ${getLanguage()}.\nKeep performance tags sparse and subtle.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(appState.script)}`;
   try {
     snapshotScript(); appState.script = validateScript(await callGeminiText({ prompt, schema: buildScriptSchema(), actionLabel: 'refining the podcast script' }));
-    snapshotScript({ force: true }); queueSave(); renderScriptStage();
+    snapshotScript({ force: true }); invalidatePodcastAudio('script-refined'); queueSave(); renderScriptStage();
   } catch (error) {
     handleGenerationError(error, 'Script refinement failed', 'Try again or edit the script manually.', () => refineScript(action));
   } finally { setBusy(false); }
@@ -1908,29 +1973,199 @@ function pcm16ToWavBlob(pcmBytes, sampleRate = 24000, channels = 1) {
   new Uint8Array(buffer, 44).set(pcmBytes); return new Blob([buffer], { type: 'audio/wav' });
 }
 function sampleRateFromMimeType(mimeType) { return Number(String(mimeType || '').match(/rate=(\d+)/i)?.[1]) || 24000; }
+
+function buildSpeakerVoiceConfigs(speakers = appState.speakers) {
+  return (Array.isArray(speakers) ? speakers : []).map(speaker => ({
+    speaker: normaliseWhitespace(speaker.speakerName),
+    voiceConfig: { prebuiltVoiceConfig: { voiceName: normaliseWhitespace(speaker.geminiVoiceName) } }
+  }));
+}
+
+function getSpeakerVoiceMappingSignature(speakers = appState.speakers) {
+  return JSON.stringify((Array.isArray(speakers) ? speakers : []).map(speaker => ({
+    id: speaker.id,
+    speakerName: normaliseWhitespace(speaker.speakerName),
+    geminiVoiceName: normaliseWhitespace(speaker.geminiVoiceName)
+  })));
+}
+
+function hashTtsCacheValue(value) {
+  let hash = 2166136261;
+  const text = String(value ?? '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildTtsChunkCacheKey({ transcript, mappingSignature, index }) {
+  return `tts-${index}-${hashTtsCacheValue(`${mappingSignature}\n${transcript}`)}`;
+}
+
+function buildTtsRequestBody(transcript, speakerVoiceConfigs) {
+  return {
+    contents: [{ role: 'user', parts: [{ text: transcript }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: deepClone(speakerVoiceConfigs)
+        }
+      }
+    }
+  };
+}
+
+function createTtsChunks(script = appState.script, maxCharacters = appState.settings.maxTtsCharacters) {
+  if (!Array.isArray(script?.segments) || !script.segments.length) return [];
+  const safeLimit = Math.max(1, Number(maxCharacters) || DEFAULT_MAX_TTS_CHARACTERS);
+  const chunks = [];
+  let currentSegments = [];
+
+  const createChunk = segments => {
+    const chunkScript = { ...script, segments: deepClone(segments) };
+    return { script: chunkScript, transcript: buildTtsTranscript(chunkScript) };
+  };
+
+  for (const segment of script.segments) {
+    const candidateSegments = [...currentSegments, segment];
+    const candidate = createChunk(candidateSegments);
+    if (candidate.transcript.length <= safeLimit) {
+      currentSegments = candidateSegments;
+      continue;
+    }
+
+    if (!currentSegments.length) {
+      throw new Error(`A single script segment exceeds the ${safeLimit.toLocaleString('en-GB')} character TTS chunk limit.`);
+    }
+
+    chunks.push(createChunk(currentSegments));
+    currentSegments = [segment];
+    const singleSegmentChunk = createChunk(currentSegments);
+    if (singleSegmentChunk.transcript.length > safeLimit) {
+      throw new Error(`A single script segment exceeds the ${safeLimit.toLocaleString('en-GB')} character TTS chunk limit.`);
+    }
+  }
+
+  if (currentSegments.length) chunks.push(createChunk(currentSegments));
+  return chunks.map((chunk, index) => ({ ...chunk, index }));
+}
+
+function concatPcmBytes(parts) {
+  const totalLength = parts.reduce((total, part) => total + part.byteLength, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  parts.forEach(part => { combined.set(part, offset); offset += part.byteLength; });
+  return combined;
+}
+
+function invalidatePodcastAudio(reason = '') {
+  const hadAudio = Boolean(appState.audio?.url || appState.audio?.blob || Object.keys(appState.audioCacheReferences || {}).length);
+  revokeAudioUrl();
+  appState.audioCacheReferences = {};
+  if (appState.currentStage === 'audio' && appState.script) appState.currentStage = 'script';
+  if (reason) appState.lastAudioInvalidationReason = reason;
+  return hadAudio;
+}
+
+function invalidateAudioForSpeakerMappingChange({
+  speakerId = '',
+  previousSpeakerName = '',
+  nextSpeakerName = '',
+  previousVoiceName = '',
+  nextVoiceName = ''
+} = {}) {
+  const nameChanged = previousSpeakerName !== nextSpeakerName;
+  const voiceChanged = previousVoiceName !== nextVoiceName;
+  if (!nameChanged && !voiceChanged) return false;
+  return invalidatePodcastAudio(`speaker-mapping:${speakerId || 'unknown'}`);
+}
+
+function getTtsSpeakerValidationIssue(script = appState.script, speakers = appState.speakers) {
+  const issue = validateScriptSpeakers(script, speakers)[0];
+  if (!issue) return null;
+  return {
+    title: 'Script speaker mismatch',
+    message: `Segment ${issue.index + 1} uses “${issue.speaker || 'blank'}”, which is not a configured speaker.`,
+    suggestion: 'Choose one of the configured human speaker names before generating audio.'
+  };
+}
+
+async function requestTtsChunk(endpoint, transcript, speakerVoiceConfigs) {
+  const requestBody = buildTtsRequestBody(transcript, speakerVoiceConfigs);
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey },
+    body: JSON.stringify(requestBody)
+  });
+  const raw = await response.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { throw createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw); }
+  if (!response.ok) throw createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
+  const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
+  if (!audioPart) throw createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
+  return {
+    pcmBytes: base64ToBytes(audioPart.inlineData.data),
+    sampleRate: sampleRateFromMimeType(audioPart.inlineData.mimeType)
+  };
+}
+
 async function generatePodcastAudio() {
   if (!appState.script?.segments?.length) return;
-  const transcript = buildTtsTranscript();
-  if (transcript.length > appState.settings.maxTtsCharacters) return showServiceError({ title: 'Script is too long', message: `The TTS transcript contains ${transcript.length.toLocaleString('en-GB')} characters.`, suggestion: 'Shorten the script or increase the threshold in settings.', details: '', retry: null });
-  if (appState.speakers.some(speaker => !getGeminiTtsVoice(speaker.geminiVoiceName))) return showServiceError({ title: 'Voice selection required', message: 'One or more saved Gemini voices are unavailable.', suggestion: 'Select an available Gemini voice for both speakers.', details: '', retry: null });
-  hideServiceError(); revokeAudioUrl(); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
+  const speakerIssue = getTtsSpeakerValidationIssue();
+  if (speakerIssue) return showServiceError({ ...speakerIssue, details: '', retry: null });
+
+  const invalidSpeaker = appState.speakers.find(speaker => {
+    const voice = getGeminiTtsVoice(speaker.geminiVoiceName);
+    return !voice || voice.gender !== speaker.gender || voice.type !== speaker.voiceType;
+  });
+  if (invalidSpeaker) return showServiceError({ title: 'Voice selection required', message: `${invalidSpeaker.speakerName || 'A speaker'} does not have a valid matching Gemini voice.`, suggestion: 'Select an available voice matching the chosen gender and voice type.', details: '', retry: null });
+
+  let chunks;
+  try {
+    chunks = createTtsChunks();
+  } catch (error) {
+    return showServiceError({ title: 'Script segment is too long', message: error.message, suggestion: 'Split the long dialogue segment into shorter turns.', details: '', retry: null });
+  }
+  if (!chunks.length) return;
+
+  const speakerVoiceConfigs = buildSpeakerVoiceConfigs();
+  const mappingSignature = getSpeakerVoiceMappingSignature();
+  hideServiceError(); invalidatePodcastAudio('audio-regeneration'); appState.lastAction = 'generate-audio'; setBusy(true, 'audio', AUDIO_PROGRESS_MESSAGES);
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(getTtsModel())}:generateContent`;
   const startedAt = performance.now();
-  const requestBody = { contents: [{ role: 'user', parts: [{ text: transcript }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: appState.speakers.map(speaker => ({ speaker: speaker.speakerName, voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker.geminiVoiceName } } })) } } } };
+  const pcmParts = [];
+  let sampleRate = 0;
+
   try {
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': appState.connection.apiKey }, body: JSON.stringify(requestBody) });
-    const raw = await response.text(); let data;
-    try { data = JSON.parse(raw); } catch { throw createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw); }
-    if (!response.ok) throw createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
-    const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
-    if (!audioPart) throw createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
-    const pcmBytes = base64ToBytes(audioPart.inlineData.data); const sampleRate = sampleRateFromMimeType(audioPart.inlineData.mimeType); const wavBlob = pcm16ToWavBlob(pcmBytes, sampleRate, 1);
-    appState.audio = { blob: wavBlob, url: URL.createObjectURL(wavBlob), sampleRate, generationSeconds: (performance.now() - startedAt) / 1000, durationSeconds: pcmBytes.byteLength / (sampleRate * 2), createdAt: new Date().toISOString() };
+    for (const chunk of chunks) {
+      if (els.scriptLoadingMessage) els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
+      const result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);
+      if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+      sampleRate = sampleRate || result.sampleRate;
+      pcmParts.push(result.pcmBytes);
+    }
+
+    const pcmBytes = concatPcmBytes(pcmParts);
+    const wavBlob = pcm16ToWavBlob(pcmBytes, sampleRate || 24000, 1);
+    appState.audio = { blob: wavBlob, url: URL.createObjectURL(wavBlob), sampleRate: sampleRate || 24000, generationSeconds: (performance.now() - startedAt) / 1000, durationSeconds: pcmBytes.byteLength / ((sampleRate || 24000) * 2), createdAt: new Date().toISOString() };
+    appState.audioCacheReferences = {
+      voiceMappingSignature: mappingSignature,
+      chunks: chunks.map(chunk => ({
+        index: chunk.index,
+        cacheKey: buildTtsChunkCacheKey({ transcript: chunk.transcript, mappingSignature, index: chunk.index }),
+        speakerOrder: speakerVoiceConfigs.map(config => config.speaker)
+      }))
+    };
+    queueSave();
     setStage('audio');
   } catch (error) {
+    invalidatePodcastAudio('audio-generation-failed');
     handleGenerationError(error, 'Audio generation failed', 'Try a shorter script or select a different TTS model.', generatePodcastAudio);
   } finally { setBusy(false); }
 }
+
 async function generateVoiceTest(index) {
   const speaker = appState.speakers[index];
   if (!appState.connection.apiKey.trim()) return showServiceError({ title: 'API key required', message: 'Add a Gemini API key before generating a voice test.', suggestion: 'Open connection settings.', details: '', retry: null });
@@ -2075,8 +2310,24 @@ els.speakerList.addEventListener('input', event => {
   const card = event.target.closest('[data-speaker-index]');
   const field = event.target.dataset.speakerField;
   if (!card || !['speakerName', 'personality', 'deliveryInstructions'].includes(field)) return;
-  const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  const index = Number(card.dataset.speakerIndex);
+  const speaker = appState.speakers[index];
+  const previousSpeakerName = speaker.speakerName;
+  const previousVoiceName = speaker.geminiVoiceName;
   updateSpeakerField(speaker, field, event.target.value);
+
+  if (field === 'speakerName' && previousSpeakerName !== speaker.speakerName) {
+    renameScriptSpeaker(previousSpeakerName, speaker.speakerName);
+    invalidateAudioForSpeakerMappingChange({
+      speakerId: speaker.id,
+      previousSpeakerName,
+      nextSpeakerName: speaker.speakerName,
+      previousVoiceName,
+      nextVoiceName: speaker.geminiVoiceName
+    });
+    if (appState.currentStage === 'script') renderScriptStage();
+  }
+  if (field === 'personality' || field === 'deliveryInstructions') invalidatePodcastAudio(`speaker-${field}-changed`);
   queueSave();
 });
 els.speakerList.addEventListener('change', event => {
@@ -2084,8 +2335,17 @@ els.speakerList.addEventListener('change', event => {
   const field = event.target.dataset.speakerField;
   if (!card || !['gender', 'voiceType', 'geminiVoiceName'].includes(field)) return;
   const speaker = appState.speakers[Number(card.dataset.speakerIndex)];
+  const previousSpeakerName = speaker.speakerName;
+  const previousVoiceName = speaker.geminiVoiceName;
   resetDuplicateVoiceApproval();
   updateSpeakerField(speaker, field, event.target.value);
+  invalidateAudioForSpeakerMappingChange({
+    speakerId: speaker.id,
+    previousSpeakerName,
+    nextSpeakerName: speaker.speakerName,
+    previousVoiceName,
+    nextVoiceName: speaker.geminiVoiceName
+  });
   renderSpeakerCards();
   queueSave();
 });
@@ -2108,6 +2368,7 @@ els.swapCharacters.addEventListener('click', () => {
   appState.speakers.reverse();
   appState.speakers[0].id = 'host-1';
   appState.speakers[1].id = 'host-2';
+  invalidatePodcastAudio('speaker-order-changed');
   renderSpeakerCards(); queueSave();
 });
 
@@ -2131,7 +2392,7 @@ els.scriptPanel.addEventListener('dragend', () => { dragIndex = null; for (const
 for (const menu of [els.refineMenu, els.scriptMoreMenu]) menu.addEventListener('click', event => {
   const button = event.target.closest('[data-script-action]'); if (!button) return; const action = button.dataset.scriptAction; menu.removeAttribute('open');
   if (['regenerate','shorten','expand','conversational','serious','humour'].includes(action)) refineScript(action);
-  if (action === 'reset' && appState.originalScript) { snapshotScript(); appState.script = deepClone(appState.originalScript); snapshotScript({ force: true }); queueSave(); renderScriptStage(); }
+  if (action === 'reset' && appState.originalScript) { snapshotScript(); appState.script = deepClone(appState.originalScript); invalidatePodcastAudio('script-reset'); snapshotScript({ force: true }); queueSave(); renderScriptStage(); }
   if (action === 'copy') copyText(buildCleanTranscript(), 'Transcript copied.');
   if (action === 'download-json') downloadBlob(new Blob([JSON.stringify(appState.script, null, 2)], { type: 'application/json' }), buildEpisodeFilename('json'));
 });
