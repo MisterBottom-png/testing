@@ -1,0 +1,135 @@
+name: Apply natural podcast performance tags
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-studio
+    paths:
+      - .github/workflows/natural-performance-tags.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Apply natural performance-tag patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('podcast-studio.html')
+          source = path.read_text()
+
+          replacements = [
+              (
+                  """    function normaliseWhitespace(value) {
+                    return String(value ?? '').replace(/\\s+/g, ' ').trim();
+                  }
+          """,
+                  """    function normaliseWhitespace(value) {
+                    return String(value ?? '').replace(/\\s+/g, ' ').trim();
+                  }
+
+                  function normalisePerformanceTag(value) {
+                    return normaliseWhitespace(value)
+                      .replace(/^\\[+|\\]+$/g, '')
+                      .replace(/[\\r\\n]+/g, ' ')
+                      .slice(0, 80)
+                      .trim();
+                  }
+          """
+              ),
+              (
+                  'placeholder="Delivery direction" aria-label="Direction for segment ${index + 1}"',
+                  'placeholder="Optional performance tag, e.g. curious" aria-label="Performance tag for segment ${index + 1}"'
+              ),
+              (
+                  "direction: normaliseWhitespace(segment.direction),",
+                  "direction: normalisePerformanceTag(segment.direction),"
+              ),
+              (
+                  "direction: { type: 'string', description: 'Short delivery direction, without brackets.' },",
+                  "direction: { type: 'string', description: 'Optional short English Gemini TTS performance tag without brackets. Use an empty string for most segments.' },"
+              ),
+              (
+                  """- Put short performance guidance only in the direction field.
+          - Do not claim uncertain facts with unsupported certainty.
+          """,
+                  """- Use the direction field as an optional English Gemini TTS performance tag without brackets.
+          - Keep tags sparse and natural: leave the direction field empty for most dialogue turns.
+          - Add a tag only when delivery genuinely changes or a reaction materially improves the line.
+          - Aim to tag roughly one quarter of the segments, never every line.
+          - Prefer subtle cues such as curious, softly, dryly, more serious, brief pause, laughs softly, or sighs.
+          - Avoid exaggerated acting, repeated tags, forced laughter, sound-effect labels, and tags that merely repeat a character's base personality.
+          - Do not claim uncertain facts with unsupported certainty.
+          """
+              ),
+              (
+                  "Keep all dialogue in ${getLanguage()}.\\nReturn only JSON matching the supplied schema.",
+                  "Keep all dialogue in ${getLanguage()}.\\nKeep performance tags sparse, subtle, and natural. Leave most direction fields empty, use English tags without brackets, and avoid repeating the same tag on nearby turns.\\nReturn only JSON matching the supplied schema."
+              ),
+              (
+                  """      const dialogue = script.segments.map(segment => {
+                    const direction = segment.direction ? ` [${segment.direction}]` : '';
+                    return `${segment.speaker}:${direction} ${segment.text}`;
+                  }).join('\\n\\n');
+
+                  return `Create a natural podcast conversation between ${characterA.name} and ${characterB.name}.\\n\\n${speakerInstructions}\\n\\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Keep the delivery natural and preserve every spoken word exactly.\\n\\n${dialogue}`;
+          """,
+                  """      let previousTag = '';
+                  const dialogue = script.segments.map(segment => {
+                    const tag = normalisePerformanceTag(segment.direction);
+                    const repeatedTag = tag && tag.toLocaleLowerCase() === previousTag.toLocaleLowerCase();
+                    const performanceCue = tag && !repeatedTag ? ` [${tag}]` : '';
+                    previousTag = tag || '';
+                    return `${segment.speaker}:${performanceCue} ${segment.text}`;
+                  }).join('\\n\\n');
+
+                  return `Create a natural podcast conversation between ${characterA.name} and ${characterB.name}.\\n\\n${speakerInstructions}\\n\\nSpeak only the dialogue. Do not read speaker names, brackets, or instructions aloud. Bracketed cues are silent, subtle performance directions that apply only to the line immediately following them. Do not exaggerate them. Keep the delivery conversational and preserve every spoken word exactly.\\n\\n${dialogue}`;
+          """
+              )
+          ]
+
+          for old, new in replacements:
+              if old not in source:
+                  raise SystemExit(f'Expected source block not found: {old[:90]!r}')
+              source = source.replace(old, new, 1)
+
+          path.write_text(source)
+          PY
+
+      - name: Validate application
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          source = Path('podcast-studio.html').read_text()
+          HTMLParser().feed(source)
+          start = source.index('<script>') + len('<script>')
+          end = source.rindex('</script>')
+          Path('/tmp/podcast-studio.js').write_text(source[start:end])
+          PY
+          node --check /tmp/podcast-studio.js
+          grep -q "Keep tags sparse and natural" podcast-studio.html
+          grep -q "Optional performance tag" podcast-studio.html
+          grep -q "Bracketed cues are silent, subtle performance directions" podcast-studio.html
+
+      - name: Commit validated update
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/natural-performance-tags.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Make podcast performance tags natural"
+          git push
