@@ -3,6 +3,7 @@
 const STORAGE_KEY = 'geminiPodcastStudio.preferences.v2';
 const API_KEY_STORAGE_KEY = 'geminiPodcastStudio.apiKey.v1';
 const SESSION_KEY = 'geminiPodcastStudio.sessionKey.v1';
+const PODCAST_PROJECT_SCHEMA_VERSION = 2;
 const DEFAULT_MAX_TTS_CHARACTERS = 12000;
 const MAX_HISTORY = 30;
 
@@ -20,13 +21,38 @@ const AUDIO_PROGRESS_MESSAGES = [
 ];
 
 const CHARACTER_TEMPLATES = [
-  { name: 'Anna', role: 'Astrophysicist', personality: 'Enthusiastic, intelligent and optimistic', direction: 'Speak warmly and clearly with lively pacing', accent: '' },
-  { name: 'Mark', role: 'Sceptical journalist', personality: 'Dry, curious and politely challenging', direction: 'Speak calmly with restrained humour', accent: '' },
-  { name: 'Maya', role: 'Science presenter', personality: 'Curious, precise and approachable', direction: 'Speak clearly with confident conversational energy', accent: '' },
-  { name: 'Jonas', role: 'Critical analyst', personality: 'Thoughtful, pragmatic and mildly witty', direction: 'Speak evenly with deliberate pacing', accent: '' },
-  { name: 'Elena', role: 'Historian', personality: 'Reflective, vivid and intellectually playful', direction: 'Speak warmly with measured emphasis', accent: '' },
-  { name: 'David', role: 'Investigative host', personality: 'Direct, sceptical and fair-minded', direction: 'Speak calmly with crisp articulation', accent: '' }
+  { speakerName: 'Anna', role: 'Astrophysicist', personality: 'Enthusiastic, intelligent and optimistic', deliveryInstructions: 'Speak warmly and clearly with lively pacing', accent: '' },
+  { speakerName: 'Mark', role: 'Sceptical journalist', personality: 'Dry, curious and politely challenging', deliveryInstructions: 'Speak calmly with restrained humour', accent: '' },
+  { speakerName: 'Maya', role: 'Science presenter', personality: 'Curious, precise and approachable', deliveryInstructions: 'Speak clearly with confident conversational energy', accent: '' },
+  { speakerName: 'Jonas', role: 'Critical analyst', personality: 'Thoughtful, pragmatic and mildly witty', deliveryInstructions: 'Speak evenly with deliberate pacing', accent: '' },
+  { speakerName: 'Elena', role: 'Historian', personality: 'Reflective, vivid and intellectually playful', deliveryInstructions: 'Speak warmly with measured emphasis', accent: '' },
+  { speakerName: 'David', role: 'Investigative host', personality: 'Direct, sceptical and fair-minded', deliveryInstructions: 'Speak calmly with crisp articulation', accent: '' }
 ];
+
+const DEFAULT_PODCAST_SPEAKERS = Object.freeze([
+  Object.freeze({
+    id: 'host-1',
+    speakerName: 'Host 1',
+    gender: '',
+    voiceType: '',
+    geminiVoiceName: '',
+    personality: '',
+    deliveryInstructions: ''
+  }),
+  Object.freeze({
+    id: 'host-2',
+    speakerName: 'Host 2',
+    gender: '',
+    voiceType: '',
+    geminiVoiceName: '',
+    personality: '',
+    deliveryInstructions: ''
+  })
+]);
+
+function createDefaultPodcastSpeakers() {
+  return DEFAULT_PODCAST_SPEAKERS.map(speaker => ({ ...speaker }));
+}
 
 const GEMINI_TTS_VOICE_GENDERS = Object.freeze(['female', 'male']);
 
@@ -98,6 +124,14 @@ function getGeminiTtsVoice(apiName, catalogue = GEMINI_TTS_VOICES) {
   const normalisedApiName = typeof apiName === 'string' ? apiName.trim() : '';
   if (!normalisedApiName) return null;
   return getGeminiTtsVoices({}, catalogue).find(voice => voice.apiName === normalisedApiName) || null;
+}
+
+function inferGenderFromVoice(apiName) {
+  return getGeminiTtsVoice(apiName)?.gender || '';
+}
+
+function inferTypeFromVoice(apiName) {
+  return getGeminiTtsVoice(apiName)?.type || '';
 }
 
 const ICONS = {
