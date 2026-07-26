@@ -13,12 +13,12 @@ function resetHistory() { appState.history = []; appState.historyIndex = -1; sna
 function undo() {
   if (appState.historyIndex <= 0) return;
   appState.historyIndex -= 1; appState.script = deepClone(appState.history[appState.historyIndex]);
-  renderScriptStage(); queueSave(); announce('Undid the last script change.');
+  invalidatePodcastAudio('script-undo'); renderScriptStage(); queueSave(); announce('Undid the last script change.');
 }
 function redo() {
   if (appState.historyIndex >= appState.history.length - 1) return;
   appState.historyIndex += 1; appState.script = deepClone(appState.history[appState.historyIndex]);
-  renderScriptStage(); queueSave(); announce('Redid the script change.');
+  invalidatePodcastAudio('script-redo'); renderScriptStage(); queueSave(); announce('Redid the script change.');
 }
 function updateUndoRedo() {
   els.undoButton.disabled = appState.historyIndex <= 0 || appState.busy;
@@ -86,10 +86,16 @@ function renderScriptMetrics() {
     <div class="metric"><strong>${formatDuration(seconds)}</strong><span>estimated</span></div>
     <div class="metric"><strong>${appState.script.segments.length.toLocaleString('en-GB')}</strong><span>segments</span></div>
     <div class="metric"><strong>${ttsChars.toLocaleString('en-GB')}</strong><span>TTS characters</span></div>`;
-  const tooLong = ttsChars > appState.settings.maxTtsCharacters;
-  els.scriptValidation.className = `validation-status${tooLong ? ' warning' : ''}`;
-  els.scriptValidation.textContent = tooLong ? `Transcript exceeds the ${appState.settings.maxTtsCharacters.toLocaleString('en-GB')} character threshold.` : 'Script is ready for audio generation.';
-  els.generateAudioButton.disabled = tooLong || appState.busy;
+  let chunkCount = 1;
+  let chunkError = null;
+  try { chunkCount = Math.max(1, createTtsChunks().length); } catch (error) { chunkError = error; }
+  els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 ? ' warning' : ''}`;
+  els.scriptValidation.textContent = chunkError
+    ? chunkError.message
+    : chunkCount > 1
+      ? `Script is ready and will be generated in ${chunkCount} TTS chunks.`
+      : 'Script is ready for audio generation.';
+  els.generateAudioButton.disabled = Boolean(chunkError) || appState.busy;
 }
 function segmentMenu(index) {
   return `<details class="menu icon-menu"><summary class="menu-summary" aria-label="Segment ${index + 1} actions">${ICONS.more}</summary><div class="menu-popover">
@@ -127,7 +133,7 @@ function updateSegmentFromControl(control) {
     card.dataset.speakerIndex = String(Math.max(0, appState.speakers.findIndex(speaker => speaker.speakerName === control.value)));
   }
   appState.script.estimatedWords = getWordCount();
-  renderScriptMetrics(); queueSave();
+  invalidatePodcastAudio('script-edited'); renderScriptMetrics(); queueSave();
   clearTimeout(typingHistoryTimer);
   typingHistoryTimer = setTimeout(() => snapshotScript(), 650);
 }
@@ -143,7 +149,7 @@ function performSegmentAction(index, action) {
     const nextSpeaker = appState.speakers.find(speaker => speaker.speakerName !== segments[index].speaker)?.speakerName || appState.speakers[0].speakerName;
     segments.splice(index + 1, 0, { speaker: nextSpeaker, direction: '', text: '' });
   }
-  appState.script.estimatedWords = getWordCount(); snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  appState.script.estimatedWords = getWordCount(); invalidatePodcastAudio('script-structure-changed'); snapshotScript({ force: true }); queueSave(); renderScriptStage();
   const focusIndex = action === 'delete' ? Math.min(index, segments.length - 1) : action === 'up' ? Math.max(0, index - 1) : action === 'down' ? Math.min(segments.length - 1, index + 1) : index + 1;
   requestAnimationFrame(() => els.scriptPanel.querySelector(`[data-segment-index="${focusIndex}"] textarea`)?.focus());
   announce(`Segment ${index + 1} ${action === 'delete' ? 'deleted' : action === 'duplicate' ? 'duplicated' : action === 'insert' ? 'inserted' : `moved ${action}`}.`);
@@ -152,7 +158,7 @@ function reorderSegments(from, to) {
   if (from === to || from == null || to == null) return;
   const [segment] = appState.script.segments.splice(from, 1);
   appState.script.segments.splice(to, 0, segment);
-  snapshotScript({ force: true }); queueSave(); renderScriptStage();
+  invalidatePodcastAudio('script-reordered'); snapshotScript({ force: true }); queueSave(); renderScriptStage();
   els.reorderStatus.textContent = `Segment moved to position ${to + 1} of ${appState.script.segments.length}.`;
 }
 function buildCleanTranscript() { return appState.script?.segments?.map(segment => `${segment.speaker}: ${segment.text}`).join('\n\n') || ''; }
