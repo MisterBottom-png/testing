@@ -2,39 +2,26 @@
 
 ## Completed
 
-- Kept `src/index.html` as the Vite development entry point.
-- Preserved the existing five-file CSS cascade without redesign or selector reordering.
-- Replaced ordered classic JavaScript files with one ES-module entry.
-- Split JavaScript into responsibility-focused modules for constants, state, text utilities, persistence, API transport, errors, script validation/generation, TTS chunking/generation, PCM/WAV conversion, IndexedDB, media cache, previews and UI concerns.
-- Removed reliance on application symbols living in the browser global scope.
-- Kept `main.js` limited to creating the application context and installing modules.
-- Preserved deliberate late function replacement through the documented application-context bridge.
-- Kept the original monolithic and generated single-file references untouched.
-- Added module-boundary regression tests.
-
-## Deliberately unchanged
-
-- Model choices and defaults.
-- Request payloads and endpoints.
-- Retry behaviour.
-- Existing TTS chunking and preview-cache behaviour.
-- Storage keys and schema.
-- UI structure, wording, IDs and styling.
-- Production single-file generation.
+- Preserved `src/index.html` as the Vite development entry point.
+- Preserved the five existing CSS layers without selector reordering or redesign.
+- Replaced the ordered classic-script list with one ES-module entry point.
+- Converted JavaScript responsibilities into focused modules with explicit exports.
+- Removed reliance on browser global declarations between source files.
+- Kept `main.js` as a thin composition root.
+- Passed application state and cross-module services explicitly.
+- Kept low-level Gemini transport, persistence, IndexedDB, PCM and WAV code independent of UI modules and the DOM.
+- Added tests for module boundaries, source entry-point parity and an acyclic static import graph.
+- Preserved the repository-root monolithic reference and frozen `dist/` output.
 
 ## Compatibility bridge still present
 
-A small number of baseline functions are intentionally replaceable during startup, including validation, rendering, error mapping and audio invalidation refinements. `app-context.js` preserves those bindings explicitly. This is safer than converting the baseline's late overrides into a broad behavioural rewrite.
+The application-scoped service registry in `runtime.js` preserves existing late function decoration used by preview and final-review behaviour. It replaces implicit globals but is intentionally not a dependency-injection framework or a reason to rewrite working behaviour. Removing it requires a separate parity-focused refactor.
 
-## Validation
+## Not included
 
-Run:
-
-```text
-npm install --no-audit --no-fund
-npm run build
-npm test
-npm run check
-```
-
-Live Gemini script and TTS requests still require an authorised API key and supported model access.
+- Model/default changes.
+- Retry or cancellation changes.
+- New TTS chunking behaviour.
+- New caching behaviour.
+- UI or wording optimisation.
+- Production single-file generation.

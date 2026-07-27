@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createModuleContext } from './module-harness.mjs';
+import { createServices, installServices } from './service-harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const source = await readFile(path.join(root, 'src', 'js', 'constants.js'), 'utf8');
-const context = createModuleContext(['constants']);
+const api = installServices(createServices(), ['constants']);
 const {
   GEMINI_TTS_VOICES,
   GEMINI_TTS_VOICE_GENDERS,
@@ -14,7 +14,7 @@ const {
   getGeminiTtsVoices,
   getAvailableVoiceTypes,
   getGeminiTtsVoice
-} = context;
+} = api;
 
 const toPlain = value => JSON.parse(JSON.stringify(value));
 

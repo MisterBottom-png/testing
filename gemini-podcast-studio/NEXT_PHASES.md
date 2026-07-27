@@ -1,12 +1,12 @@
 # Deferred phases
 
-After modular-source parity is accepted, separate tasks may address:
+After ES-module parity is reviewed, separate tasks may address:
 
-1. Further reduction of the documented mutable application-context bridge.
-2. A production single-file inlining pipeline sourced from the Vite application.
-3. Model-default and saved-preference migrations.
-4. Retry, cancellation and generation-job infrastructure.
-5. TTS and media-cache optimisation.
-6. Further UI or accessibility improvements.
+1. Replacing the remaining service-registry decorators with narrower interfaces.
+2. A production single-file inlining pipeline generated from `src/`.
+3. Any model/default migration requested at that time.
+4. Retry, cancellation or generation-job changes.
+5. TTS, caching or storage optimisation.
+6. Further UI or accessibility optimisation.
 
-None of those changes are part of the modular extraction.
+None of these are part of the modular extraction task.

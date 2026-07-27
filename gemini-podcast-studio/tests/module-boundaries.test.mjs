@@ -1,50 +1,85 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
-const readSource = file => readFile(path.join(root, 'src', 'js', file), 'utf8');
+const jsRoot = path.join(root, 'src', 'js');
 
-test('the browser starts from one ES-module entry without ordered classic scripts', async () => {
+async function source(file) {
+  return readFile(path.join(jsRoot, file), 'utf8');
+}
+
+function staticImports(text) {
+  return [...text.matchAll(/\bimport\s+(?:[^'";]+?\s+from\s+)?['"]\.\/([^'"]+)['"]/g)].map(match => match[1]);
+}
+
+test('development HTML uses one ES-module entry point instead of ordered classic scripts', async () => {
   const html = await readFile(path.join(root, 'src', 'index.html'), 'utf8');
   assert.equal((html.match(/<script\b/g) || []).length, 1);
-  assert.match(html, /<script type="module" src="\.\/js\/main\.js"><\/script>/);
+  assert.match(html, /<script\s+type="module"\s+src="\.\/js\/main\.js"><\/script>/);
   assert.doesNotMatch(html, /<script\s+defer/);
 });
 
-test('main remains a thin installer coordinator', async () => {
-  const source = await readSource('main.js');
-  assert.match(source, /createAppContext/);
-  assert.match(source, /installConstants\(app\)/);
-  assert.match(source, /installFinalReview\(app\)/);
-  assert.doesNotMatch(source, /fetch\(|localStorage|sessionStorage|document\.|innerHTML/);
-});
-
-test('low-level audio, API and storage modules do not read the DOM', async () => {
-  for (const file of [
-    'pcm-audio.js', 'wav-encoder.js', 'tts-chunking.js',
-    'gemini-api.js', 'indexeddb.js', 'media-cache.js', 'preferences.js'
-  ]) {
-    const source = await readSource(file);
-    assert.doesNotMatch(source, /\bdocument\b|ctx\.els\b|querySelector|getElementById/, `${file} must stay DOM-independent`);
-  }
-});
-
-test('API transport does not render UI or coordinate retry behaviour', async () => {
-  const source = await readSource('gemini-api.js');
-  assert.doesNotMatch(source, /showServiceError|handleGenerationError|render[A-Z]|setBusy|retry/i);
-  assert.match(source, /fetch\(endpoint/);
-});
-
-test('application symbols are carried by the explicit context rather than browser globals', async () => {
-  const files = [
-    'constants.js', 'state.js', 'text-utils.js', 'preferences.js', 'gemini-api.js',
-    'script-generation.js', 'script-validation.js', 'tts-generation.js', 'ui-events.js'
+test('focused extraction modules exist and expose explicit module syntax', async () => {
+  const expected = [
+    'runtime.js', 'constants.js', 'state.js', 'text-utils.js', 'preferences.js',
+    'gemini-api.js', 'script-validation.js', 'script-generation.js',
+    'pcm-audio.js', 'wav-encoder.js', 'tts-chunking.js', 'tts-generation.js',
+    'indexeddb.js', 'media-cache.js', 'ui-create.js', 'ui-script.js',
+    'ui-audio.js', 'ui-status.js', 'ui-events.js', 'voice-preview.js',
+    'conversation-preview.js', 'final-review.js', 'main.js'
   ];
-  for (const file of files) {
-    const source = await readSource(file);
-    assert.match(source, /^export function install[A-Za-z]+\(ctx\)/);
-    assert.doesNotMatch(source, /globalThis\.[A-Za-z_$][\w$]*\s*=|window\.[A-Za-z_$][\w$]*\s*=/);
+  const files = new Set(await readdir(jsRoot));
+  for (const file of expected) {
+    assert.ok(files.has(file), `${file} is missing`);
+    assert.match(await source(file), /\b(?:export|import)\b/, `${file} is not an ES module`);
   }
+});
+
+test('main is a thin composition root', async () => {
+  const main = await source('main.js');
+  assert.ok(main.split('\n').length <= 120, 'main.js contains feature implementation instead of composition');
+  for (const file of ['runtime.js', 'constants.js', 'state.js', 'preferences.js', 'script-generation.js', 'tts-generation.js', 'ui-events.js', 'conversation-preview.js']) {
+    assert.match(main, new RegExp(`from ['"]\\./${file.replace('.', '\\.')}['"]`));
+  }
+  assert.doesNotMatch(main, /function\s+(?:buildConversationPreview|generatePodcastAudio|generatePodcastScript|renderSpeakerCards)\b/);
+});
+
+test('low-level transport, storage and audio modules do not depend on the DOM or UI rendering', async () => {
+  const lowLevel = [
+    'gemini-api.js', 'script-validation.js', 'pcm-audio.js', 'wav-encoder.js',
+    'tts-chunking.js', 'indexeddb.js', 'media-cache.js'
+  ];
+  for (const file of lowLevel) {
+    const text = await source(file);
+    assert.doesNotMatch(text, /\b(?:document|window|HTMLElement|querySelector|getElementById|showServiceError|render[A-Z]|els\.)\b/, `${file} reaches into UI or DOM state`);
+  }
+});
+
+test('the static ES-module import graph is acyclic', async () => {
+  const files = (await readdir(jsRoot)).filter(file => file.endsWith('.js'));
+  const graph = new Map();
+  for (const file of files) graph.set(file, staticImports(await source(file)).filter(dep => files.includes(dep)));
+
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(file, stack = []) {
+    if (visiting.has(file)) assert.fail(`circular import: ${[...stack, file].join(' -> ')}`);
+    if (visited.has(file)) return;
+    visiting.add(file);
+    for (const dependency of graph.get(file) || []) visit(dependency, [...stack, file]);
+    visiting.delete(file);
+    visited.add(file);
+  }
+  for (const file of files) visit(file);
+});
+
+test('package scripts use Vite for modular development and do not refresh dist', async () => {
+  const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(packageJson.scripts.dev, 'vite --host 0.0.0.0');
+  assert.equal(packageJson.scripts.build, 'vite build');
+  assert.equal(packageJson.scripts.preview, 'vite preview --host 0.0.0.0');
+  assert.equal(packageJson.scripts.check, 'npm run build && npm test');
+  assert.ok(!Object.values(packageJson.scripts).some(command => /build-single-file|verify-single-file/.test(command)), 'single-file pipeline must not be part of this phase');
 });

@@ -2,19 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createModuleContext } from './module-harness.mjs';
+import { createServices, installServices } from './service-harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const uiEvents = await readFile(path.join(root, 'src', 'js', 'ui-events.js'), 'utf8');
-const appState = {
-  speakers: [],
-  podcast: { topic: '', durationMinutes: 3, language: 'English', customLanguage: '', format: 'conversation', customFormat: '', tones: [], instructions: '' },
-  settings: { speakingRate: 140, theme: 'light', maxTtsCharacters: 12000 },
-  connection: { apiKey: '', textModel: '', customTextModel: '', ttsModel: '', customTtsModel: '' },
-  audio: { url: '' }
-};
-const els = { speakerList: { innerHTML: '' } };
-const context = createModuleContext(['constants', 'text-utils', 'ui-create'], { appState, els, console });
+
+const context = createServices({
+  appState: {
+    speakers: [],
+    podcast: { topic: '', durationMinutes: 3, language: 'English', customLanguage: '', format: 'conversation', customFormat: '', tones: [], instructions: '' },
+    settings: { speakingRate: 140, theme: 'light', maxTtsCharacters: 12000 },
+    connection: { apiKey: '', textModel: '', customTextModel: '', ttsModel: '', customTtsModel: '' },
+    audio: { url: '' }
+  },
+  els: { speakerList: { innerHTML: '' } }
+});
+installServices(context, ['constants', 'textUtilities', 'appHelpers', 'createUi']);
+
 const {
   createDefaultPodcastSpeakers,
   renderSpeakerCards,
@@ -22,9 +26,9 @@ const {
 } = context;
 
 function renderWith(speakers = createDefaultPodcastSpeakers()) {
-  appState.speakers = JSON.parse(JSON.stringify(speakers));
+  context.appState.speakers = JSON.parse(JSON.stringify(speakers));
   renderSpeakerCards();
-  return els.speakerList.innerHTML;
+  return context.els.speakerList.innerHTML;
 }
 
 test('renders two distinguishable speaker configuration cards with all required controls', () => {
@@ -112,7 +116,7 @@ test('native labelled controls provide keyboard navigation semantics', () => {
 });
 
 test('speaker input events use the shared updater and persist through the existing save queue', () => {
-  assert.match(uiEvents, /ctx\.updateSpeakerField\(speaker, field, event\.target\.value\)/);
-  assert.match(uiEvents, /ctx\.queueSave\(\)/);
-  assert.match(uiEvents, /ctx\.renderSpeakerCards\(\)/);
+  assert.match(uiEvents, /services\.updateSpeakerField\(speaker, field, event\.target\.value\)/);
+  assert.match(uiEvents, /services\.queueSave\(\)/);
+  assert.match(uiEvents, /services\.renderSpeakerCards\(\)/);
 });

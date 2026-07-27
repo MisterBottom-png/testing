@@ -1,104 +1,227 @@
-export function installUiStatus(ctx) {
-  function queueSave() {
-      ctx.els.saveState.textContent = 'Saving…';
-      clearTimeout(ctx.saveTimer);
-      ctx.saveTimer = setTimeout(() => { ctx.savePreferences(); ctx.els.saveState.textContent = 'Saved locally'; }, 260);
+export function installStatusUi(services) {
+  const DIAGNOSTIC_REDACTION = '[REDACTED]';
+  const DIAGNOSTIC_SENSITIVE_FIELD_PATTERN = /(?:api[-_ ]?key|x-goog-api-key|authorization|headers?|query|prompt|contents?|body|request(?:data)?|response(?:data)?|raw|inlineData|audioData)/i;
+  function redactDiagnosticString(value) {
+    let result = String(value ?? '');
+    const configuredKey = String(services.appState?.connection?.apiKey || '');
+    if (configuredKey) result = result.split(configuredKey).join(DIAGNOSTIC_REDACTION);
+    return result.replace(/([?&](?:key|api[_-]?key|x-goog-api-key)=)[^&#\s]+/gi, `$1${DIAGNOSTIC_REDACTION}`).replace(/((?:x-goog-api-key|authorization|api[-_ ]?key)\s*[:=]\s*)[^\s,;}\]]+/gi, `$1${DIAGNOSTIC_REDACTION}`);
   }
-  ctx.expose("queueSave", queueSave);
+  function redactDiagnosticValue(value, seen = new WeakSet()) {
+    if (typeof value === 'string') return redactDiagnosticString(value);
+    if (value == null || typeof value !== 'object') return value;
+    if (seen.has(value)) return '[Circular]';
+    seen.add(value);
+    if (value instanceof Error) {
+      return {
+        name: redactDiagnosticString(value.name),
+        message: redactDiagnosticString(value.message),
+        status: Number(value.status || 0) || undefined,
+        stack: redactDiagnosticString(value.stack || '')
+      };
+    }
+    if (Array.isArray(value)) return value.map(item => redactDiagnosticValue(item, seen));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, DIAGNOSTIC_SENSITIVE_FIELD_PATTERN.test(key) ? DIAGNOSTIC_REDACTION : redactDiagnosticValue(item, seen)]));
+  }
+  function diagnosticLog(level, event, details = null) {
+    const method = ['error', 'warn', 'info'].includes(level) ? level : 'log';
+    const payload = {
+      event: redactDiagnosticString(event),
+      details: redactDiagnosticValue(details)
+    };
+    console[method]('[Gemini Podcast Studio]', payload);
+    return payload;
+  }
   function setBusy(busy, kind = '', messages = []) {
-      ctx.appState.busy = busy;
-      ctx.els.createStage.setAttribute('aria-busy', String(busy && kind === 'script'));
-      ctx.els.scriptStage.setAttribute('aria-busy', String(busy && ['refine', 'audio'].includes(kind)));
-      clearInterval(ctx.progressTimer);
-      clearInterval(ctx.progressMessageTimer);
-      const status = kind === 'script' ? { shell: ctx.els.createLoading, message: ctx.els.createLoadingMessage, elapsed: ctx.els.createElapsed } : { shell: ctx.els.scriptLoading, message: ctx.els.scriptLoadingMessage, elapsed: ctx.els.scriptElapsed };
-      ctx.els.createLoading.classList.remove('visible');
-      ctx.els.scriptLoading.classList.remove('visible');
-      ctx.els.generateScriptButton.disabled = busy;
-      ctx.els.generateAudioButton.disabled = busy;
-      if (!busy) {
-          restoreActionLabels();
-          ctx.renderConnectionStatus();
-          ctx.renderCurrentStage({ focus: false });
-          return;
-      }
-      const safeMessages = messages.length ? messages : ['Working…'];
-      let index = 0;
-      ctx.progressStartedAt = performance.now();
-      status.message.textContent = safeMessages[0];
-      status.elapsed.textContent = '0:00';
-      status.shell.classList.add('visible');
-      if (kind === 'audio')
-          ctx.els.scriptLoadingTitle.textContent = 'Generating podcast audio';
-      else if (kind === 'voice')
-          ctx.els.scriptLoadingTitle.textContent = 'Generating voice preview';
-      else
-          ctx.els.scriptLoadingTitle.textContent = 'Refining script';
-      const activeButton = kind === 'script' ? ctx.els.generateScriptButton : ctx.els.generateAudioButton;
-      activeButton.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${kind === 'audio' ? 'Generating audio…' : kind === 'script' ? 'Generating script…' : 'Working…'}</span>`;
-      ctx.progressTimer = setInterval(() => { status.elapsed.textContent = ctx.formatDuration((performance.now() - ctx.progressStartedAt) / 1000); }, 250);
-      ctx.progressMessageTimer = setInterval(() => { index = (index + 1) % safeMessages.length; status.message.textContent = safeMessages[index]; }, 2600);
+    services.appState.busy = busy;
+    services.els.createStage.setAttribute('aria-busy', String(busy && kind === 'script'));
+    services.els.scriptStage.setAttribute('aria-busy', String(busy && ['refine', 'audio'].includes(kind)));
+    clearInterval(services.progressTimer);
+    clearInterval(services.progressMessageTimer);
+    const status = kind === 'script' ? {
+      shell: services.els.createLoading,
+      message: services.els.createLoadingMessage,
+      elapsed: services.els.createElapsed
+    } : {
+      shell: services.els.scriptLoading,
+      message: services.els.scriptLoadingMessage,
+      elapsed: services.els.scriptElapsed
+    };
+    services.els.createLoading.classList.remove('visible');
+    services.els.scriptLoading.classList.remove('visible');
+    services.els.generateScriptButton.disabled = busy;
+    services.els.generateAudioButton.disabled = busy;
+    if (!busy) {
+      restoreActionLabels();
+      services.renderConnectionStatus();
+      services.renderCurrentStage({
+        focus: false
+      });
+      return;
+    }
+    const safeMessages = messages.length ? messages : ['Working…'];
+    let index = 0;
+    services.progressStartedAt = performance.now();
+    status.message.textContent = safeMessages[0];
+    status.elapsed.textContent = '0:00';
+    status.shell.classList.add('visible');
+    if (kind === 'audio') services.els.scriptLoadingTitle.textContent = 'Generating podcast audio';else if (kind === 'voice') services.els.scriptLoadingTitle.textContent = 'Generating voice preview';else services.els.scriptLoadingTitle.textContent = 'Refining script';
+    const activeButton = kind === 'script' ? services.els.generateScriptButton : services.els.generateAudioButton;
+    activeButton.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${kind === 'audio' ? 'Generating audio…' : kind === 'script' ? 'Generating script…' : 'Working…'}</span>`;
+    services.progressTimer = setInterval(() => {
+      status.elapsed.textContent = services.formatDuration((performance.now() - services.progressStartedAt) / 1000);
+    }, 250);
+    services.progressMessageTimer = setInterval(() => {
+      index = (index + 1) % safeMessages.length;
+      status.message.textContent = safeMessages[index];
+    }, 2600);
   }
-  ctx.expose("setBusy", setBusy);
   function restoreActionLabels() {
-      ctx.els.generateScriptButton.innerHTML = '<span>Generate script</span>';
-      ctx.els.generateAudioButton.innerHTML = '<span>Generate audio</span>';
+    services.els.generateScriptButton.innerHTML = '<span>Generate script</span>';
+    services.els.generateAudioButton.innerHTML = '<span>Generate audio</span>';
   }
-  ctx.expose("restoreActionLabels", restoreActionLabels);
-  function showServiceError({ title, message, suggestion, details = '', retry = null }) {
-      ctx.els.serviceErrorTitle.textContent = title;
-      ctx.els.serviceErrorMessage.textContent = message;
-      ctx.els.serviceErrorSuggestion.textContent = suggestion;
-      ctx.els.serviceErrorDetails.textContent = ctx.redactDiagnosticString(details || 'No additional technical details.');
-      ctx.els.retryButton.classList.toggle('hidden', typeof retry !== 'function');
-      ctx.els.retryButton.onclick = typeof retry === 'function' ? retry : null;
-      ctx.els.serviceError.classList.add('visible');
-      ctx.els.serviceError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  function createApiError(status, message, details = '') {
+    const error = new Error(message);
+    error.status = status;
+    error.details = details;
+    return error;
   }
-  ctx.expose("showServiceError", showServiceError);
-  function hideServiceError() { ctx.els.serviceError.classList.remove('visible'); ctx.els.retryButton.onclick = null; }
-  ctx.expose("hideServiceError", hideServiceError);
+  function mapError(error) {
+    const status = Number(error?.status || 0);
+    const message = String(error?.message || 'Unknown error.');
+    if (status === 400) return {
+      message,
+      suggestion: 'Check the model IDs and generation settings.'
+    };
+    if (status === 401 || status === 403) return {
+      message,
+      suggestion: 'Verify the API key and confirm that Gemini API access is enabled.'
+    };
+    if (status === 429) return {
+      message,
+      suggestion: 'The key may have reached a quota or rate limit. Retry later.'
+    };
+    if (status >= 500) return {
+      message,
+      suggestion: 'The Gemini service may be temporarily unavailable.'
+    };
+    if (error instanceof TypeError && /fetch/i.test(message)) return {
+      message: 'The browser could not reach the Gemini API.',
+      suggestion: 'Check the network or serve this file from localhost.'
+    };
+    return {
+      message,
+      suggestion: 'Review the technical details, adjust the request, and retry.'
+    };
+  }
+  function showServiceError({
+    title,
+    message,
+    suggestion,
+    details = '',
+    retry = null
+  }) {
+    services.els.serviceErrorTitle.textContent = title;
+    services.els.serviceErrorMessage.textContent = message;
+    services.els.serviceErrorSuggestion.textContent = suggestion;
+    services.els.serviceErrorDetails.textContent = redactDiagnosticString(details || 'No additional technical details.');
+    services.els.retryButton.classList.toggle('hidden', typeof retry !== 'function');
+    services.els.retryButton.onclick = typeof retry === 'function' ? retry : null;
+    services.els.serviceError.classList.add('visible');
+    services.els.serviceError.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest'
+    });
+  }
+  function hideServiceError() {
+    services.els.serviceError.classList.remove('visible');
+    services.els.retryButton.onclick = null;
+  }
   function handleGenerationError(error, title, fallbackSuggestion, retry) {
-      ctx.diagnosticLog('error', title, error);
-      const mapped = ctx.mapError(error);
-      showServiceError({ title, message: mapped.message, suggestion: mapped.suggestion || fallbackSuggestion, details: error?.details || error?.stack || String(error), retry });
+    diagnosticLog('error', title, error);
+    const mapped = services.mapError(error);
+    showServiceError({
+      title,
+      message: mapped.message,
+      suggestion: mapped.suggestion || fallbackSuggestion,
+      details: error?.details || error?.stack || String(error),
+      retry
+    });
   }
-  ctx.expose("handleGenerationError", handleGenerationError);
-  function resetProject({ preserveConnection = true, preservePreferences = true } = {}) {
-      ctx.revokeAudioUrl();
-      ctx.appState.schemaVersion = ctx.PODCAST_PROJECT_SCHEMA_VERSION;
-      ctx.appState.currentStage = 'create';
-      ctx.appState.script = null;
-      ctx.appState.legacyScript = null;
-      ctx.appState.originalScript = null;
-      ctx.appState.history = [];
-      ctx.appState.historyIndex = -1;
-      ctx.appState.podcast = { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' };
-      ctx.appState.speakers = ctx.createDefaultPodcastSpeakers();
-      ctx.appState.audioCacheReferences = {};
-      ctx.appState.lastModified = '';
-      ctx.appState.expandedSpeakers.clear();
-      if (!preserveConnection)
-          ctx.appState.connection = { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' };
-      if (!preservePreferences)
-          ctx.appState.settings = { theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', maxTtsCharacters: ctx.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 };
-      ctx.populateInputsFromState();
-      ctx.renderConnectionForms();
-      ctx.renderSpeakerCards();
-      ctx.applyTheme();
-      ctx.savePreferences();
-      ctx.renderCurrentStage();
-      hideServiceError();
-      ctx.clearValidation();
+  function resetProject({
+    preserveConnection = true,
+    preservePreferences = true
+  } = {}) {
+    services.revokeAudioUrl();
+    services.appState.schemaVersion = services.PODCAST_PROJECT_SCHEMA_VERSION;
+    services.appState.currentStage = 'create';
+    services.appState.script = null;
+    services.appState.legacyScript = null;
+    services.appState.originalScript = null;
+    services.appState.history = [];
+    services.appState.historyIndex = -1;
+    services.appState.podcast = {
+      topic: '',
+      durationMinutes: 5,
+      language: 'English',
+      customLanguage: '',
+      format: 'Friendly conversation',
+      customFormat: '',
+      tones: ['Informative', 'Casual'],
+      instructions: ''
+    };
+    services.appState.speakers = services.createDefaultPodcastSpeakers();
+    services.appState.audioCacheReferences = {};
+    services.appState.lastModified = '';
+    services.appState.expandedSpeakers.clear();
+    if (!preserveConnection) services.appState.connection = {
+      apiKey: '',
+      rememberKey: false,
+      textModel: 'gemini-3.6-flash',
+      customTextModel: '',
+      ttsModel: 'gemini-3.1-flash-tts-preview',
+      customTtsModel: ''
+    };
+    if (!preservePreferences) services.appState.settings = {
+      theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+      maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS,
+      speakingRate: 140
+    };
+    services.populateInputsFromState();
+    services.renderConnectionForms();
+    services.renderSpeakerCards();
+    services.applyTheme();
+    services.savePreferences();
+    services.renderCurrentStage();
+    hideServiceError();
+    services.clearValidation();
   }
-  ctx.expose("resetProject", resetProject);
   function clearStoredData() {
-      localStorage.removeItem(ctx.STORAGE_KEY);
-      localStorage.removeItem(ctx.API_KEY_STORAGE_KEY);
-      sessionStorage.removeItem(ctx.SESSION_KEY);
-      ctx.els.settingsDialog.close();
-      ctx.resetProject({ preserveConnection: false, preservePreferences: false });
-      ctx.announce('Stored data cleared.');
+    localStorage.removeItem(services.STORAGE_KEY);
+    localStorage.removeItem(services.API_KEY_STORAGE_KEY);
+    sessionStorage.removeItem(services.SESSION_KEY);
+    services.els.settingsDialog.close();
+    services.resetProject({
+      preserveConnection: false,
+      preservePreferences: false
+    });
+    services.announce('Stored data cleared.');
   }
-  ctx.expose("clearStoredData", clearStoredData);
+  Object.assign(services, {
+    DIAGNOSTIC_REDACTION,
+    DIAGNOSTIC_SENSITIVE_FIELD_PATTERN,
+    redactDiagnosticString,
+    redactDiagnosticValue,
+    diagnosticLog,
+    setBusy,
+    restoreActionLabels,
+    createApiError,
+    mapError,
+    showServiceError,
+    hideServiceError,
+    handleGenerationError,
+    resetProject,
+    clearStoredData
+  });
+  return services;
 }

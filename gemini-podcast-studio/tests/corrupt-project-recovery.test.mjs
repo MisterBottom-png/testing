@@ -1,9 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppContext } from '../src/js/app-context.js';
-import { installConstants } from '../src/js/constants.js';
-import { installTextUtils } from '../src/js/text-utils.js';
-import { installPreferences } from '../src/js/preferences.js';
+import { createServices, installServices } from './service-harness.mjs';
 
 function createStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -18,28 +15,27 @@ function createStorage(initial = {}) {
 function createHarness(rawProject) {
   const localStorage = createStorage({ 'geminiPodcastStudio.preferences.v2': rawProject });
   const sessionStorage = createStorage();
-  globalThis.localStorage = localStorage;
-  globalThis.sessionStorage = sessionStorage;
-  globalThis.matchMedia = () => ({ matches: false });
-
-  const context = createAppContext();
-  installConstants(context);
-  context.expose('appState', {
-    schemaVersion: context.PODCAST_PROJECT_SCHEMA_VERSION,
+  Object.defineProperties(globalThis, {
+    localStorage: { configurable: true, writable: true, value: localStorage },
+    sessionStorage: { configurable: true, writable: true, value: sessionStorage },
+    matchMedia: { configurable: true, writable: true, value: () => ({ matches: false }) }
+  });
+  const services = installServices(createServices(), ['constants', 'textUtilities']);
+  services.appState = {
+    schemaVersion: services.PODCAST_PROJECT_SCHEMA_VERSION,
     connection: { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' },
     podcast: { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' },
-    speakers: context.createDefaultPodcastSpeakers(),
+    speakers: services.createDefaultPodcastSpeakers(),
     script: null,
     originalScript: null,
     legacyScript: null,
     audioCacheReferences: {},
     lastModified: '',
-    settings: { theme: 'light', maxTtsCharacters: context.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
-  });
-  context.expose('els', {});
-  installTextUtils(context);
-  installPreferences(context);
-  return { context, localStorage, api: context };
+    settings: { theme: 'light', maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
+  };
+  services.els = { saveState: { textContent: '' } };
+  installServices(services, ['preferences']);
+  return { context: services, localStorage, api: services };
 }
 
 test('corrupt saved JSON is backed up and loading falls back safely without deleting the original project value', () => {

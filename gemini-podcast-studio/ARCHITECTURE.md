@@ -1,43 +1,46 @@
 # Architecture
 
-Gemini Podcast Studio is developed as a Vite application whose editable source lives entirely under `src/`.
+`src/` is the editable source of truth. The development application is served and bundled by Vite from `src/index.html`.
 
 ```text
 src/index.html
-├── styles/
-│   ├── tokens.css
-│   ├── base.css
-│   ├── layout.css
-│   ├── components.css
-│   └── responsive.css
-└── js/
-    ├── main.js
-    ├── app-context.js
-    └── responsibility-focused modules
+  + src/styles/*.css
+  + src/js/main.js
+          |
+          v
+  explicit ES-module composition
+          |
+          v
+      Vite dev/build
 ```
 
-`src/index.html` loads only `src/js/main.js` as an ES module. `main.js` creates one application context and installs each module in dependency order. Every source module exports an installer; shared state and services are passed through the context instead of being created as browser globals.
+## JavaScript composition
 
-## Dependency direction
+`src/js/main.js` is the composition root. It creates one application-scoped service registry and installs focused ES modules in dependency order. Modules export explicit installer functions; dependencies, mutable application state and configuration are passed through the registry instead of being resolved as browser globals.
 
-- Pure utilities and constants are installed first.
-- State and persistence depend only on lower-level utilities and configuration.
-- API, PCM, WAV, chunking and IndexedDB modules do not read the DOM.
-- UI modules may depend on application services.
-- `main.js` performs startup coordination only.
+The registry is a temporary compatibility bridge for behaviour that previously relied on late global-function decoration. It keeps those substitutions explicit and testable without introducing circular imports. New low-level modules must remain independent of the DOM and UI modules.
 
-Low-level modules never import UI modules. API transport returns data or throws errors; it does not render messages. Storage modules read browser storage, not form controls. Audio conversion utilities accept values and return values without accessing the page.
+## Source responsibilities
 
-## Compatibility context
+- `constants.js`: application constants, defaults, voice catalogue and icons.
+- `state.js`: application state and static DOM reference collection.
+- `text-utils.js`: pure text, formatting and model-selection helpers.
+- `app-helpers.js`: browser-facing generic helpers such as downloads, announcements and object-URL cleanup.
+- `preferences.js`: project schema, migration and browser preference persistence.
+- `gemini-api.js`: Gemini text request transport and response parsing only.
+- `script-validation.js`: script schemas, prompts and validation.
+- `script-generation.js`: script generation and refinement coordination.
+- `pcm-audio.js`, `wav-encoder.js`: DOM-free PCM and WAV utilities.
+- `tts-chunking.js`, `tts-generation.js`: existing TTS request preparation and transport.
+- `indexeddb.js`, `media-cache.js`: existing preview database and cache access.
+- `generation-jobs.js`: full-episode audio generation coordination.
+- `ui-connection.js`, `ui-create.js`, `ui-script.js`, `ui-audio.js`, `ui-status.js`: rendering and UI state by surface.
+- `ui-events.js`: event registration and user-action routing.
+- `voice-preview.js`, `conversation-preview.js`: existing preview workflows and their UI coordination.
+- `final-review.js`: final behaviour-preserving decorators installed after initialisation.
 
-The baseline relied on ordered classic scripts and a small number of functions that later scripts deliberately replaced. `app-context.js` is a temporary explicit compatibility bridge for those mutable seams. `expose()` registers a service and `defineMutable()` preserves the few bindings that must remain replaceable during startup. This keeps the existing late-validation and accessibility refinements intact without publishing application symbols on `window` or `globalThis`.
+## Generated and reference files
 
-The bridge is intentionally narrow and documented. It can be reduced in later parity-safe work, but removing it is not required for this extraction.
-
-## Build outputs
-
-- `npm run dev` starts the modular source through Vite.
-- `npm run build` writes a disposable Vite build to `.vite-build/`.
-- `dist/gemini-podcast-studio.html` and the repository-root `podcast-studio.html` remain preserved references from the earlier single-file workflow.
-
-The production single-file inlining pipeline is deliberately outside this phase.
+- `dist/gemini-podcast-studio.html` remains a frozen generated/reference artefact and is not edited by this phase.
+- The repository-root `podcast-studio.html` remains the original monolithic behavioural reference.
+- The legacy single-file scripts under `scripts/` are retained for historical recovery only and are not called by current package scripts.

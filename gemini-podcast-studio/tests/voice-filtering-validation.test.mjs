@@ -2,16 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createModuleContext } from './module-harness.mjs';
+import { createServices, installServices } from './service-harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const uiSource = await readFile(path.join(root, 'src', 'js', 'ui-create.js'), 'utf8');
 const apiSource = await readFile(path.join(root, 'src', 'js', 'script-generation.js'), 'utf8');
 const eventsSource = await readFile(path.join(root, 'src', 'js', 'ui-events.js'), 'utf8');
-const context = createModuleContext(['constants', 'text-utils', 'ui-create'], {
-  appState: { speakers: [] },
+
+const context = createServices({
+  appState: {
+    speakers: [],
+    podcast: { topic: '', durationMinutes: 3, language: 'English', customLanguage: '', format: 'conversation', customFormat: '', tones: [], instructions: '' },
+    settings: { speakingRate: 140, theme: 'light', maxTtsCharacters: 12000 },
+    connection: { apiKey: '', textModel: '', customTextModel: '', ttsModel: '', customTtsModel: '' },
+    audio: { url: '' }
+  },
   els: { speakerList: { innerHTML: '' } }
 });
+installServices(context, ['constants', 'textUtilities', 'appHelpers', 'createUi']);
 
 const {
   GEMINI_TTS_VOICES,
@@ -156,5 +164,5 @@ test('UI source contains no-match guidance and both duplicate-voice actions', ()
   assert.match(uiSource, /data-duplicate-voice-action="use-anyway"/);
   assert.match(uiSource, /data-duplicate-voice-action="choose-another"/);
   assert.match(eventsSource, /document\.getElementById\('speakerVoice1'\)\?\.focus\(\)/);
-  assert.match(apiSource, /ctx\.getDuplicateVoiceSignature\(\) && !ctx\.isDuplicateVoiceApproved\(\)/);
+  assert.match(apiSource, /services\.getDuplicateVoiceSignature\(\) && !services\.isDuplicateVoiceApproved\(\)/);
 });

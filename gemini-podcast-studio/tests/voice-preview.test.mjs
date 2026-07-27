@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppContext } from '../src/js/app-context.js';
-import { installPcmAudio } from '../src/js/pcm-audio.js';
-import { installWavEncoder } from '../src/js/wav-encoder.js';
-import { installGeminiErrors } from '../src/js/gemini-errors.js';
-import { installIndexeddb } from '../src/js/indexeddb.js';
-import { installMediaCache } from '../src/js/media-cache.js';
-import { installVoicePreview } from '../src/js/voice-preview.js';
+import { createServices, installServices } from './service-harness.mjs';
 
 class FakeClassList {
   values = new Set();
@@ -14,15 +8,9 @@ class FakeClassList {
 }
 class FakeElement {
   constructor(id = '') {
-    this.id = id;
-    this.dataset = {};
-    this.disabled = false;
-    this.attributes = new Map();
-    this.classList = new FakeClassList();
-    this.listeners = {};
-    this.parentElement = null;
-    this.innerHTML = '';
-    this.textContent = '';
+    this.id = id; this.dataset = {}; this.disabled = false; this.attributes = new Map();
+    this.classList = new FakeClassList(); this.listeners = {}; this.parentElement = null;
+    this.innerHTML = ''; this.textContent = '';
   }
   addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
@@ -38,20 +26,13 @@ for (let index = 0; index < 2; index += 1) {
   const container = new FakeElement(`previewContainer${index}`);
   const button = new FakeElement(`speakerPreview${index}`);
   const status = new FakeElement(`speakerPreviewStatus${index}`);
-  button.parentElement = container;
-  status.parentElement = container;
-  elements.set(button.id, button);
-  elements.set(status.id, status);
+  button.parentElement = container; status.parentElement = container;
+  elements.set(button.id, button); elements.set(status.id, status);
 }
 const generic = () => new FakeElement();
 const els = {
-  speakerList: generic(),
-  createForm: generic(),
-  connectionSetupForm: generic(),
-  connectionSettingsForm: generic(),
-  clearStoredDataButton: generic(),
-  language: generic(),
-  customLanguage: generic()
+  speakerList: generic(), createForm: generic(), connectionSetupForm: generic(), connectionSettingsForm: generic(),
+  clearStoredDataButton: generic(), language: generic(), customLanguage: generic()
 };
 const appState = {
   connection: { apiKey: 'test-key', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' },
@@ -63,47 +44,32 @@ const appState = {
 };
 let serviceError = null;
 let announcements = [];
-const voices = {
-  Iapetus: { apiName: 'Iapetus', gender: 'male', type: 'clear' },
-  Sulafat: { apiName: 'Sulafat', gender: 'female', type: 'warm' },
-  Erinome: { apiName: 'Erinome', gender: 'female', type: 'clear' }
-};
-const context = createAppContext();
-for (const [name, value] of Object.entries({
-  appState,
-  els,
-  renderSpeakerCards() {},
-  resetProject() {},
-  generateVoiceTest() {},
-  getLanguage: () => appState.podcast.language === 'custom' ? appState.podcast.customLanguage : appState.podcast.language,
-  getTtsModel: () => appState.connection.ttsModel === 'custom' ? appState.connection.customTtsModel : appState.connection.ttsModel,
-  getGeminiTtsVoice: name => voices[name] || null,
-  hashTtsCacheValue(value) {
-    let hash = 0;
-    for (const character of String(value)) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-    return hash.toString(36);
-  },
-  showServiceError: value => { serviceError = value; },
-  hideServiceError() { serviceError = null; },
+const services = createServices({
+  appState, els, renderSpeakerCards() {}, resetProject() {}, generateVoiceTest() {},
+  createApiError(status, message, details = '') { const error = new Error(message); error.status = status; error.details = details; return error; },
+  mapError: error => ({ message: error.message, suggestion: error.status === 429 ? 'Rate limited.' : 'Check configuration.' }),
+  showServiceError: value => { serviceError = value; }, hideServiceError() { serviceError = null; },
   announce: message => { announcements.push(message); }
-})) context.expose(name, value);
-
-globalThis.document = {
-  getElementById: id => elements.get(id) || null,
-  createElement: () => new FakeElement(),
-  querySelectorAll: () => []
+});
+installServices(services, ['constants', 'textUtilities', 'appHelpers', 'pcmAudio', 'wavEncoder']);
+services.announce = message => { announcements.push(message); };
+services.voicePreviewCacheBackend = {};
+services.setVoicePreviewCacheBackendForTests = backend => { services.voicePreviewCacheBackend = backend; };
+services.readVoicePreviewCache = async (key, backend) => {
+  try { return { record: await backend.get(key), storageError: null }; }
+  catch (error) { return { record: null, storageError: error }; }
 };
-globalThis.window = { addEventListener() {} };
-globalThis.URL = { createObjectURL: () => 'blob:test', revokeObjectURL() {} };
-globalThis.Audio = function () {};
-globalThis.requestAnimationFrame = callback => callback();
-installPcmAudio(context);
-installWavEncoder(context);
-installGeminiErrors(context);
-installIndexeddb(context);
-installMediaCache(context);
-installVoicePreview(context);
-const api = context;
+services.writeVoicePreviewCache = async (record, backend) => { try { await backend.set(record); return null; } catch (error) { return error; } };
+services.removeVoicePreviewCache = async (key, backend) => { try { await backend.delete(key); return null; } catch (error) { return error; } };
+services.clearVoicePreviewCache = async backend => { try { await (backend || services.voicePreviewCacheBackend).clear(); return null; } catch (error) { return error; } };
+Object.defineProperties(globalThis, {
+  document: { configurable: true, value: { getElementById: id => elements.get(id) || null, createElement: () => new FakeElement(), querySelectorAll: () => [] } },
+  window: { configurable: true, value: { addEventListener() {} } },
+  URL: { configurable: true, value: { createObjectURL: () => 'blob:test', revokeObjectURL() {} } },
+  Audio: { configurable: true, value: function Audio() {} }
+});
+installServices(services, ['voicePreview']);
+const api = services;
 
 function createCache(initial = []) {
   const map = new Map(initial.map(record => [record.cacheKey, record]));

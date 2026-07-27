@@ -1,26 +1,36 @@
 # Validation
 
-The modular development source is verified through Vite and the Node test suite.
+The ES-module extraction is validated against the preserved behaviour and source contracts.
 
-Automated checks cover:
-
-- One ES-module browser entry with no ordered classic scripts.
-- Vite production compilation from `src/index.html`.
-- JavaScript syntax for every source and test file.
-- Preservation of the Create, Script and Audio stages.
-- Existing model selection, speaker mapping, script editing, TTS chunk assembly, WAV encoding, persistence, migration, previews and cache behaviour.
-- Diagnostic API-key redaction.
-- DOM independence for API, storage, PCM, WAV, chunking and IndexedDB modules.
-- Absence of application assignments to `window` or `globalThis`.
-- Existing accessibility and responsive protections.
-
-Commands:
+## Automated checks
 
 ```bash
-npm install --no-audit --no-fund
-npm run build
-npm test
 npm run check
 ```
 
-Manual browser checks against the preserved monolithic reference remain appropriate for visual comparison. Live script and TTS generation cannot be claimed without a valid Gemini API key.
+This runs:
+
+- Vite production bundling from `src/index.html`.
+- The complete Node test suite.
+- Module-entry, module-boundary and import-cycle checks.
+- Existing script, TTS, preview, cache, persistence, accessibility and diagnostic tests.
+
+## Vite startup check
+
+```bash
+npm run dev -- --port 4173
+curl -I http://127.0.0.1:4173/
+```
+
+Expected result: Vite starts successfully and the development entry point returns HTTP 200.
+
+## Manual checks still requiring a browser and valid Gemini access
+
+- Compare the rendered UI with the monolithic reference for visual parity.
+- Generate a real script with the existing model selection.
+- Generate and play full podcast audio.
+- Download and externally validate the WAV.
+- Reload and confirm preferences and saved script state.
+- Confirm there are no browser console errors under normal interaction.
+
+A live Gemini generation result must not be claimed without a valid authorised API key and available models.
