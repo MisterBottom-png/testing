@@ -1,0 +1,98 @@
+name: Apply Gemini module overlay
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/tmp/gemini-module-overlay.zip
+      - .github/workflows/apply-gemini-module-overlay.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 0
+
+      - name: Preserve protected reference hashes
+        run: |
+          sha256sum podcast-studio.html > /tmp/root-reference.before
+          sha256sum gemini-podcast-studio/dist/gemini-podcast-studio.html > /tmp/dist.before
+          find gemini-podcast-studio/src/styles -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/styles.before
+
+      - name: Verify and apply module overlay
+        run: |
+          unzip -t .github/tmp/gemini-module-overlay.zip
+          unzip -oq .github/tmp/gemini-module-overlay.zip -d .
+          while IFS= read -r path; do
+            [ -n "$path" ] && rm -f -- "$path"
+          done < .github/tmp/gemini-module-deletions.txt
+          rm -f .github/tmp/gemini-module-deletions.txt
+          rmdir .github/tmp 2>/dev/null || true
+
+      - name: Confirm protected references are unchanged
+        run: |
+          sha256sum --check /tmp/root-reference.before
+          sha256sum --check /tmp/dist.before
+          find gemini-podcast-studio/src/styles -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/styles.after
+          diff -u /tmp/styles.before /tmp/styles.after
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install application dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        working-directory: gemini-podcast-studio
+        run: |
+          for file in src/js/*.js tests/*.mjs vite.config.js; do node --check "$file"; done
+
+      - name: Build and run full test suite
+        working-directory: gemini-podcast-studio
+        run: npm run check
+
+      - name: Smoke-test Vite preview in Chrome
+        working-directory: gemini-podcast-studio
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/gemini-vite.log 2>&1 &
+          preview_pid=$!
+          trap 'kill ${preview_pid} 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /tmp/gemini-index.html; then
+              break
+            fi
+            sleep 0.25
+          done
+          grep -q 'Podcast Studio' /tmp/gemini-index.html
+          timeout 30s google-chrome --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=3000 --dump-dom http://127.0.0.1:4173/ > /tmp/gemini-dom.html 2> /tmp/gemini-chrome.log
+          grep -q 'id="speakerName0"' /tmp/gemini-dom.html
+          grep -q '>Saved locally<' /tmp/gemini-dom.html
+          if grep -E 'Uncaught|ReferenceError|TypeError|CONSOLE.*ERROR' /tmp/gemini-chrome.log; then
+            echo 'Browser JavaScript error detected.' >&2
+            exit 1
+          fi
+
+      - name: Remove generated installation files
+        run: |
+          rm -rf gemini-podcast-studio/node_modules gemini-podcast-studio/.vite-build
+          rm -f gemini-podcast-studio/package-lock.json
+
+      - name: Commit verified extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "Extract Gemini Podcast Studio ES modules"
+          git push origin HEAD:agent/gemini-podcast-modular-source
