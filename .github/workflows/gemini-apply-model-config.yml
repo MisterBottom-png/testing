@@ -24,18 +24,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/model-config-reconstruct.log) 2>&1
           git fetch --quiet origin agent/gemini-model-config-staging:refs/remotes/origin/agent/gemini-model-config-staging
           git checkout --quiet origin/agent/gemini-model-config-staging -- .github/tmp
+          find .github/tmp -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
 
           cat .github/tmp/model-config-test.part-* > /tmp/model-configuration.test.mjs.b64
-          test "$(wc -c < /tmp/model-configuration.test.mjs.b64)" -eq 9804
+          test_bytes=$(wc -c < /tmp/model-configuration.test.mjs.b64)
+          echo "test-encoded-bytes=$test_bytes"
+          test "$test_bytes" -eq 9804
           base64 --decode /tmp/model-configuration.test.mjs.b64 > /tmp/model-configuration.test.mjs
-          test "$(sha256sum /tmp/model-configuration.test.mjs | cut -d' ' -f1)" = "3b3b6652ab775def7bd65b65821ac770550d413f0cae22723e1034a2cfaae43f"
+          test_sha=$(sha256sum /tmp/model-configuration.test.mjs | cut -d' ' -f1)
+          echo "test-sha=$test_sha"
+          test "$test_sha" = "3b3b6652ab775def7bd65b65821ac770550d413f0cae22723e1034a2cfaae43f"
 
           cat .github/tmp/model-config-apply.part-* > /tmp/apply-model-config.py.b64
-          test "$(wc -c < /tmp/apply-model-config.py.b64)" -eq 38388
+          apply_bytes=$(wc -c < /tmp/apply-model-config.py.b64)
+          echo "apply-encoded-bytes=$apply_bytes"
+          test "$apply_bytes" -eq 38388
           base64 --decode /tmp/apply-model-config.py.b64 > /tmp/apply-model-config.py
-          test "$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)" = "8e0194b84ff37039921f5cacd28d36015b3150e03a78bbd0aa11b2f735acaa8e"
+          apply_sha=$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)
+          echo "apply-sha=$apply_sha"
+          test "$apply_sha" = "8e0194b84ff37039921f5cacd28d36015b3150e03a78bbd0aa11b2f735acaa8e"
           python -m py_compile /tmp/apply-model-config.py
 
       - name: Prove focused tests fail before implementation
@@ -103,6 +113,7 @@ jobs:
         with:
           name: gemini-model-configuration-diagnostics
           path: |
+            /tmp/model-config-reconstruct.log
             /tmp/model-config-red.log
             /tmp/gemini-model-config-dev.log
           if-no-files-found: ignore
