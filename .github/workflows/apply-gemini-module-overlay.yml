@@ -7,6 +7,12 @@ on:
     paths:
       - .github/tmp/gemini-module-overlay.zip
       - .github/workflows/apply-gemini-module-overlay.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/tmp/gemini-module-overlay.zip
+      - .github/workflows/apply-gemini-module-overlay.yml
 
 permissions:
   contents: write
