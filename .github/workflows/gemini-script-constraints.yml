@@ -1,0 +1,190 @@
+name: Apply Gemini script constraints
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/gemini-script-constraints.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Fetch staged implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin agent/gemini-script-constraints-staging:refs/remotes/origin/agent/gemini-script-constraints-staging
+
+      - name: Prove focused tests fail before implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --quiet origin/agent/gemini-script-constraints-staging -- gemini-podcast-studio/tests/script-generation-constraints.test.mjs
+          cd gemini-podcast-studio
+          set +e
+          node --test tests/script-generation-constraints.test.mjs > /tmp/script-constraints-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/script-constraints-red.log
+          if [ "$status" -eq 0 ]; then
+            echo "Focused script-constraint tests unexpectedly passed before implementation."
+            exit 1
+          fi
+          echo "Focused tests failed as expected before implementation."
+
+      - name: Apply script constraints and validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --quiet origin/agent/gemini-script-constraints-staging -- \
+            gemini-podcast-studio/src/js/text-utils.js \
+            gemini-podcast-studio/src/js/app-helpers.js \
+            gemini-podcast-studio/src/js/script-validation.js \
+            gemini-podcast-studio/src/js/gemini-api.js \
+            gemini-podcast-studio/src/js/script-generation.js \
+            gemini-podcast-studio/tests/script-generation-constraints.test.mjs
+
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              target = Path(path)
+              source = target.read_text()
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}.')
+              target.write_text(source.replace(old, new, 1))
+
+          constants_path = 'gemini-podcast-studio/src/js/constants.js'
+          constants_insert = """  const DEFAULT_SPEAKING_RATE = 140;
+          const MAX_SEGMENT_WORDS = 90;
+          const MAX_SCRIPT_OVERAGE_RATIO = 1.15;
+          const MIN_SCRIPT_LENGTH_RATIO = 0.75;
+          const SCRIPT_TOKENS_PER_TARGET_WORD = 2.5;
+          const MIN_SCRIPT_OUTPUT_TOKENS = 2048;
+          const MAX_SCRIPT_OUTPUT_TOKENS = 8192;
+          const SCRIPT_SEGMENTS_PER_MINUTE = 10;
+          const MIN_SCRIPT_SEGMENTS = 16;
+          const MAX_SCRIPT_SEGMENTS = 100;
+          const MAX_DIRECTION_WORDS = 12;
+          const MAX_DIRECTION_CHARACTERS = 120;
+          """
+          replace_once(constants_path, "  const DEFAULT_SPEAKING_RATE = 140;\n", constants_insert)
+          constants_exports = """    DEFAULT_SPEAKING_RATE,
+              MAX_SEGMENT_WORDS,
+              MAX_SCRIPT_OVERAGE_RATIO,
+              MIN_SCRIPT_LENGTH_RATIO,
+              SCRIPT_TOKENS_PER_TARGET_WORD,
+              MIN_SCRIPT_OUTPUT_TOKENS,
+              MAX_SCRIPT_OUTPUT_TOKENS,
+              SCRIPT_SEGMENTS_PER_MINUTE,
+              MIN_SCRIPT_SEGMENTS,
+              MAX_SCRIPT_SEGMENTS,
+              MAX_DIRECTION_WORDS,
+              MAX_DIRECTION_CHARACTERS,
+          """
+          replace_once(constants_path, "    DEFAULT_SPEAKING_RATE,\n", constants_exports)
+
+          ui_script_path = 'gemini-podcast-studio/src/js/ui-script.js'
+          old_metrics = """    services.els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 ? ' warning' : ''}`;
+              services.els.scriptValidation.textContent = chunkError ? chunkError.message : chunkCount > 1 ? `Script is ready and will be generated in ${chunkCount} TTS chunks.` : 'Script is ready for audio generation.';
+              services.els.generateAudioButton.disabled = Boolean(chunkError) || services.appState.busy;
+          """
+          new_metrics = """    const scriptWarnings = services.refreshScriptWarnings(services.appState.script);
+              const readinessMessage = chunkError ? chunkError.message : chunkCount > 1 ? `Script is ready and will be generated in ${chunkCount} TTS chunks.` : 'Script is ready for audio generation.';
+              const warningMessages = scriptWarnings.map(warning => warning.message);
+              services.els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 || warningMessages.length ? ' warning' : ''}`;
+              services.els.scriptValidation.textContent = [...warningMessages, readinessMessage].join(' ');
+              services.els.generateAudioButton.disabled = Boolean(chunkError) || services.appState.busy;
+          """
+          replace_once(ui_script_path, old_metrics, new_metrics)
+
+          mapping_test_path = 'gemini-podcast-studio/tests/script-tts-mapping.test.mjs'
+          old_fixture = """  const script = services.validateScript({
+              title: 'Human names', summary: '', language: 'English', estimatedWords: 4,
+              segments: [{ speaker: 'James', direction: '', text: 'Welcome.' }, { speaker: 'Anna', direction: '', text: 'Let us begin.' }]
+            });
+          """
+          new_fixture = """  const script = services.validateScript({
+              title: 'Human names', summary: '',
+              segments: [{ speaker: 'James', direction: '', text: 'Welcome.' }, { speaker: 'Anna', direction: '', text: 'Let us begin.' }]
+            });
+          """
+          replace_once(mapping_test_path, old_fixture, new_fixture)
+
+          changelog = Path('gemini-podcast-studio/CHANGELOG.md')
+          line = '- Added bounded script-generation requests, locale-aware word counting, strict local structured-script validation, finish-reason classification and editable warnings.'
+          source = changelog.read_text().rstrip()
+          if line not in source:
+              changelog.write_text(source + '\n' + line + '\n')
+          PY
+
+      - name: Run focused and full verification
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee /tmp/script-constraints-verify.log) 2>&1
+          npm install --no-audit --no-fund
+          node --test tests/script-generation-constraints.test.mjs
+          npm test
+          npm run build
+          npm run verify:single
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+          test -f dist/gemini-podcast-studio.html
+          test ! -d .single-file-build
+          grep -q "Gemini stopped because the script reached the output-token limit" dist/gemini-podcast-studio.html
+          grep -q "more than 15% above" dist/gemini-podcast-studio.html
+          grep -q "thinkingLevel" dist/gemini-podcast-studio.html
+          grep -q "maxOutputTokens" dist/gemini-podcast-studio.html
+
+          npm run dev -- --port 4173 > /tmp/gemini-script-constraints-dev.log 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/ > /tmp/gemini-script-constraints-dev.html; then
+              break
+            fi
+            sleep 1
+          done
+          test -s /tmp/gemini-script-constraints-dev.html
+          grep -q 'src="./js/main.js"' /tmp/gemini-script-constraints-dev.html
+          kill "$dev_pid" 2>/dev/null || true
+          wait "$dev_pid" 2>/dev/null || true
+          trap - EXIT
+          git diff --check
+          wc -c dist/gemini-podcast-studio.html
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-script-constraints-diagnostics
+          path: |
+            /tmp/script-constraints-red.log
+            /tmp/script-constraints-verify.log
+            /tmp/gemini-script-constraints-dev.log
+          if-no-files-found: ignore
+
+      - name: Commit verified script constraints
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/gemini-script-constraints.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Constrain and validate generated scripts"
+          git push origin HEAD:agent/gemini-podcast-modular-source
+          git push origin --delete agent/gemini-script-constraints-staging || true
