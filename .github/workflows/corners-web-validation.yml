@@ -40,8 +40,14 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Type check
-        run: npm run typecheck
+      - name: Type check game core
+        run: npm run typecheck --workspace @corners/game-core
+
+      - name: Type check server
+        run: npm run typecheck --workspace @corners/server
+
+      - name: Type check web client
+        run: npm run typecheck --workspace @corners/web
 
       - name: Build web PWA
         run: npm run build
