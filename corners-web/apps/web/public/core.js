@@ -1,19 +1,18 @@
-const ROW_LENGTHS = [1, 2, 3, 4, 13, 12, 11, 10, 9, 10, 11, 12, 13, 4, 3, 2, 1];
-const ROW_STARTS = [12, 11, 10, 9, 0, 1, 2, 3, 4, 3, 2, 1, 0, 9, 10, 11, 12];
+const BOARD_SIZE = 8;
+const PIECES_PER_PLAYER = 9;
 
-const HOLES = ROW_LENGTHS.flatMap((length, y) =>
-  Array.from({ length }, (_, i) => ({ x: ROW_STARTS[y] + i * 2, y })),
-);
+const HOLES = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => ({
+  x: index % BOARD_SIZE,
+  y: Math.floor(index / BOARD_SIZE),
+}));
 
-const INDEX_BY_COORD = new Map(HOLES.map((hole, index) => [`${hole.x},${hole.y}`, index]));
+const INDEX_BY_COORD = new Map(HOLES.map((cell, index) => [`${cell.x},${cell.y}`, index]));
 const CAMPS = [
-  new Set(HOLES.map((hole, index) => (hole.y <= 3 ? index : -1)).filter((index) => index >= 0)),
-  new Set(HOLES.map((hole, index) => (hole.y >= 13 ? index : -1)).filter((index) => index >= 0)),
+  new Set(HOLES.map((cell, index) => (cell.x < 3 && cell.y < 3 ? index : -1)).filter((index) => index >= 0)),
+  new Set(HOLES.map((cell, index) => (cell.x >= 5 && cell.y >= 5 ? index : -1)).filter((index) => index >= 0)),
 ];
 
-const STEP_DIRECTIONS = [
-  [2, 0], [-2, 0], [1, 1], [-1, 1], [1, -1], [-1, -1],
-];
+const STEP_DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 function indexAt(x, y) {
   return INDEX_BY_COORD.get(`${x},${y}`) ?? -1;
@@ -32,7 +31,7 @@ function createInitialState(mode = 'local') {
   for (const index of CAMPS[0]) pieces[index] = 1;
   for (const index of CAMPS[1]) pieces[index] = 2;
   return {
-    version: 1,
+    version: 2,
     gameId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     mode,
     phase: 'playing',
@@ -52,13 +51,13 @@ function jumpDestinations(state, fromIndex) {
 
   while (queue.length) {
     const current = queue.shift();
-    const hole = HOLES[current];
+    const cell = HOLES[current];
     for (const [dx, dy] of STEP_DIRECTIONS) {
-      const middle = indexAt(hole.x + dx, hole.y + dy);
-      const landing = indexAt(hole.x + dx * 2, hole.y + dy * 2);
+      const middle = indexAt(cell.x + dx, cell.y + dy);
+      const landing = indexAt(cell.x + dx * 2, cell.y + dy * 2);
       if (middle < 0 || landing < 0 || state.pieces[middle] === 0) continue;
-      const landingOccupied = landing === fromIndex ? false : state.pieces[landing] !== 0;
-      if (landingOccupied || visited.has(landing)) continue;
+      const occupied = landing === fromIndex ? false : state.pieces[landing] !== 0;
+      if (occupied || visited.has(landing)) continue;
       visited.add(landing);
       results.add(landing);
       queue.push(landing);
@@ -82,24 +81,16 @@ function getLegalDestinations(state, fromIndex, { ignoreTurn = false } = {}) {
     const destination = indexAt(from.x + dx, from.y + dy);
     if (destination >= 0 && state.pieces[destination] === 0) results.add(destination);
   }
-
   for (const destination of jumpDestinations(state, fromIndex)) results.add(destination);
-
-  const targetCamp = CAMPS[player === 0 ? 1 : 0];
-  if (targetCamp.has(fromIndex)) {
-    return [...results].filter((destination) => targetCamp.has(destination));
-  }
-
   return [...results];
 }
 
 function isWinningPosition(state, player) {
   const targetCamp = CAMPS[player === 0 ? 1 : 0];
-  let count = 0;
   for (const index of targetCamp) {
-    if (state.pieces[index] === player + 1) count += 1;
+    if (state.pieces[index] !== player + 1) return false;
   }
-  return count === 10;
+  return true;
 }
 
 function applyMove(state, from, to) {
@@ -107,8 +98,9 @@ function applyMove(state, from, to) {
   if (state.pieces[from] !== state.currentPlayer + 1) {
     return { ok: false, message: 'Сейчас ход другого игрока.' };
   }
-  const legal = getLegalDestinations(state, from);
-  if (!legal.includes(to)) return { ok: false, message: 'Так ходить нельзя.' };
+  if (!getLegalDestinations(state, from).includes(to)) {
+    return { ok: false, message: 'Так ходить нельзя.' };
+  }
 
   const player = state.currentPlayer;
   state.pieces[to] = state.pieces[from];
@@ -129,25 +121,28 @@ function getAllLegalMoves(state, player = state.currentPlayer) {
   const moves = [];
   for (let from = 0; from < state.pieces.length; from += 1) {
     if (state.pieces[from] !== player + 1) continue;
-    for (const to of getLegalDestinations(state, from, { ignoreTurn: true })) {
-      moves.push({ from, to });
-    }
+    for (const to of getLegalDestinations(state, from, { ignoreTurn: true })) moves.push({ from, to });
   }
   return moves;
 }
 
-function progressScore(player, from, to) {
-  const a = HOLES[from];
-  const b = HOLES[to];
-  const direction = player === 0 ? 1 : -1;
-  const forward = (b.y - a.y) * direction;
-  const centerBias = Math.abs(a.x - 12) - Math.abs(b.x - 12);
-  const targetCamp = CAMPS[player === 0 ? 1 : 0];
-  const homeCamp = CAMPS[player];
-  const targetBonus = targetCamp.has(to) ? 35 : 0;
-  const leaveHomeBonus = homeCamp.has(from) && !homeCamp.has(to) ? 12 : 0;
-  const longJumpBonus = Math.max(0, Math.abs(b.y - a.y) + Math.abs(b.x - a.x) / 2 - 1) * 1.5;
-  return forward * 12 + centerBias * 1.5 + targetBonus + leaveHomeBonus + longJumpBonus;
+function distanceToTarget(player, index) {
+  const cell = HOLES[index];
+  const target = player === 0 ? { x: 6, y: 6 } : { x: 1, y: 1 };
+  return Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y);
+}
+
+function evaluateState(state, player) {
+  const ownTarget = CAMPS[player === 0 ? 1 : 0];
+  const ownHome = CAMPS[player];
+  let score = 0;
+  for (let index = 0; index < state.pieces.length; index += 1) {
+    if (state.pieces[index] !== player + 1) continue;
+    score -= distanceToTarget(player, index) * 8;
+    if (ownTarget.has(index)) score += 65;
+    if (!ownHome.has(index)) score += 5;
+  }
+  return score;
 }
 
 function chooseBotMove(state, difficulty = 'smart') {
@@ -157,16 +152,23 @@ function chooseBotMove(state, difficulty = 'smart') {
 
   const player = state.currentPlayer;
   const scored = moves.map((move) => {
-    let score = progressScore(player, move.from, move.to);
-    if (difficulty === 'smart') {
-      const simulated = cloneState(state);
-      applyMove(simulated, move.from, move.to);
-      if (simulated.winner === player) score += 10000;
-      score += Math.random() * 5;
+    const simulated = cloneState(state);
+    applyMove(simulated, move.from, move.to);
+    let score = evaluateState(simulated, player);
+    if (simulated.winner === player) score += 100000;
+
+    const opponentMoves = getAllLegalMoves(simulated, simulated.currentPlayer);
+    let opponentBest = -Infinity;
+    for (const response of opponentMoves.slice(0, 40)) {
+      const reply = cloneState(simulated);
+      applyMove(reply, response.from, response.to);
+      opponentBest = Math.max(opponentBest, evaluateState(reply, simulated.currentPlayer));
     }
+    if (Number.isFinite(opponentBest)) score -= opponentBest * 0.18;
+    score += Math.random() * 0.5;
     return { ...move, score };
   });
+
   scored.sort((a, b) => b.score - a.score);
-  const pool = scored.slice(0, Math.min(difficulty === 'smart' ? 4 : 8, scored.length));
-  return pool[Math.floor(Math.random() * pool.length)];
+  return scored[0];
 }
