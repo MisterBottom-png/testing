@@ -35,12 +35,55 @@
 
   <section class="overlay" id="welcomeOverlay">
     <div class="modal">
-      <div class="modal-head"><div><h2>Уголки</h2><p class="lead">Переведи девять своих шашек из квадрата 3×3 в противоположный угол доски. Правила простые, последствия для дружбы традиционно не документируются.</p></div></div>
+      <div class="modal-head"><div><h2>Уголки</h2><p class="lead">Выбери форму дома и правила движения, затем переведи все свои шашки в противоположный угол раньше соперника.</p></div></div>
       <button class="resume hidden" id="resumeBtn">Продолжить сохранённую партию</button>
       <div class="field-row">
         <div class="field"><label for="blueName">Имя синих</label><input id="blueName" maxlength="18" value="Игрок 1"></div>
         <div class="field"><label for="redName">Имя красных</label><input id="redName" maxlength="18" value="Игрок 2"></div>
       </div>
+
+      <section class="setup-section" aria-labelledby="homeTypeTitle">
+        <div class="setup-heading"><h3 id="homeTypeTitle">Форма дома</h3><span>3 варианта</span></div>
+        <div class="home-options">
+          <label class="choice-card">
+            <input type="radio" name="homeType" value="3x3" checked>
+            <span class="mini-board" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="choice-copy"><strong>Квадрат 3×3</strong><small>9 шашек · компактная партия</small></span>
+            <span class="choice-check">✓</span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="homeType" value="3x4">
+            <span class="mini-board" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>
+            <span class="choice-copy"><strong>Прямоугольник 3×4</strong><small>12 шашек · плотная доска</small></span>
+            <span class="choice-check">✓</span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="homeType" value="1-2-3-4">
+            <span class="mini-board" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i></span>
+            <span class="choice-copy"><strong>Дом 1–2–3–4</strong><small>10 шашек · треугольная гальма</small></span>
+            <span class="choice-check">✓</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="setup-section" aria-labelledby="movementTypeTitle">
+        <div class="setup-heading"><h3 id="movementTypeTitle">Тип ходов</h3><span>2 варианта</span></div>
+        <div class="movement-options">
+          <label class="movement-card">
+            <input type="radio" name="movementType" value="classic" checked>
+            <span class="movement-icon">↕↔</span>
+            <span><strong>Классические</strong><small>Вертикаль и горизонталь</small></span>
+            <span class="choice-check">✓</span>
+          </label>
+          <label class="movement-card">
+            <input type="radio" name="movementType" value="diagonal">
+            <span class="movement-icon">✣</span>
+            <span><strong>Диагональные</strong><small>Плюс ходы и прыжки по диагонали</small></span>
+            <span class="choice-check">✓</span>
+          </label>
+        </div>
+      </section>
+
       <div class="mode-grid">
         <button class="mode-btn" data-mode="local"><span class="mode-icon">👥</span><span><strong>На одном телефоне</strong><small>Передавайте устройство после каждого хода</small></span><span class="arrow">›</span></button>
         <button class="mode-btn" data-mode="bot"><span class="mode-icon">◆</span><span><strong>Против компьютера</strong><small>Красными управляет тактический бот</small></span><span class="arrow">›</span></button>
@@ -52,7 +95,7 @@
 
   <section class="overlay hidden" id="onlineOverlay">
     <div class="modal">
-      <div class="modal-head"><div><h2>Онлайн P2P</h2><p class="lead">Соединение идёт напрямую между телефонами. Коды длинные, потому что браузеры обожают превращать простую вещь в дипломатический договор.</p></div><button class="close-btn" data-close-online>×</button></div>
+      <div class="modal-head"><div><h2>Онлайн P2P</h2><p class="lead">Соединение идёт напрямую между телефонами. Форму дома и тип ходов задаёт создатель партии; второй игрок получает те же настройки.</p></div><button class="close-btn" data-close-online>×</button></div>
       <div class="tabs"><button class="tab active" data-online-tab="host">Создать игру</button><button class="tab" data-online-tab="guest">Присоединиться</button></div>
       <div id="hostPanel">
         <div class="online-step"><div class="step-title"><span class="step-number">1</span>Создай приглашение</div><p class="hint">Нажми кнопку и отправь полученный код второму игроку.</p><div class="action-row"><button class="action" id="createOfferBtn">Создать код</button><button class="action secondary" id="copyOfferBtn" disabled>Копировать</button></div><textarea class="signal-box" id="offerOut" readonly placeholder="Здесь появится код приглашения"></textarea></div>
@@ -67,10 +110,11 @@
   </section>
 
   <section class="overlay hidden" id="rulesOverlay">
-    <div class="modal"><div class="modal-head"><div><h2>Правила</h2><p class="lead">Два игрока начинают в противоположных квадратных домах 3×3 на доске 8×8.</p></div><button class="close-btn" data-close-rules>×</button></div><div class="rules">
-      <h3>Цель</h3><p>Первым переставить все 9 своих шашек в квадрат 3×3, где начинал соперник.</p>
-      <h3>Ход</h3><ul><li>Шашка ходит на соседнюю свободную клетку только по горизонтали или вертикали.</li><li>Можно перепрыгнуть через соседнюю свою или чужую шашку, если клетка сразу за ней свободна.</li><li>За один ход разрешена цепочка из нескольких прыжков с изменением направления. Взятия нет: перепрыгнутые шашки остаются на доске.</li><li>Игра показывает все клетки, на которых можно закончить выбранный ход.</li></ul>
-      <h3>Управление</h3><p>Нажми свою фишку, затем зелёное поле. Повторное нажатие на выбранную фишку отменяет выбор.</p>
+    <div class="modal"><div class="modal-head"><div><h2>Правила</h2><p class="lead">Перед партией выбираются форма дома и допустимые направления движения.</p></div><button class="close-btn" data-close-rules>×</button></div><div class="rules">
+      <h3>Три формы дома</h3><ul><li><strong>3×3:</strong> квадрат из 9 шашек.</li><li><strong>3×4:</strong> прямоугольник из 12 шашек.</li><li><strong>1–2–3–4:</strong> треугольный дом из 10 шашек.</li></ul>
+      <h3>Два типа игры</h3><ul><li><strong>Классические:</strong> простой ход и прыжки только по горизонтали или вертикали.</li><li><strong>Диагональные:</strong> дополнительно разрешены простые ходы и прыжки по диагонали.</li></ul>
+      <h3>Цель и прыжки</h3><p>Переставь все свои шашки в исходный дом соперника. Прыгать можно через свою или чужую шашку на свободную клетку. За один ход разрешена цепочка прыжков, а перепрыгнутые шашки не снимаются.</p>
+      <h3>Управление</h3><p>Нажми свою фишку, затем зелёную клетку. Игра показывает все места, где разрешено закончить ход.</p>
     </div></div>
   </section>
 
