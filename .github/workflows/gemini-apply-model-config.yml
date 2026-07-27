@@ -51,23 +51,40 @@ jobs:
           from pathlib import Path
           path = Path('/tmp/apply-model-config.py')
           source = path.read_text()
-          old = """replace_once('src/js/script-generation.js', 'services.callGeminiText({', 'services.generateStructuredScript({')
+
+          old_script_patch = """replace_once('src/js/script-generation.js', 'services.callGeminiText({', 'services.generateStructuredScript({')
           replace_once('src/js/script-generation.js', 'services.callGeminiText({', 'services.generateStructuredScript({')
           """
-          new = """script_generation = read('src/js/script-generation.js')
+          new_script_patch = """script_generation = read('src/js/script-generation.js')
           old_transport_call = 'services.callGeminiText({'
           new_transport_call = 'services.generateStructuredScript({'
           if script_generation.count(old_transport_call) != 2:
               raise SystemExit(f\"src/js/script-generation.js: expected two Gemini transport calls, found {script_generation.count(old_transport_call)}\")
           write('src/js/script-generation.js', script_generation.replace(old_transport_call, new_transport_call))
           """
-          if source.count(old) != 1:
-              raise SystemExit(f'Expected one legacy two-call patch block, found {source.count(old)}.')
-          path.write_text(source.replace(old, new, 1))
+          if source.count(old_script_patch) != 1:
+              raise SystemExit(f'Expected one legacy script transport patch block, found {source.count(old_script_patch)}.')
+          source = source.replace(old_script_patch, new_script_patch, 1)
+
+          old_jobs_patch = """replace_once('src/js/generation-jobs.js', "    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;\\n", '')
+          replace_once('src/js/generation-jobs.js', 'result = await services.requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);', 'result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });')"""
+          new_jobs_patch = """generation_jobs = read('src/js/generation-jobs.js')
+          tts_endpoint_line = "    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;\\n"
+          if generation_jobs.count(tts_endpoint_line) != 2:
+              raise SystemExit(f\"src/js/generation-jobs.js: expected two existing TTS endpoint paths, found {generation_jobs.count(tts_endpoint_line)}\")
+          generation_jobs = generation_jobs.replace(tts_endpoint_line, '', 1)
+          old_chunk_request = 'result = await services.requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);'
+          new_chunk_request = 'result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });'
+          if generation_jobs.count(old_chunk_request) != 1:
+              raise SystemExit(f\"src/js/generation-jobs.js: expected one episode TTS request call, found {generation_jobs.count(old_chunk_request)}\")
+          write('src/js/generation-jobs.js', generation_jobs.replace(old_chunk_request, new_chunk_request, 1))"""
+          if source.count(old_jobs_patch) != 1:
+              raise SystemExit(f'Expected one legacy generation-jobs patch block, found {source.count(old_jobs_patch)}.')
+          path.write_text(source.replace(old_jobs_patch, new_jobs_patch, 1))
           PY
           corrected_sha=$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)
           echo "apply-corrected-sha=$corrected_sha"
-          test "$corrected_sha" = "0d2a5749f3ff186e8328f6796916f867b56da56392612b449203812b996ab0f7"
+          test "$corrected_sha" = "0a142e428616ce0b746e2006486f8b8ccb1aa08f20444f4f9fdda37c00ecc05a"
           python -m py_compile /tmp/apply-model-config.py
 
       - name: Prove focused tests fail before implementation
