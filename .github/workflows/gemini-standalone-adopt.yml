@@ -26,6 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The archive is split only to keep connector writes below transport limits.
           for file in .github/tmp-v2/standalone-build.part-*; do
             printf '%s bytes=%s blob=%s\n' "$file" "$(wc -c < "$file")" "$(git hash-object "$file")"
           done
