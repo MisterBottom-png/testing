@@ -1,0 +1,27 @@
+name: Gemini module analysis
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/scripts/analyse-gemini-modules.mjs
+      - .github/workflows/gemini-module-analysis.yml
+      - gemini-podcast-studio/src/js/**
+      - gemini-podcast-studio/src/index.html
+
+permissions:
+  contents: read
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install parser
+        run: npm install --no-save --no-package-lock @babel/parser @babel/traverse
+      - name: Analyse module dependencies
+        run: node .github/scripts/analyse-gemini-modules.mjs
