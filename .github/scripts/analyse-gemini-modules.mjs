@@ -85,7 +85,7 @@ for (const file of allFiles) {
 }
 
 const output = JSON.stringify(report, null, 2);
-await writeFile('.module-analysis.json', `${output}\n`, 'utf8');
+await writeFile('module-analysis.json', `${output}\n`, 'utf8');
 console.log('MODULE_ANALYSIS_BEGIN');
 console.log(output);
 console.log('MODULE_ANALYSIS_END');
