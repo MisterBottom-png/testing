@@ -127,19 +127,22 @@ No new duplicate helper was introduced. Existing overlaps to preserve for later,
 
 The API key must remain in the request header only. It must never be added to endpoint URLs, cache descriptors, cache metadata, downloaded content or diagnostic exports.
 
-## Verification
+## Verification completed
 
-Local/source verification to run from `gemini-podcast-studio/`:
+GitHub Actions workflow `Gemini Podcast Studio baseline`, run `30234901009`, completed successfully against commit `64a1faa97bf3bf6a5589e17b18c7c6964c41c285`.
 
-```sh
-npm install --no-audit --no-fund
-for file in src/js/*.js; do node --check "$file"; done
-npm run check
-```
+Completed checks:
 
-`npm run check` performs the single-file build, generated-file verification and all Node tests. Live script/TTS verification additionally requires a valid Gemini API key and supported model access.
+- `npm install --no-audit --no-fund`
+- `node --check` for every file in `src/js/`
+- `npm run build`
+- `npm run verify`
+- `npm test`, including the added diagnostic-redaction and API-key URL regression tests
+- Full `npm run check`
 
-Remaining manual browser checks when a valid key is available:
+All automated steps passed. The generated single-file output was built and verified only inside the clean CI workspace; it was not edited or committed in this baseline task.
+
+Live Gemini script generation, TTS generation, browser audio playback, external WAV playback/download and reload persistence were not claimed because no authorised Gemini API key was available to this task. Exact remaining manual checks:
 
 1. Generate a JSON script and confirm the configured human speaker names are retained.
 2. Generate full podcast audio and confirm native playback works.
