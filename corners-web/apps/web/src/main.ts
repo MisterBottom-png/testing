@@ -1,4 +1,4 @@
-import { io } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import type {
   RoomMutationResult,
   ServerToClientEvents,
@@ -7,7 +7,7 @@ import type {
 import "./styles.css";
 
 const serverUrl = import.meta.env.VITE_SERVER_URL ?? "http://localhost:3001";
-const socket = io<ServerToClientEvents, ClientToServerEvents>(serverUrl);
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(serverUrl);
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
