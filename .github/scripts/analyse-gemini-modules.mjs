@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parse } from '@babel/parser';
 import traverseModule from '@babel/traverse';
@@ -84,6 +84,8 @@ for (const file of allFiles) {
   };
 }
 
+const output = JSON.stringify(report, null, 2);
+await writeFile('.module-analysis.json', `${output}\n`, 'utf8');
 console.log('MODULE_ANALYSIS_BEGIN');
-console.log(JSON.stringify(report, null, 2));
+console.log(output);
 console.log('MODULE_ANALYSIS_END');
