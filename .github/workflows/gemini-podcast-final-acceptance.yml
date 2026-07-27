@@ -6,6 +6,12 @@ on:
       - agent/gemini-podcast-modular-source
     paths:
       - gemini-podcast-studio/.run-final-acceptance
+  pull_request:
+    branches:
+      - main
+    paths:
+      - gemini-podcast-studio/**
+      - .github/workflows/gemini-podcast-final-acceptance.yml
 
 permissions:
   contents: write
@@ -19,44 +25,32 @@ jobs:
         with:
           ref: agent/gemini-podcast-modular-source
 
-      - name: Install, validate and publish result
-        run: |
-          set +e
-          cd gemini-podcast-studio
-          {
-            echo "## Runtime"
-            node --version
-            npm --version
-            echo "## Install"
-            npm install --no-audit --no-fund
-            echo "## JavaScript syntax"
-            for file in src/js/*.js; do node --check "$file" || exit 91; done
-            echo "## Production build, verification and tests"
-            npm run check
-          } > final-acceptance.log 2>&1
-          status=$?
-          cd ..
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
+      - name: Install dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        working-directory: gemini-podcast-studio
+        run: |
+          for file in src/js/*.js; do node --check "$file"; done
+
+      - name: Build, verify and run full test suite
+        working-directory: gemini-podcast-studio
+        run: npm run check
+
+      - name: Commit refreshed production build
+        if: github.event_name == 'push'
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if [ "$status" -ne 0 ]; then
-            {
-              echo "status=$status"
-              echo
-              tail -n 260 gemini-podcast-studio/final-acceptance.log
-            } > gemini-podcast-studio/final-acceptance-failure.txt
-            rm -f gemini-podcast-studio/final-acceptance.log
-            git add gemini-podcast-studio/final-acceptance-failure.txt
-            git commit -m "Record Gemini Podcast Studio acceptance failure"
-            git push
-            exit 0
-          fi
-
-          rm -f gemini-podcast-studio/final-acceptance-failure.txt gemini-podcast-studio/final-acceptance.log
-          git add gemini-podcast-studio/dist/gemini-podcast-studio.html gemini-podcast-studio/final-acceptance-failure.txt
+          git add gemini-podcast-studio/dist/gemini-podcast-studio.html
           if git diff --cached --quiet; then
-            echo "Production build and full test suite passed; generated output is current."
+            echo "Production build is already current."
           else
             git commit -m "Refresh accepted Gemini Podcast Studio build"
             git push
