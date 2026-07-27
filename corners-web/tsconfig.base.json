@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {
-      "@corners/game-core": ["packages/game-core/src/index.ts"]
+      "@corners/game-core": ["./packages/game-core/src/index.ts"]
     }
   }
 }
