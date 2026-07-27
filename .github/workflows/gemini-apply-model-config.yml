@@ -114,8 +114,9 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          path = Path('gemini-podcast-studio/tests/model-configuration.test.mjs')
-          source = path.read_text()
+
+          model_test_path = Path('gemini-podcast-studio/tests/model-configuration.test.mjs')
+          source = model_test_path.read_text()
           harness_pattern = re.compile(r"async function createHarness\(savedProject = null\) \{.*?\n\}\n\n", re.S)
           corrected_harness = """async function createHarness(savedProject = null) {
             const localStorage = createStorage(savedProject ? { 'geminiPodcastStudio.preferences.v2': JSON.stringify(savedProject) } : {});
@@ -148,7 +149,23 @@ jobs:
           new_invalid = "  const { services, localStorage, loadPreferences } = await createHarness(saved);\n  const migration = await loadPreferences();"
           if source.count(old_valid) != 1 or source.count(old_invalid) != 1:
               raise SystemExit('Expected both preference-loading test calls exactly once.')
-          path.write_text(source.replace(old_valid, new_valid, 1).replace(old_invalid, new_invalid, 1))
+          model_test_path.write_text(source.replace(old_valid, new_valid, 1).replace(old_invalid, new_invalid, 1))
+
+          mapping_test_path = Path('gemini-podcast-studio/tests/script-tts-mapping.test.mjs')
+          mapping_source = mapping_test_path.read_text()
+          old_stub = """  services.requestTtsChunk = async (_endpoint, transcript, speakerVoiceConfigs) => {
+            requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
+            return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
+          };
+          """
+          new_stub = """  services.generateTtsPcm = async ({ transcript, speakerVoiceConfigs }) => {
+            requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
+            return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
+          };
+          """
+          if mapping_source.count(old_stub) != 1:
+              raise SystemExit(f'Expected one legacy TTS chunk test stub, found {mapping_source.count(old_stub)}.')
+          mapping_test_path.write_text(mapping_source.replace(old_stub, new_stub, 1))
           PY
           test "$(sha256sum gemini-podcast-studio/tests/model-configuration.test.mjs | cut -d' ' -f1)" = "6054ec3a76e71543691d464bd9c915bc7ef6a6ccf4fdb1fab03fbd41f153f697"
           rm -rf .github/tmp
