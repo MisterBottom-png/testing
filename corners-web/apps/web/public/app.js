@@ -1,8 +1,10 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
-const STORAGE_KEY = 'corners-game-save-v3';
+const STORAGE_KEY = 'corners-game-save-v4';
 const SETTINGS_KEY = 'corners-settings-v2';
-const MODE_LABELS = { local:'На одном телефоне', bot:'Против компьютера', online:'Онлайн P2P' };
+const MODE_LABELS = { local:'Локально', bot:'Бот', online:'P2P' };
+const HOME_LABELS = { '3x3':'3×3', '3x4':'3×4', '1-2-3-4':'1–2–3–4' };
+const MOVEMENT_LABELS = { classic:'Классика', diagonal:'Диагональ' };
 
 let state = createInitialState('local');
 let selected = null;
@@ -30,19 +32,22 @@ function currentPlayerCanAct(){
   if (state.mode === 'online') return online.connected && state.currentPlayer === online.playerIndex;
   return true;
 }
-function targetCount(player){ const target = CAMPS[player === 0 ? 1 : 0]; let count=0; for(const i of target) if(state.pieces[i]===player+1) count++; return count; }
+function targetCount(player){ const target = getCamps(state.homeType)[player === 0 ? 1 : 0]; let count=0; for(const i of target) if(state.pieces[i]===player+1) count++; return count; }
+function selectedConventions(){ return { homeType: document.querySelector('input[name="homeType"]:checked')?.value || '3x3', movementType: document.querySelector('input[name="movementType"]:checked')?.value || 'classic' }; }
+function syncConventionControls(){ const home=document.querySelector(`input[name="homeType"][value="${state.homeType || '3x3'}"]`); const movement=document.querySelector(`input[name="movementType"][value="${state.movementType || 'classic'}"]`); if(home) home.checked=true; if(movement) movement.checked=true; }
 function elapsedText(){ const ms=Math.max(0,Date.now()-state.startedAt); const m=Math.floor(ms/60000); const s=Math.floor(ms/1000)%60; return `${m}:${String(s).padStart(2,'0')}`; }
 
 function renderBoard(){
   const gradient = `<defs><radialGradient id="bluePiece" cx="32%" cy="25%"><stop offset="0" stop-color="#d8efff"/><stop offset=".34" stop-color="#78baff"/><stop offset="1" stop-color="#1465bd"/></radialGradient><radialGradient id="redPiece" cx="32%" cy="25%"><stop offset="0" stop-color="#ffe2e5"/><stop offset=".34" stop-color="#ff8490"/><stop offset="1" stop-color="#bb2341"/></radialGradient></defs>`;
   const margin=24, cellSize=61, center=cellSize/2;
+  const camps=getCamps(state.homeType);
   let content = gradient + `<rect class="board-frame" x="14" y="14" width="508" height="508" rx="24"/>`;
   HOLES.forEach((cell,index)=>{
     const x=margin+cell.x*cellSize, y=margin+cell.y*cellSize;
     const cx=x+center, cy=y+center;
     const classes=['cell',(cell.x+cell.y)%2?'dark':'light'];
-    if(CAMPS[0].has(index)) classes.push('home-blue');
-    if(CAMPS[1].has(index)) classes.push('home-red');
+    if(camps[0].has(index)) classes.push('home-blue');
+    if(camps[1].has(index)) classes.push('home-red');
     content += `<rect class="${classes.join(' ')}" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="5"/>`;
     if(legal.includes(index)) content += `<circle class="legal" data-index="${index}" cx="${cx}" cy="${cy}" r="14" role="button" aria-label="Сделать ход на клетку ${cell.x+1}, ${cell.y+1}"/>`;
     const piece=state.pieces[index];
@@ -59,9 +64,10 @@ function renderBoard(){
 }
 
 function render(){
-  $('#modeLabel').textContent = `${MODE_LABELS[state.mode]} · ${state.moveCount} ходов · ${elapsedText()}`;
+  $('#modeLabel').textContent = `${MODE_LABELS[state.mode]} · ${HOME_LABELS[state.homeType]} · ${MOVEMENT_LABELS[state.movementType]}`;
   $('#name0').textContent=names[0]; $('#name1').textContent=names[1];
-  $('#progress0').textContent=`В цели: ${targetCount(0)}/9`; $('#progress1').textContent=`В цели: ${targetCount(1)}/9`;
+  const pieceCount=getPieceCount(state.homeType);
+  $('#progress0').textContent=`В цели: ${targetCount(0)}/${pieceCount}`; $('#progress1').textContent=`В цели: ${targetCount(1)}/${pieceCount}`;
   $('#player0').classList.toggle('active',state.currentPlayer===0 && state.phase==='playing');
   $('#player1').classList.toggle('active',state.currentPlayer===1 && state.phase==='playing');
   const pill=$('#turnPill');
@@ -117,14 +123,14 @@ function undo(){
 }
 function restartGame(skipConfirm=false){
   if(!skipConfirm && state.moveCount>0 && !confirm('Начать партию заново?')) return;
-  state=createInitialState(state.mode); history=[]; selected=null; legal=[]; botThinking=false; winnerOverlay.classList.add('hidden'); saveGame(); render();
+  state=createInitialState(state.mode,{homeType:state.homeType,movementType:state.movementType}); history=[]; selected=null; legal=[]; botThinking=false; winnerOverlay.classList.add('hidden'); saveGame(); render();
   if(state.mode==='online' && online.isHost) broadcastState();
 }
 function showWinner(){
   if(state.winner===null) return;
   $('#winnerToken').className=`token winner-token ${state.winner===0?'blue':'red'}`;
   $('#winnerTitle').textContent=`Побеждает ${names[state.winner]}`;
-  $('#winnerText').textContent=`Все 9 фишек заняли дом соперника за ${state.moveCount} ходов.`;
+  $('#winnerText').textContent=`Все ${getPieceCount(state.homeType)} шашек заняли дом соперника за ${state.moveCount} ходов.`;
   winnerOverlay.classList.remove('hidden'); playVictory();
 }
 
@@ -132,7 +138,7 @@ function launchGame(mode,resuming=false){
   names=[safeName($('#blueName').value,'Игрок 1'),safeName($('#redName').value,mode==='bot'?'Компьютер':'Игрок 2')];
   if(mode==='bot') names[1]='Компьютер';
   difficulty=$('#difficulty').value;
-  if(!resuming) state=createInitialState(mode);
+  if(!resuming) state=createInitialState(mode,selectedConventions());
   state.mode=mode; history=[]; selected=null; legal=[];
   welcomeOverlay.classList.add('hidden'); onlineOverlay.classList.add('hidden'); gameApp.classList.remove('hidden');
   saveGame(); render();
@@ -149,8 +155,8 @@ function loadGame(){
   try{
     const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
     if(!saved?.state?.pieces||saved.state.pieces.length!==HOLES.length) return false;
-    state=saved.state; names=saved.names||names; difficulty=saved.difficulty||'smart';
-    $('#blueName').value=names[0]; $('#redName').value=names[1]; $('#difficulty').value=difficulty;
+    state=saved.state; state.homeType ||= '3x3'; state.movementType ||= 'classic'; names=saved.names||names; difficulty=saved.difficulty||'smart';
+    $('#blueName').value=names[0]; $('#redName').value=names[1]; $('#difficulty').value=difficulty; syncConventionControls();
     launchGame(state.mode,true); if(state.phase==='finished') setTimeout(showWinner,250); return true;
   }catch{return false;}
 }
@@ -197,11 +203,11 @@ function handleOnlineMessage(message){
   if(message.type==='reset'){ if(online.isHost) restartGame(true); }
 }
 async function createOffer(){
-  try{ names[0]=safeName($('#blueName').value,'Игрок 1'); names[1]='Соперник'; state=createInitialState('online'); setupPeer(true); const offer=await online.pc.createOffer(); await online.pc.setLocalDescription(offer); setConnectionStatus('Собираем данные соединения…'); await waitForIce(online.pc); $('#offerOut').value=encodeSignal(online.pc.localDescription); $('#copyOfferBtn').disabled=false; setConnectionStatus('Код готов. Отправь его сопернику.'); }
+  try{ names[0]=safeName($('#blueName').value,'Игрок 1'); names[1]='Соперник'; state=createInitialState('online',selectedConventions()); setupPeer(true); const offer=await online.pc.createOffer(); await online.pc.setLocalDescription(offer); setConnectionStatus('Собираем данные соединения…'); await waitForIce(online.pc); $('#offerOut').value=encodeSignal(online.pc.localDescription); $('#copyOfferBtn').disabled=false; setConnectionStatus('Код готов. Отправь его сопернику.'); }
   catch(error){setConnectionStatus(`Не удалось создать приглашение: ${error.message}`);}
 }
 async function createAnswer(){
-  try{ const offer=decodeSignal($('#offerIn').value); names[1]=safeName($('#redName').value,'Игрок 2'); names[0]='Соперник'; state=createInitialState('online'); setupPeer(false); await online.pc.setRemoteDescription(offer); const answer=await online.pc.createAnswer(); await online.pc.setLocalDescription(answer); setConnectionStatus('Собираем данные соединения…'); await waitForIce(online.pc); $('#answerOut').value=encodeSignal(online.pc.localDescription); $('#copyAnswerBtn').disabled=false; setConnectionStatus('Ответ готов. Отправь его создателю.'); }
+  try{ const offer=decodeSignal($('#offerIn').value); names[1]=safeName($('#redName').value,'Игрок 2'); names[0]='Соперник'; state=createInitialState('online',selectedConventions()); setupPeer(false); await online.pc.setRemoteDescription(offer); const answer=await online.pc.createAnswer(); await online.pc.setLocalDescription(answer); setConnectionStatus('Собираем данные соединения…'); await waitForIce(online.pc); $('#answerOut').value=encodeSignal(online.pc.localDescription); $('#copyAnswerBtn').disabled=false; setConnectionStatus('Ответ готов. Отправь его создателю игры.'); }
   catch(error){setConnectionStatus(`Неверный код или ошибка соединения: ${error.message}`);}
 }
 async function acceptAnswer(){
