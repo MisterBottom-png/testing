@@ -1,9 +1,9 @@
 name: Apply Gemini model configuration
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/gemini-podcast-modular-source
+      - main
     paths:
       - .github/workflows/gemini-apply-model-config.yml
 
