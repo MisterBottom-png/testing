@@ -1,0 +1,40 @@
+name: Refresh Gemini Podcast Studio distribution
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/refresh-gemini-podcast-dist.yml
+      - gemini-podcast-studio/src/**
+      - gemini-podcast-studio/scripts/**
+      - gemini-podcast-studio/tests/**
+      - gemini-podcast-studio/package.json
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+
+      - name: Build, verify and test
+        working-directory: gemini-podcast-studio
+        run: npm run check
+
+      - name: Commit refreshed distribution
+        run: |
+          if git diff --quiet -- gemini-podcast-studio/dist/gemini-podcast-studio.html; then
+            echo "Distribution is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gemini-podcast-studio/dist/gemini-podcast-studio.html
+          git commit -m "Refresh generated podcast studio distribution"
+          git push origin HEAD:agent/gemini-podcast-modular-source
