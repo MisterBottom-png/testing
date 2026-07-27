@@ -22,25 +22,25 @@ jobs:
           fetch-depth: 1
           show-progress: false
 
-      - name: Reconstruct verified source archive
+      - name: Reconstruct verified source archives
         shell: bash
         run: |
           set -euo pipefail
-          # The archive is split only to keep connector writes below transport limits.
-          for file in .github/tmp-v2/standalone-build.part-*; do
-            printf '%s bytes=%s blob=%s\n' "$file" "$(wc -c < "$file")" "$(git hash-object "$file")"
-          done
           test "$(find .github/tmp-v2 -type f | wc -l)" = "11"
           cat .github/tmp-v2/standalone-build.part-* > /tmp/gemini-standalone-source.tar.gz.b64
-          encoded_bytes="$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)"
-          echo "encoded-bytes=$encoded_bytes"
-          test "$encoded_bytes" = "30576"
+          test "$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)" = "30576"
           base64 --decode /tmp/gemini-standalone-source.tar.gz.b64 > /tmp/gemini-standalone-source.tar.gz
-          archive_sha="$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)"
-          echo "archive-sha=$archive_sha"
-          test "$archive_sha" = "23006daf4860cd11f4e2809a8eaa36017877b90cbbeb26ef7524c364f2db40ec"
+          test "$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)" = "23006daf4860cd11f4e2809a8eaa36017877b90cbbeb26ef7524c364f2db40ec"
           gzip --test /tmp/gemini-standalone-source.tar.gz
           tar -xzf /tmp/gemini-standalone-source.tar.gz -C gemini-podcast-studio
+
+          test "$(find .github/overlay-v3 -type f | wc -l)" = "5"
+          cat .github/overlay-v3/standalone-fix.part-* > /tmp/gemini-standalone-overlay.tar.gz.b64
+          test "$(wc -c < /tmp/gemini-standalone-overlay.tar.gz.b64)" = "13412"
+          base64 --decode /tmp/gemini-standalone-overlay.tar.gz.b64 > /tmp/gemini-standalone-overlay.tar.gz
+          test "$(sha256sum /tmp/gemini-standalone-overlay.tar.gz | cut -d' ' -f1)" = "498c916e8b3e977380678c3acb154b4bec97233b249eadef2b0859d425ea3907"
+          gzip --test /tmp/gemini-standalone-overlay.tar.gz
+          tar -xzf /tmp/gemini-standalone-overlay.tar.gz -C gemini-podcast-studio
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -89,7 +89,7 @@ jobs:
       - name: Commit generated standalone build
         shell: bash
         run: |
-          rm -rf .github/tmp .github/tmp-v2
+          rm -rf .github/tmp .github/tmp-v2 .github/overlay-v3
           rm -f .github/workflows/gemini-standalone-adopt.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
