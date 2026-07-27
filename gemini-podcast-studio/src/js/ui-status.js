@@ -1,3 +1,42 @@
+const DIAGNOSTIC_REDACTION = '[REDACTED]';
+const DIAGNOSTIC_SENSITIVE_FIELD_PATTERN = /(?:api[-_ ]?key|x-goog-api-key|authorization|headers?|query|prompt|contents?|body|request(?:data)?|response(?:data)?|raw|inlineData|audioData)/i;
+
+function redactDiagnosticString(value) {
+  let result = String(value ?? '');
+  const configuredKey = String(appState?.connection?.apiKey || '');
+  if (configuredKey) result = result.split(configuredKey).join(DIAGNOSTIC_REDACTION);
+  return result
+    .replace(/([?&](?:key|api[_-]?key|x-goog-api-key)=)[^&#\s]+/gi, `$1${DIAGNOSTIC_REDACTION}`)
+    .replace(/((?:x-goog-api-key|authorization|api[-_ ]?key)\s*[:=]\s*)[^\s,;}\]]+/gi, `$1${DIAGNOSTIC_REDACTION}`);
+}
+
+function redactDiagnosticValue(value, seen = new WeakSet()) {
+  if (typeof value === 'string') return redactDiagnosticString(value);
+  if (value == null || typeof value !== 'object') return value;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (value instanceof Error) {
+    return {
+      name: redactDiagnosticString(value.name),
+      message: redactDiagnosticString(value.message),
+      status: Number(value.status || 0) || undefined,
+      stack: redactDiagnosticString(value.stack || '')
+    };
+  }
+  if (Array.isArray(value)) return value.map(item => redactDiagnosticValue(item, seen));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key,
+    DIAGNOSTIC_SENSITIVE_FIELD_PATTERN.test(key) ? DIAGNOSTIC_REDACTION : redactDiagnosticValue(item, seen)
+  ]));
+}
+
+function diagnosticLog(level, event, details = null) {
+  const method = ['error', 'warn', 'info'].includes(level) ? level : 'log';
+  const payload = { event: redactDiagnosticString(event), details: redactDiagnosticValue(details) };
+  console[method]('[Gemini Podcast Studio]', payload);
+  return payload;
+}
+
 function setBusy(busy, kind = '', messages = []) {
   appState.busy = busy;
   els.createStage.setAttribute('aria-busy', String(busy && kind === 'script'));
@@ -33,12 +72,12 @@ function mapError(error) {
 }
 function showServiceError({ title, message, suggestion, details = '', retry = null }) {
   els.serviceErrorTitle.textContent = title; els.serviceErrorMessage.textContent = message; els.serviceErrorSuggestion.textContent = suggestion;
-  els.serviceErrorDetails.textContent = details || 'No additional technical details.'; els.retryButton.classList.toggle('hidden', typeof retry !== 'function'); els.retryButton.onclick = typeof retry === 'function' ? retry : null;
+  els.serviceErrorDetails.textContent = redactDiagnosticString(details || 'No additional technical details.'); els.retryButton.classList.toggle('hidden', typeof retry !== 'function'); els.retryButton.onclick = typeof retry === 'function' ? retry : null;
   els.serviceError.classList.add('visible'); els.serviceError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 function hideServiceError() { els.serviceError.classList.remove('visible'); els.retryButton.onclick = null; }
 function handleGenerationError(error, title, fallbackSuggestion, retry) {
-  console.error(error); const mapped = mapError(error);
+  diagnosticLog('error', title, error); const mapped = mapError(error);
   showServiceError({ title, message: mapped.message, suggestion: mapped.suggestion || fallbackSuggestion, details: error?.details || error?.stack || String(error), retry });
 }
 
