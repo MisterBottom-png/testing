@@ -69,7 +69,7 @@
 - [x] Connect room controls to the typed Socket.IO client.
 - [x] Configure generated service worker and web app manifest.
 - [x] Run static TypeScript verification.
-- [ ] Run the production client build after dependencies are available.
+- [x] Run the production client build after dependencies are available.
 
 ### Task 4: Validation and repository integration
 
@@ -83,5 +83,5 @@
 - [x] Add `npm run check` for tests, type checking, and production build.
 - [x] Add CI scoped to `corners-web/**`.
 - [x] Verify core runtime behavior and static TypeScript correctness locally.
-- [ ] Verify dependency installation and the production build in GitHub Actions.
+- [x] Verify dependency installation and the production build in GitHub Actions.
 - [x] Commit the scaffold to `agent/multiplayer-corners-web-game`.
