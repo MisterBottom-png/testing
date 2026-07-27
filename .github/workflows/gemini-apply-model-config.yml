@@ -44,8 +44,30 @@ jobs:
           test "$apply_bytes" -eq 38388
           base64 --decode /tmp/apply-model-config.py.b64 > /tmp/apply-model-config.py
           apply_sha=$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)
-          echo "apply-sha=$apply_sha"
+          echo "apply-original-sha=$apply_sha"
           test "$apply_sha" = "8e0194b84ff37039921f5cacd28d36015b3150e03a78bbd0aa11b2f735acaa8e"
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/apply-model-config.py')
+          source = path.read_text()
+          old = """replace_once('src/js/script-generation.js', 'services.callGeminiText({', 'services.generateStructuredScript({')
+          replace_once('src/js/script-generation.js', 'services.callGeminiText({', 'services.generateStructuredScript({')
+          """
+          new = """script_generation = read('src/js/script-generation.js')
+          old_transport_call = 'services.callGeminiText({'
+          new_transport_call = 'services.generateStructuredScript({'
+          if script_generation.count(old_transport_call) != 2:
+              raise SystemExit(f\"src/js/script-generation.js: expected two Gemini transport calls, found {script_generation.count(old_transport_call)}\")
+          write('src/js/script-generation.js', script_generation.replace(old_transport_call, new_transport_call))
+          """
+          if source.count(old) != 1:
+              raise SystemExit(f'Expected one legacy two-call patch block, found {source.count(old)}.')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          corrected_sha=$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)
+          echo "apply-corrected-sha=$corrected_sha"
+          test "$corrected_sha" = "0d2a5749f3ff186e8328f6796916f867b56da56392612b449203812b996ab0f7"
           python -m py_compile /tmp/apply-model-config.py
 
       - name: Prove focused tests fail before implementation
