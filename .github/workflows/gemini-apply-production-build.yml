@@ -52,14 +52,27 @@ jobs:
 
       - name: Build and verify standalone application
         working-directory: gemini-podcast-studio
+        shell: bash
         run: |
-          npm install --no-audit --no-fund
-          npm run check
-          npm run verify:single
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
-          test -f dist/gemini-podcast-studio.html
-          test ! -d .single-file-build
-          git diff --check
+          set -o pipefail
+          {
+            npm install --no-audit --no-fund
+            npm run check
+            npm run verify:single
+            echo "dist-files=$(find dist -maxdepth 1 -type f | wc -l)"
+            test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+            test -f dist/gemini-podcast-studio.html
+            test ! -d .single-file-build
+            git diff --check
+          } 2>&1 | tee /tmp/gemini-production-verify.log
+
+      - name: Upload verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-production-verification
+          path: /tmp/gemini-production-verify.log
+          if-no-files-found: warn
 
       - name: Commit production build
         shell: bash
