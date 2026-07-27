@@ -4,6 +4,42 @@ function queueSave() {
   saveTimer = setTimeout(() => { savePreferences(); els.saveState.textContent = 'Saved locally'; }, 260);
 }
 
+const CORRUPT_PROJECT_BACKUP_KEY = `${STORAGE_KEY}.corruptBackup`;
+
+function preserveCorruptProject(rawValue, error, now = new Date().toISOString()) {
+  const raw = String(rawValue ?? '');
+  const details = error?.stack || error?.message || String(error || 'Unknown saved-project error.');
+  try {
+    localStorage.setItem(CORRUPT_PROJECT_BACKUP_KEY, JSON.stringify({ capturedAt: now, raw, details }));
+  } catch {}
+  appState.projectLoadWarning = 'The saved project is corrupt and could not be loaded safely.';
+  appState.projectLoadWarningDetails = details;
+}
+
+function readStoredProjectSafely(now = new Date().toISOString()) {
+  const raw = localStorage.getItem(STORAGE_KEY) || '';
+  if (!raw) return { project: {}, corrupt: false };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved project data is not a project object.');
+    return { project: parsed, corrupt: false };
+  } catch (error) {
+    preserveCorruptProject(raw, error, now);
+    return { project: {}, corrupt: true, error };
+  }
+}
+
+function migrateStoredProjectSafely(savedProject, now = new Date().toISOString()) {
+  try {
+    return migratePodcastProject(savedProject, now);
+  } catch (error) {
+    let raw = '';
+    try { raw = JSON.stringify(savedProject); } catch { raw = String(savedProject); }
+    preserveCorruptProject(raw, error, now);
+    return { project: createDefaultPodcastProject(), migrated: false, failed: true };
+  }
+}
+
 function normaliseProjectSpeaker(speaker, index, { legacy = false } = {}) {
   const source = speaker && typeof speaker === 'object' ? deepClone(speaker) : {};
   const geminiVoiceName = normaliseWhitespace(source.geminiVoiceName ?? source.voice);
@@ -150,9 +186,9 @@ function projectContentSignature(project) {
 }
 
 function savePreferences(now = new Date().toISOString()) {
-  let stored = {};
-  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { stored = {}; }
-  const previousResult = migratePodcastProject(stored, now);
+  const storedResult = readStoredProjectSafely(now);
+  const stored = storedResult.project;
+  const previousResult = migrateStoredProjectSafely(stored, now);
   const hasStoredProject = Boolean(Object.keys(stored).length);
   const nextProject = createPodcastProjectSnapshot();
   const contentChanged = !hasStoredProject || projectContentSignature(nextProject) !== projectContentSignature(previousResult.project);
@@ -173,10 +209,10 @@ function savePreferences(now = new Date().toISOString()) {
 }
 
 function loadPreferences(now = new Date().toISOString()) {
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { saved = {}; }
+  const storedResult = readStoredProjectSafely(now);
+  const saved = storedResult.project;
   const hasSavedProject = Boolean(Object.keys(saved).length);
-  const migration = migratePodcastProject(saved, now);
+  const migration = migrateStoredProjectSafely(saved, now);
   const project = migration.project;
   if (hasSavedProject && migration.migrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
 
