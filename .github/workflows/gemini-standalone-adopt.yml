@@ -1,0 +1,79 @@
+name: Apply Gemini standalone build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/gemini-standalone-adopt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 0
+
+      - name: Reconstruct verified source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/tmp/standalone-build.part-* > /tmp/gemini-standalone-source.tar.gz.b64
+          test "$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)" = "31112"
+          base64 --decode /tmp/gemini-standalone-source.tar.gz.b64 > /tmp/gemini-standalone-source.tar.gz
+          test "$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)" = "5147449f4f31b2d614caed77d083cb67825cfe0e73097d655e36c0ea80a5266f"
+          gzip --test /tmp/gemini-standalone-source.tar.gz
+          tar -xzf /tmp/gemini-standalone-source.tar.gz -C gemini-podcast-studio
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        working-directory: gemini-podcast-studio
+        run: |
+          for file in src/js/*.js scripts/*.mjs tests/*.mjs vite.config.js; do node --check "$file"; done
+
+      - name: Run source and build tests
+        working-directory: gemini-podcast-studio
+        run: npm test
+
+      - name: Build verified standalone application
+        working-directory: gemini-podcast-studio
+        run: |
+          npm run build
+          npm run verify:single
+          test "$(find dist -type f | wc -l)" = "1"
+          test -f dist/gemini-podcast-studio.html
+          test ! -e .single-file-build
+
+      - name: Run browser runtime verification
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          chromium_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$chromium_path"
+          CHROMIUM_PATH="$chromium_path" npm run test:runtime
+
+      - name: Commit generated standalone build
+        shell: bash
+        run: |
+          rm -rf .github/tmp
+          rm -f .github/workflows/gemini-standalone-adopt.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build standalone Gemini Podcast Studio"
+          git push origin HEAD:agent/gemini-podcast-modular-source
