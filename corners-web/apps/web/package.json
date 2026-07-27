@@ -1,0 +1,19 @@
+{
+  "name": "@corners/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@corners/game-core": "0.1.0",
+    "socket.io-client": "4.8.3"
+  },
+  "devDependencies": {
+    "vite": "8.1.5",
+    "vite-plugin-pwa": "1.3.0"
+  }
+}

@@ -1,0 +1,53 @@
+name: Corners Web Validation
+
+on:
+  pull_request:
+    paths:
+      - "corners-web/**"
+      - ".github/workflows/corners-web-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "corners-web/**"
+      - ".github/workflows/corners-web-validation.yml"
+
+concurrency:
+  group: corners-web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: corners-web
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.16.0"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type check game core
+        run: npm run typecheck --workspace @corners/game-core
+
+      - name: Type check server
+        run: npm run typecheck --workspace @corners/server
+
+      - name: Type check web client
+        run: npm run typecheck --workspace @corners/web
+
+      - name: Build web PWA
+        run: npm run build
