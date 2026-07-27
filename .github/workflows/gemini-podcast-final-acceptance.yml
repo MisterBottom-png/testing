@@ -20,6 +20,8 @@ jobs:
           ref: agent/gemini-podcast-modular-source
 
       - name: Apply final review refinements
+        id: apply
+        continue-on-error: true
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -152,23 +154,49 @@ function migrateStoredProjectSafely(savedProject, now = new Date().toISOString()
           node-version: 22
 
       - name: Install dependencies
+        id: install
+        continue-on-error: true
         working-directory: gemini-podcast-studio
         run: npm install --no-audit --no-fund
 
       - name: Check JavaScript syntax
+        id: syntax
+        continue-on-error: true
         working-directory: gemini-podcast-studio
         run: |
           for file in src/js/*.js; do node --check "$file"; done
 
       - name: Run production build and full test suite
+        id: check
+        continue-on-error: true
         working-directory: gemini-podcast-studio
         run: npm run check
 
-      - name: Commit accepted implementation
+      - name: Publish result
+        if: always()
+        env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gemini-podcast-studio/src gemini-podcast-studio/tests gemini-podcast-studio/dist/gemini-podcast-studio.html
+          if [ "$APPLY_OUTCOME" != "success" ] || [ "$INSTALL_OUTCOME" != "success" ] || [ "$SYNTAX_OUTCOME" != "success" ] || [ "$CHECK_OUTCOME" != "success" ]; then
+            git reset --hard HEAD
+            cat > gemini-podcast-studio/final-acceptance-failure.txt <<EOF
+          apply=$APPLY_OUTCOME
+          install=$INSTALL_OUTCOME
+          syntax=$SYNTAX_OUTCOME
+          check=$CHECK_OUTCOME
+          EOF
+            git add gemini-podcast-studio/final-acceptance-failure.txt
+            git commit -m "Record Gemini Podcast Studio acceptance failure"
+            git push
+            exit 0
+          fi
+          rm -f gemini-podcast-studio/final-acceptance-failure.txt
+          git add gemini-podcast-studio/src gemini-podcast-studio/tests gemini-podcast-studio/dist/gemini-podcast-studio.html gemini-podcast-studio/final-acceptance-failure.txt
           if git diff --cached --quiet; then
             echo "Final implementation is already current."
           else
