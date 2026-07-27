@@ -70,15 +70,17 @@ export function indexAt(x: number, y: number): number {
 function isHomeCell(homeType: HomeType, player: PlayerIndex, cell: BoardCell): boolean {
   if (homeType === "3x4") {
     return player === 0
-      ? cell.x <= 2 && cell.y <= 3
-      : cell.x >= 5 && cell.y >= 4;
+      ? cell.x <= 2 && cell.y >= 4
+      : cell.x >= 5 && cell.y <= 3;
   }
   if (homeType === "1-2-3-4") {
-    return player === 0 ? cell.x + cell.y <= 3 : cell.x + cell.y >= 11;
+    return player === 0
+      ? cell.y >= 4 && cell.x <= cell.y - 4
+      : cell.y <= 3 && cell.x >= cell.y + 4;
   }
   return player === 0
-    ? cell.x <= 2 && cell.y <= 2
-    : cell.x >= 5 && cell.y >= 5;
+    ? cell.x <= 2 && cell.y >= 5
+    : cell.x >= 5 && cell.y <= 2;
 }
 
 export function getCamps(homeType: HomeType): readonly [Set<number>, Set<number>] {
