@@ -110,6 +110,52 @@ jobs:
           set -euo pipefail
           exec > >(tee /tmp/model-config-apply.log) 2>&1
           python /tmp/apply-model-config.py
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('gemini-podcast-studio/tests/model-configuration.test.mjs')
+          source = path.read_text()
+          old_harness = """  return withGlobals({
+            document: { getElementById() { return createElementStub(); } },
+            localStorage,
+            sessionStorage,
+            matchMedia: () => ({ matches: false })
+          }, () => {
+            const services = installServices(createServices(), ['constants', 'textUtilities']);
+            installState(services);
+            installServices(services, ['appHelpers', 'preferences', 'connectionUi']);
+            return { services, localStorage };
+          });
+          """
+          new_harness = """  const globals = {
+            document: { getElementById() { return createElementStub(); } },
+            localStorage,
+            sessionStorage,
+            matchMedia: () => ({ matches: false })
+          };
+          return withGlobals(globals, () => {
+            const services = installServices(createServices(), ['constants', 'textUtilities']);
+            installState(services);
+            installServices(services, ['appHelpers', 'preferences', 'connectionUi']);
+            return {
+              services,
+              localStorage,
+              loadPreferences: () => withGlobals(globals, () => services.loadPreferences())
+            };
+          });
+          """
+          if source.count(old_harness) != 1:
+              raise SystemExit(f'Expected one model test harness block, found {source.count(old_harness)}.')
+          source = source.replace(old_harness, new_harness, 1)
+          old_valid = "  const { services } = await createHarness(saved);\n  const migration = services.loadPreferences();"
+          new_valid = "  const { services, loadPreferences } = await createHarness(saved);\n  const migration = await loadPreferences();"
+          old_invalid = "  const { services, localStorage } = await createHarness(saved);\n  const migration = services.loadPreferences();"
+          new_invalid = "  const { services, localStorage, loadPreferences } = await createHarness(saved);\n  const migration = await loadPreferences();"
+          if source.count(old_valid) != 1 or source.count(old_invalid) != 1:
+              raise SystemExit('Expected both preference-loading test calls exactly once.')
+          path.write_text(source.replace(old_valid, new_valid, 1).replace(old_invalid, new_invalid, 1))
+          PY
+          test "$(sha256sum gemini-podcast-studio/tests/model-configuration.test.mjs | cut -d' ' -f1)" = "6054ec3a76e71543691d464bd9c915bc7ef6a6ccf4fdb1fab03fbd41f153f697"
           rm -rf .github/tmp
 
       - name: Run focused and full verification
