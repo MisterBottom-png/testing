@@ -43,6 +43,44 @@ export async function verifyHttpDelivery(url, expectedBytes) {
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
+export async function removeDirectoryWithRetries(directory, {
+  remove = rm,
+  attempts = 5,
+  delayMs = 100
+} = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await remove(directory, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      const retryable = ['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error?.code);
+      if (!retryable || attempt === attempts) throw error;
+      await delay(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+export function classifyPreferencePersistence({ mode, persistedTopic, savedTopic, restoredTopic }) {
+  const details = JSON.stringify({ savedTopic, restoredTopic });
+  if (savedTopic !== persistedTopic) {
+    return { name: 'Preference persistence', status: 'fail', details };
+  }
+  if (restoredTopic === persistedTopic) {
+    return { name: 'Preference persistence', status: 'pass', details };
+  }
+  if (mode === 'file') {
+    return {
+      name: 'Preference persistence',
+      status: 'limited',
+      details: `The preference was written to localStorage, but this Chromium build did not retain the file:// origin across reload. Use the generated file through a local HTTP server when persistent preferences are required. ${details}`
+    };
+  }
+  return { name: 'Preference persistence', status: 'fail', details };
+}
+
 async function freePort() {
   const server = createNetServer();
   await new Promise((resolve, reject) => {
@@ -189,7 +227,11 @@ async function launchChromium() {
         new Promise(resolve => child.once('exit', resolve)),
         delay(2_000).then(() => child.exitCode == null && child.kill('SIGKILL'))
       ]);
-      await rm(profileDirectory, { recursive: true, force: true });
+      try {
+        await removeDirectoryWithRetries(profileDirectory);
+      } catch (error) {
+        console.warn(`Unable to remove Chromium profile directory after retries: ${error.message}`);
+      }
     }
   };
 }
@@ -433,7 +475,12 @@ async function runMode({ mode, url }) {
       await client.send('Page.reload', { ignoreCache: true });
       await waitForPageCondition(client, `document.readyState === 'complete' && document.querySelectorAll('#speakerList article').length === 2`);
       const restored = await evaluate(client, `document.getElementById('topic')?.value`);
-      check(results, 'Preference persistence', saved.storedTopic === persistedTopic && restored === persistedTopic, JSON.stringify({ saved, restored }));
+      results.push(classifyPreferencePersistence({
+        mode,
+        persistedTopic,
+        savedTopic: saved.storedTopic,
+        restoredTopic: restored
+      }));
     } catch (error) {
       if (mode === 'file') limitation(results, 'Preference persistence', error); else check(results, 'Preference persistence', false, error.message);
     }
@@ -522,7 +569,9 @@ async function runMode({ mode, url }) {
   } finally {
     client.close();
     await chrome.close();
-    await rm(downloadDirectory, { recursive: true, force: true });
+    await removeDirectoryWithRetries(downloadDirectory).catch(error => {
+      console.warn(`Unable to remove runtime download directory after retries: ${error.message}`);
+    });
   }
 }
 

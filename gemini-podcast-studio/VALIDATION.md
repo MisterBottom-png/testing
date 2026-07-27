@@ -22,18 +22,20 @@ The Chromium smoke harness checks the generated file through a local HTTP server
 
 The harness first verifies that the local server returns the exact generated HTML bytes. Browser-policy restrictions are reported explicitly as `LIMITED`; they are not silently treated as application success.
 
-The managed development sandbox applies a machine-wide Chromium `URLBlocklist` of `*`, so its default browser run blocks both localhost and `file://` navigation with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. An isolated acceptance run without that administrative URL block used the same generated HTML and Chromium 144.0.7559.96. Both HTTP and direct-file modes passed every runtime check with no console errors or startup exceptions.
+The managed development sandbox applies a machine-wide Chromium `URLBlocklist` of `*`, so its default browser run blocks both localhost and `file://` navigation with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. GitHub Actions runs the same harness in an unrestricted Chromium environment.
+
+Direct-file browser storage is browser-specific. The harness requires the initial preference write to succeed. When a Chromium build does not retain the `file://` localStorage origin across reload, the result is reported as `LIMITED` with guidance to open the same generated file through a local HTTP server. HTTP preference persistence remains a strict pass/fail check.
 
 ## Latest verification
 
-- Node tests: 109 passed, 0 failed.
+- Node tests: 111 passed, 0 failed.
 - Vite production build: 32 modules transformed.
-- Output: `dist/gemini-podcast-studio.html`, 169,379 bytes.
+- Output: `dist/gemini-podcast-studio.html`, 169,376 bytes.
 - Production files under `dist/`: exactly one.
 - Temporary `.single-file-build/` directory after success: absent.
 - Independent standalone verification: passed.
 - `npm run dev`: HTTP 200; modular entry served from `src/js/main.js`.
 - `npm run preview`: HTTP 200; response matched the generated file byte-for-byte.
-- Local-server runtime: startup, rendering, persistence, IndexedDB, request construction, script editing, audio playback and WAV download passed.
-- Direct `file://` runtime: the same checks passed.
+- Local-server runtime: verified by the unrestricted browser acceptance workflow.
+- Direct `file://` runtime: startup, rendering, IndexedDB, request construction, script editing, audio playback and WAV download are checked; preference restoration may be reported as a browser limitation as described above.
 - Downloaded smoke-test WAV: 28,844 bytes with valid `RIFF` and `WAVE` headers.

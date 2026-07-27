@@ -210,3 +210,59 @@ test('standalone verifier allows only static Gemini API remote requests', async 
     await verifySingleFile({ outputPath, outputDirectory: directory });
   });
 });
+
+test('runtime smoke retries transient Chromium profile cleanup failures', async () => {
+  const runtimePath = path.join(root, 'scripts', 'runtime-smoke.mjs');
+  const runtimeModule = await import(`${pathToFileURL(runtimePath).href}?test=${Date.now()}-${Math.random()}`);
+  assert.equal(typeof runtimeModule.removeDirectoryWithRetries, 'function');
+
+  let calls = 0;
+  const remove = async () => {
+    calls += 1;
+    if (calls < 3) {
+      const error = new Error('directory not empty');
+      error.code = 'ENOTEMPTY';
+      throw error;
+    }
+  };
+
+  await runtimeModule.removeDirectoryWithRetries('/tmp/fake-profile', {
+    remove,
+    attempts: 4,
+    delayMs: 0
+  });
+  assert.equal(calls, 3);
+});
+
+test('runtime smoke reports direct-file reload storage loss as a limitation while keeping HTTP strict', async () => {
+  const runtimePath = path.join(root, 'scripts', 'runtime-smoke.mjs');
+  const runtimeModule = await import(`${pathToFileURL(runtimePath).href}?test=${Date.now()}-${Math.random()}`);
+  assert.equal(typeof runtimeModule.classifyPreferencePersistence, 'function');
+
+  const fileResult = runtimeModule.classifyPreferencePersistence({
+    mode: 'file',
+    persistedTopic: 'Runtime persistence file',
+    savedTopic: 'Runtime persistence file',
+    restoredTopic: undefined
+  });
+  assert.equal(fileResult.status, 'limited');
+  assert.match(fileResult.details, /file:\/\//i);
+  assert.match(fileResult.details, /localStorage/i);
+  assert.match(fileResult.details, /local HTTP server/i);
+
+  const httpResult = runtimeModule.classifyPreferencePersistence({
+    mode: 'http',
+    persistedTopic: 'Runtime persistence http',
+    savedTopic: 'Runtime persistence http',
+    restoredTopic: undefined
+  });
+  assert.equal(httpResult.status, 'fail');
+
+  const passResult = runtimeModule.classifyPreferencePersistence({
+    mode: 'file',
+    persistedTopic: 'Runtime persistence file',
+    savedTopic: 'Runtime persistence file',
+    restoredTopic: 'Runtime persistence file'
+  });
+  assert.equal(passResult.status, 'pass');
+});
