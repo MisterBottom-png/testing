@@ -3,6 +3,35 @@ export function installConstants(services) {
   const API_KEY_STORAGE_KEY = 'geminiPodcastStudio.apiKey.v1';
   const SESSION_KEY = 'geminiPodcastStudio.sessionKey.v1';
   const PODCAST_PROJECT_SCHEMA_VERSION = 2;
+  const DEFAULT_TEXT_MODEL = 'gemini-3.5-flash-lite';
+  const QUALITY_TEXT_MODEL = 'gemini-3.6-flash';
+  const DEFAULT_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+  const CUSTOM_MODEL_VALUE = 'custom';
+  const DEFAULT_DURATION_MINUTES = 3;
+  const DEFAULT_SPEAKING_RATE = 140;
+  const SUPPORTED_TEXT_MODELS = Object.freeze([DEFAULT_TEXT_MODEL, QUALITY_TEXT_MODEL]);
+  const SUPPORTED_TTS_MODELS = Object.freeze([DEFAULT_TTS_MODEL]);
+  const TEXT_MODEL_OPTIONS = Object.freeze([
+    Object.freeze({ value: DEFAULT_TEXT_MODEL, label: 'Gemini 3.5 Flash-Lite · Recommended' }),
+    Object.freeze({ value: QUALITY_TEXT_MODEL, label: 'Gemini 3.6 Flash · Higher quality' }),
+    Object.freeze({ value: CUSTOM_MODEL_VALUE, label: 'Custom model ID…' })
+  ]);
+  const TTS_MODEL_OPTIONS = Object.freeze([
+    Object.freeze({ value: DEFAULT_TTS_MODEL, label: 'Gemini 3.1 Flash TTS Preview' }),
+    Object.freeze({ value: CUSTOM_MODEL_VALUE, label: 'Custom model ID…' })
+  ]);
+  function isValidCustomModelId(value) {
+    return /^gemini-[a-z0-9][a-z0-9._-]*$/i.test(String(value ?? '').trim());
+  }
+  function normaliseModelSelection(selection, customValue, supportedModels, fallbackModel) {
+    const selected = String(selection ?? '').trim();
+    const custom = String(customValue ?? '').trim();
+    if (selected === CUSTOM_MODEL_VALUE && isValidCustomModelId(custom)) {
+      return { selection: CUSTOM_MODEL_VALUE, customValue: custom };
+    }
+    if (supportedModels.includes(selected)) return { selection: selected, customValue: '' };
+    return { selection: fallbackModel, customValue: '' };
+  }
   const DEFAULT_MAX_TTS_CHARACTERS = 12000;
   const MAX_HISTORY = 30;
   const SCRIPT_PROGRESS_MESSAGES = ['Planning the episode…', 'Defining the discussion…', 'Writing the dialogue…', 'Checking the structure…'];
@@ -287,6 +316,18 @@ export function installConstants(services) {
     API_KEY_STORAGE_KEY,
     SESSION_KEY,
     PODCAST_PROJECT_SCHEMA_VERSION,
+    DEFAULT_TEXT_MODEL,
+    QUALITY_TEXT_MODEL,
+    DEFAULT_TTS_MODEL,
+    CUSTOM_MODEL_VALUE,
+    DEFAULT_DURATION_MINUTES,
+    DEFAULT_SPEAKING_RATE,
+    SUPPORTED_TEXT_MODELS,
+    SUPPORTED_TTS_MODELS,
+    TEXT_MODEL_OPTIONS,
+    TTS_MODEL_OPTIONS,
+    isValidCustomModelId,
+    normaliseModelSelection,
     DEFAULT_MAX_TTS_CHARACTERS,
     MAX_HISTORY,
     SCRIPT_PROGRESS_MESSAGES,

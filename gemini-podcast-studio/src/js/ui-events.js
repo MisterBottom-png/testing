@@ -186,7 +186,7 @@ export function installUiEvents(services) {
   services.els.connectionChip.addEventListener('click', openSettings);
   services.els.closeSettingsButton.addEventListener('click', () => {
     services.appState.settings.maxTtsCharacters = Math.max(2000, Number(services.els.maxTtsCharacters.value) || services.DEFAULT_MAX_TTS_CHARACTERS);
-    services.appState.settings.speakingRate = Math.min(200, Math.max(100, Number(services.els.speakingRate.value) || 140));
+    services.appState.settings.speakingRate = Math.min(200, Math.max(100, Number(services.els.speakingRate.value) || services.DEFAULT_SPEAKING_RATE));
     services.queueSave();
     services.els.settingsDialog.close();
     if (services.appState.currentStage === 'script') services.renderScriptMetrics();

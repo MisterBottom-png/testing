@@ -92,9 +92,9 @@
                     <div id="durationChoices" class="choice-group">
                       <input class="choice-input" id="duration2" type="radio" name="duration" value="2" />
                       <label class="chip-label" for="duration2">2 minutes</label>
-                      <input class="choice-input" id="duration3" type="radio" name="duration" value="3" />
+                      <input class="choice-input" id="duration3" type="radio" name="duration" value="3" checked />
                       <label class="chip-label" for="duration3">3 minutes</label>
-                      <input class="choice-input" id="duration5" type="radio" name="duration" value="5" checked />
+                      <input class="choice-input" id="duration5" type="radio" name="duration" value="5" />
                       <label class="chip-label" for="duration5">5 minutes</label>
                       <input class="choice-input" id="duration7" type="radio" name="duration" value="7" />
                       <label class="chip-label" for="duration7">7 minutes</label>
@@ -103,11 +103,11 @@
                     </div>
                     <div id="customDurationField" class="field hidden mt-10 max-w-180">
                       <label for="customDuration">Minutes</label>
-                      <input id="customDuration" type="number" min="1" max="10" step="0.5" value="5" />
+                      <input id="customDuration" type="number" min="1" max="10" step="0.5" value="3" />
                     </div>
                     <div class="target-summary">
-                      <span>Target: <strong id="targetWords">approximately 700 spoken words</strong></span>
-                      <span>Estimated: <strong id="estimatedDuration">5:00</strong></span>
+                      <span>Target: <strong id="targetWords">approximately 420 spoken words</strong></span>
+                      <span>Estimated: <strong id="estimatedDuration">3:00</strong></span>
                     </div>
                   </fieldset>
 
@@ -174,7 +174,7 @@
           </div>
 
           <div class="action-dock">
-            <div class="action-dock-copy"><strong>Ready to write the episode</strong><span id="createActionHint">Approx. 700 words · 5:00</span></div>
+            <div class="action-dock-copy"><strong>Ready to write the episode</strong><span id="createActionHint">Approx. 420 words · 3:00</span></div>
             <button id="generateScriptButton" class="primary-button" type="submit"><span>Generate script</span></button>
           </div>
         </form>

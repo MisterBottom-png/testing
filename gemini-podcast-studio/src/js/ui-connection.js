@@ -1,4 +1,7 @@
 export function installConnectionUi(services) {
+  function modelOptionsMarkup(options, selectedValue) {
+    return options.map(option => `<option value="${services.escapeHtml(option.value)}"${selectedValue === option.value ? ' selected' : ''}>${services.escapeHtml(option.label)}</option>`).join('');
+  }
   function connectionFormMarkup(prefix) {
     const textModel = services.appState.connection.textModel;
     const ttsModel = services.appState.connection.ttsModel;
@@ -15,26 +18,20 @@ export function installConnectionUi(services) {
       <div class="field">
         <label for="${prefix}TextModel">Text model</label>
         <select id="${prefix}TextModel" data-connection-field="textModel">
-          <option value="gemini-3.6-flash"${textModel === 'gemini-3.6-flash' ? ' selected' : ''}>Gemini 3.6 Flash</option>
-          <option value="gemini-3.5-flash"${textModel === 'gemini-3.5-flash' ? ' selected' : ''}>Gemini 3.5 Flash</option>
-          <option value="gemini-2.5-flash"${textModel === 'gemini-2.5-flash' ? ' selected' : ''}>Gemini 2.5 Flash</option>
-          <option value="custom"${textModel === 'custom' ? ' selected' : ''}>Custom model ID…</option>
+          ${modelOptionsMarkup(services.TEXT_MODEL_OPTIONS, textModel)}
         </select>
       </div>
-      <div class="field${textModel === 'custom' ? '' : ' hidden'}" data-custom-model="textModel">
+      <div class="field${textModel === services.CUSTOM_MODEL_VALUE ? '' : ' hidden'}" data-custom-model="textModel">
         <label for="${prefix}CustomTextModel">Custom text model ID</label>
         <input id="${prefix}CustomTextModel" data-connection-field="customTextModel" value="${services.escapeHtml(services.appState.connection.customTextModel)}" placeholder="gemini-…" spellcheck="false" />
       </div>
       <div class="field">
         <label for="${prefix}TtsModel">TTS model</label>
         <select id="${prefix}TtsModel" data-connection-field="ttsModel">
-          <option value="gemini-3.1-flash-tts-preview"${ttsModel === 'gemini-3.1-flash-tts-preview' ? ' selected' : ''}>Gemini 3.1 Flash TTS Preview</option>
-          <option value="gemini-2.5-flash-preview-tts"${ttsModel === 'gemini-2.5-flash-preview-tts' ? ' selected' : ''}>Gemini 2.5 Flash Preview TTS</option>
-          <option value="gemini-2.5-pro-preview-tts"${ttsModel === 'gemini-2.5-pro-preview-tts' ? ' selected' : ''}>Gemini 2.5 Pro Preview TTS</option>
-          <option value="custom"${ttsModel === 'custom' ? ' selected' : ''}>Custom model ID…</option>
+          ${modelOptionsMarkup(services.TTS_MODEL_OPTIONS, ttsModel)}
         </select>
       </div>
-      <div class="field${ttsModel === 'custom' ? '' : ' hidden'}" data-custom-model="ttsModel">
+      <div class="field${ttsModel === services.CUSTOM_MODEL_VALUE ? '' : ' hidden'}" data-custom-model="ttsModel">
         <label for="${prefix}CustomTtsModel">Custom TTS model ID</label>
         <input id="${prefix}CustomTtsModel" data-connection-field="customTtsModel" value="${services.escapeHtml(services.appState.connection.customTtsModel)}" placeholder="gemini-…-tts-preview" spellcheck="false" />
       </div>
@@ -62,6 +59,7 @@ export function installConnectionUi(services) {
     services.queueSave();
   }
   Object.assign(services, {
+    modelOptionsMarkup,
     connectionFormMarkup,
     renderConnectionForms,
     renderConnectionStatus,

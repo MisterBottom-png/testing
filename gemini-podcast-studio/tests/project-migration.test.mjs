@@ -25,15 +25,15 @@ function createHarness(initialLocalStorage = {}) {
   const services = installServices(createServices(), ['constants', 'textUtilities']);
   services.appState = {
     schemaVersion: services.PODCAST_PROJECT_SCHEMA_VERSION,
-    connection: { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' },
-    podcast: { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' },
+    connection: { apiKey: '', rememberKey: false, textModel: services.DEFAULT_TEXT_MODEL, customTextModel: '', ttsModel: services.DEFAULT_TTS_MODEL, customTtsModel: '' },
+    podcast: { topic: '', durationMinutes: services.DEFAULT_DURATION_MINUTES, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' },
     speakers: services.createDefaultPodcastSpeakers(),
     script: null,
     originalScript: null,
     legacyScript: null,
     audioCacheReferences: {},
     lastModified: '',
-    settings: { theme: 'light', maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
+    settings: { theme: 'light', maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: services.DEFAULT_SPEAKING_RATE }
   };
   services.els = { saveState: { textContent: '' } };
   installServices(services, ['preferences']);
@@ -85,8 +85,8 @@ test('legacy projects migrate names, valid voices, catalogue metadata, scripts, 
   assert.equal(result.project.topic, 'Migration');
   assert.equal(result.project.language, 'Estonian');
   assert.equal(result.project.settings.theme, 'dark');
-  assert.equal(result.project.selectedModels.textModel, 'gemini-2.5-flash');
-  assert.equal(result.project.selectedModels.ttsModel, 'gemini-2.5-pro-preview-tts');
+  assert.equal(result.project.selectedModels.textModel, api.DEFAULT_TEXT_MODEL);
+  assert.equal(result.project.selectedModels.ttsModel, api.DEFAULT_TTS_MODEL);
   assert.equal(result.project.lastModified, '2026-07-27T12:00:00.000Z');
 });
 

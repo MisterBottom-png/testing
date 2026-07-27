@@ -42,10 +42,10 @@ function createHarness() {
   });
   installServices(services, ['constants', 'textUtilities', 'appHelpers', 'scriptUi', 'scriptValidation', 'pcmAudio', 'wavEncoder', 'ttsChunking', 'ttsTransport']);
   services.setStage = value => { stage = value; };
-  services.requestTtsChunk = async (_endpoint, transcript, speakerVoiceConfigs) => {
-    requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
-    return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
-  };
+  services.generateTtsPcm = async ({ transcript, speakerVoiceConfigs }) => {
+  requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
+  return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
+};
   installServices(services, ['generationJobs']);
   return { services, requests, serviceErrors, revokedUrls, get stage() { return stage; } };
 }

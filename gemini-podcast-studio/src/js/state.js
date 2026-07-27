@@ -8,14 +8,14 @@ export function installState(services) {
     connection: {
       apiKey: '',
       rememberKey: false,
-      textModel: 'gemini-3.6-flash',
+      textModel: services.DEFAULT_TEXT_MODEL,
       customTextModel: '',
-      ttsModel: 'gemini-3.1-flash-tts-preview',
+      ttsModel: services.DEFAULT_TTS_MODEL,
       customTtsModel: ''
     },
     podcast: {
       topic: '',
-      durationMinutes: 5,
+      durationMinutes: services.DEFAULT_DURATION_MINUTES,
       language: 'English',
       customLanguage: '',
       format: 'Friendly conversation',
@@ -42,7 +42,7 @@ export function installState(services) {
     settings: {
       theme: 'light',
       maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS,
-      speakingRate: 140
+      speakingRate: services.DEFAULT_SPEAKING_RATE
     }
   };
   const els = Object.fromEntries(['saveState', 'connectionChip', 'connectionLabel', 'connectionModels', 'themeButton', 'settingsButton', 'createStage', 'createForm', 'createStageTitle', 'createErrorSummary', 'createErrorList', 'connectionSetup', 'connectionSetupForm', 'topic', 'durationChoices', 'customDurationField', 'customDuration', 'targetWords', 'estimatedDuration', 'language', 'customLanguage', 'podcastFormat', 'customFormat', 'toneChoices', 'instructions', 'createLoading', 'createLoadingMessage', 'createElapsed', 'speakerList', 'swapCharacters', 'createActionHint', 'generateScriptButton', 'scriptStage', 'scriptStageTitle', 'scriptSummaryText', 'scriptTabs', 'scriptPanel', 'reorderStatus', 'scriptMetrics', 'scriptValidation', 'refineMenu', 'undoButton', 'redoButton', 'scriptMoreMenu', 'scriptLoading', 'scriptLoadingTitle', 'scriptLoadingMessage', 'scriptElapsed', 'generateAudioButton', 'backToCreateButton', 'audioStage', 'audioContent', 'serviceError', 'serviceErrorTitle', 'serviceErrorMessage', 'serviceErrorSuggestion', 'serviceErrorDetails', 'retryButton', 'dismissErrorButton', 'liveStatus', 'settingsDialog', 'closeSettingsIcon', 'connectionSettingsForm', 'maxTtsCharacters', 'speakingRate', 'clearStoredDataButton', 'closeSettingsButton'].map(id => [id, document.getElementById(id)]));

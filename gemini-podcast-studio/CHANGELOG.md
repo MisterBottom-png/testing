@@ -10,3 +10,4 @@
 - Added module-boundary and parity tests.
 
 No model, request, retry, TTS, caching, storage, wording or visual behaviour was intentionally changed.
+- Updated central Gemini model defaults and selectors, set three-minute/420-word session defaults, and added safe saved-model migration.

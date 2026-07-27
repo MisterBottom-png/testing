@@ -5,11 +5,7 @@ export function installGeminiTransport(services) {
   function extractTextResponse(data) {
     return (data?.candidates?.flatMap(candidate => candidate?.content?.parts || []) || []).map(part => part?.text || '').join('').trim();
   }
-  async function callGeminiText({
-    prompt,
-    schema,
-    actionLabel
-  }) {
+  async function callGeminiText({ prompt, schema, actionLabel }) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTextModel())}:generateContent`;
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -18,16 +14,8 @@ export function installGeminiTransport(services) {
         'x-goog-api-key': services.appState.connection.apiKey
       },
       body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: schema
-        }
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: schema }
       })
     });
     const raw = await response.text();
@@ -46,10 +34,22 @@ export function installGeminiTransport(services) {
       throw new Error('Gemini returned script data that could not be parsed as JSON.');
     }
   }
+  async function generateStructuredScript(options) {
+    return callGeminiText(options);
+  }
+  async function testGeminiConnection() {
+    return generateStructuredScript({
+      prompt: 'Return a JSON object with exactly one field named status whose value is ok.',
+      schema: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
+      actionLabel: 'testing the Gemini connection'
+    });
+  }
   Object.assign(services, {
     stripJsonFence,
     extractTextResponse,
-    callGeminiText
+    callGeminiText,
+    generateStructuredScript,
+    testGeminiConnection
   });
   return services;
 }

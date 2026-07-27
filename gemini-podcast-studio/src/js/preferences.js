@@ -84,13 +84,25 @@ export function installPreferences(services) {
     if (geminiVoiceName && !catalogueVoice) result.voiceUnavailable = true;
     return result;
   }
+  function normaliseSelectedModels(selectedModels = {}) {
+    const source = selectedModels && typeof selectedModels === 'object' ? services.deepClone(selectedModels) : {};
+    const text = services.normaliseModelSelection(source.textModel, source.customTextModel, services.SUPPORTED_TEXT_MODELS, services.DEFAULT_TEXT_MODEL);
+    const tts = services.normaliseModelSelection(source.ttsModel, source.customTtsModel, services.SUPPORTED_TTS_MODELS, services.DEFAULT_TTS_MODEL);
+    return {
+      ...source,
+      textModel: text.selection,
+      customTextModel: text.customValue,
+      ttsModel: tts.selection,
+      customTtsModel: tts.customValue
+    };
+  }
   function createDefaultPodcastProject() {
     return {
       schemaVersion: services.PODCAST_PROJECT_SCHEMA_VERSION,
       topic: '',
       language: 'English',
       customLanguage: '',
-      durationMinutes: 5,
+      durationMinutes: services.DEFAULT_DURATION_MINUTES,
       format: 'Friendly conversation',
       customFormat: '',
       tones: ['Informative', 'Casual'],
@@ -99,15 +111,15 @@ export function installPreferences(services) {
       script: null,
       audioCacheReferences: {},
       selectedModels: {
-        textModel: 'gemini-3.6-flash',
+        textModel: services.DEFAULT_TEXT_MODEL,
         customTextModel: '',
-        ttsModel: 'gemini-3.1-flash-tts-preview',
+        ttsModel: services.DEFAULT_TTS_MODEL,
         customTtsModel: ''
       },
       settings: {
         theme: 'light',
         maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS,
-        speakingRate: 140
+        speakingRate: services.DEFAULT_SPEAKING_RATE
       },
       lastModified: ''
     };
@@ -119,9 +131,12 @@ export function installPreferences(services) {
       migrated: false
     };
     if (Number(source.schemaVersion) === services.PODCAST_PROJECT_SCHEMA_VERSION && Array.isArray(source.speakers)) {
+      const project = services.deepClone(source);
+      const previousModels = project.selectedModels && typeof project.selectedModels === 'object' ? project.selectedModels : {};
+      project.selectedModels = normaliseSelectedModels(previousModels);
       return {
-        project: services.deepClone(source),
-        migrated: false
+        project,
+        migrated: JSON.stringify(previousModels) !== JSON.stringify(project.selectedModels)
       };
     }
     const defaults = createDefaultPodcastProject();
@@ -150,12 +165,13 @@ export function installPreferences(services) {
         speakers,
         script: source.script ?? defaults.script,
         audioCacheReferences: source.audioCacheReferences && typeof source.audioCacheReferences === 'object' ? services.deepClone(source.audioCacheReferences) : {},
-        selectedModels: {
+        selectedModels: normaliseSelectedModels({
+          ...selectedModels,
           textModel: selectedModels.textModel ?? source.textModel ?? defaults.selectedModels.textModel,
           customTextModel: selectedModels.customTextModel ?? source.customTextModel ?? defaults.selectedModels.customTextModel,
           ttsModel: selectedModels.ttsModel ?? source.ttsModel ?? defaults.selectedModels.ttsModel,
           customTtsModel: selectedModels.customTtsModel ?? source.customTtsModel ?? defaults.selectedModels.customTtsModel
-        },
+        }),
         settings: {
           theme: settings.theme ?? source.theme ?? defaults.settings.theme,
           maxTtsCharacters: settings.maxTtsCharacters ?? source.maxTtsCharacters ?? defaults.settings.maxTtsCharacters,
@@ -235,11 +251,11 @@ export function installPreferences(services) {
     services.appState.schemaVersion = services.PODCAST_PROJECT_SCHEMA_VERSION;
     services.appState.settings.theme = project.settings?.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     services.appState.settings.maxTtsCharacters = Number(project.settings?.maxTtsCharacters) || services.DEFAULT_MAX_TTS_CHARACTERS;
-    services.appState.settings.speakingRate = Number(project.settings?.speakingRate) || 140;
-    services.appState.connection.textModel = project.selectedModels?.textModel || services.appState.connection.textModel;
-    services.appState.connection.customTextModel = project.selectedModels?.customTextModel || '';
-    services.appState.connection.ttsModel = project.selectedModels?.ttsModel || services.appState.connection.ttsModel;
-    services.appState.connection.customTtsModel = project.selectedModels?.customTtsModel || '';
+    services.appState.settings.speakingRate = Number(project.settings?.speakingRate) || services.DEFAULT_SPEAKING_RATE;
+    services.appState.connection.textModel = project.selectedModels?.textModel ?? services.DEFAULT_TEXT_MODEL;
+    services.appState.connection.customTextModel = project.selectedModels?.customTextModel ?? '';
+    services.appState.connection.ttsModel = project.selectedModels?.ttsModel ?? services.DEFAULT_TTS_MODEL;
+    services.appState.connection.customTtsModel = project.selectedModels?.customTtsModel ?? '';
     services.appState.podcast = {
       ...services.appState.podcast,
       topic: project.topic ?? services.appState.podcast.topic,
@@ -275,6 +291,7 @@ export function installPreferences(services) {
     readStoredProjectSafely,
     migrateStoredProjectSafely,
     normaliseProjectSpeaker,
+    normaliseSelectedModels,
     createDefaultPodcastProject,
     migratePodcastProject,
     createPodcastProjectSnapshot,

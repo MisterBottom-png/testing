@@ -66,7 +66,6 @@ export function installGenerationJobs(services) {
     services.invalidatePodcastAudio('audio-regeneration');
     services.appState.lastAction = 'generate-audio';
     services.setBusy(true, 'audio', services.AUDIO_PROGRESS_MESSAGES);
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;
     const startedAt = performance.now();
     const pcmParts = [];
     let sampleRate = 0;
@@ -75,7 +74,7 @@ export function installGenerationJobs(services) {
         if (services.els.scriptLoadingMessage) services.els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
         let result;
         try {
-          result = await services.requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);
+          result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });
         } catch (error) {
           const chunkError = services.createApiError(Number(error?.status || 0), `TTS chunk ${chunk.index + 1} of ${chunks.length} failed. No partial audio was saved.`, error?.details || error?.stack || String(error));
           chunkError.cause = error;

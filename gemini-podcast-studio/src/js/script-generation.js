@@ -25,7 +25,7 @@ export function installScriptGeneration(services) {
     services.appState.lastAction = 'generate-script';
     services.setBusy(true, 'script', services.SCRIPT_PROGRESS_MESSAGES);
     try {
-      services.appState.script = services.validateScript(await services.callGeminiText({
+      services.appState.script = services.validateScript(await services.generateStructuredScript({
         prompt: services.buildScriptPrompt(),
         schema: services.buildScriptSchema(),
         actionLabel: 'generating the podcast script'
@@ -58,7 +58,7 @@ export function installScriptGeneration(services) {
     const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these human speaker names: ${services.buildScriptCharacters().map(character => character.name).join(' and ')}.\nNever replace them with Gemini voice identifiers.\nKeep all dialogue in ${services.getLanguage()}.\nKeep performance tags sparse and subtle.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(services.appState.script)}`;
     try {
       services.snapshotScript();
-      services.appState.script = services.validateScript(await services.callGeminiText({
+      services.appState.script = services.validateScript(await services.generateStructuredScript({
         prompt,
         schema: services.buildScriptSchema(),
         actionLabel: 'refining the podcast script'

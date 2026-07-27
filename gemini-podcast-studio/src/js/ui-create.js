@@ -28,7 +28,7 @@ export function installCreateUi(services) {
   }
   function syncCreateInputs() {
     services.appState.podcast.topic = services.els.topic.value.trim();
-    const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || '5';
+    const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || String(services.DEFAULT_DURATION_MINUTES);
     services.appState.podcast.durationMinutes = selectedDuration === 'custom' ? Math.min(10, Math.max(1, Number(services.els.customDuration.value) || 1)) : Number(selectedDuration);
     services.appState.podcast.language = services.els.language.value;
     services.appState.podcast.customLanguage = services.els.customLanguage.value.trim();

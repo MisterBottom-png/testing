@@ -2,11 +2,7 @@ export function installTtsTransport(services) {
   function buildSpeakerVoiceConfigs(speakers = services.appState.speakers) {
     return (Array.isArray(speakers) ? speakers : []).map(speaker => ({
       speaker: services.normaliseWhitespace(speaker.speakerName),
-      voiceConfig: {
-        prebuiltVoiceConfig: {
-          voiceName: services.normaliseWhitespace(speaker.geminiVoiceName)
-        }
-      }
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: services.normaliseWhitespace(speaker.geminiVoiceName) } }
     }));
   }
   function getSpeakerVoiceMappingSignature(speakers = services.appState.speakers) {
@@ -18,19 +14,10 @@ export function installTtsTransport(services) {
   }
   function buildTtsRequestBody(transcript, speakerVoiceConfigs) {
     return {
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: transcript
-        }]
-      }],
+      contents: [{ role: 'user', parts: [{ text: transcript }] }],
       generationConfig: {
         responseModalities: ['AUDIO'],
-        speechConfig: {
-          multiSpeakerVoiceConfig: {
-            speakerVoiceConfigs: services.deepClone(speakerVoiceConfigs)
-          }
-        }
+        speechConfig: { multiSpeakerVoiceConfig: { speakerVoiceConfigs: services.deepClone(speakerVoiceConfigs) } }
       }
     };
   }
@@ -59,11 +46,16 @@ export function installTtsTransport(services) {
       sampleRate: services.sampleRateFromMimeType(audioPart.inlineData.mimeType)
     };
   }
+  async function generateTtsPcm({ transcript, speakerVoiceConfigs = buildSpeakerVoiceConfigs() } = {}) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;
+    return requestTtsChunk(endpoint, transcript, speakerVoiceConfigs);
+  }
   Object.assign(services, {
     buildSpeakerVoiceConfigs,
     getSpeakerVoiceMappingSignature,
     buildTtsRequestBody,
-    requestTtsChunk
+    requestTtsChunk,
+    generateTtsPcm
   });
   return services;
 }
