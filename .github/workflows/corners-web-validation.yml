@@ -37,5 +37,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests, type checks, and build
-        run: npm run check
+      - name: Run tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build web PWA
+        run: npm run build
