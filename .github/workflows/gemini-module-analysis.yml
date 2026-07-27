@@ -9,6 +9,14 @@ on:
       - .github/workflows/gemini-module-analysis.yml
       - gemini-podcast-studio/src/js/**
       - gemini-podcast-studio/src/index.html
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/scripts/analyse-gemini-modules.mjs
+      - .github/workflows/gemini-module-analysis.yml
+      - gemini-podcast-studio/src/js/**
+      - gemini-podcast-studio/src/index.html
 
 permissions:
   contents: read
