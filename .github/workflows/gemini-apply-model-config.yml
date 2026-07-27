@@ -69,6 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/model-config-apply.log) 2>&1
           python /tmp/apply-model-config.py
           rm -rf .github/tmp
 
@@ -115,6 +116,7 @@ jobs:
           path: |
             /tmp/model-config-reconstruct.log
             /tmp/model-config-red.log
+            /tmp/model-config-apply.log
             /tmp/gemini-model-config-dev.log
           if-no-files-found: ignore
 
