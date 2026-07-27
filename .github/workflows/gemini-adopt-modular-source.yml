@@ -22,6 +22,7 @@ jobs:
       - name: Reconstruct verified source archive
         shell: bash
         run: |
+          exec > >(tee /tmp/gemini-reconstruct.log) 2>&1
           set -euo pipefail
           git fetch --quiet origin agent/gemini-podcast-modular-staging:refs/remotes/origin/agent/gemini-podcast-modular-staging
           git checkout --quiet origin/agent/gemini-podcast-modular-staging -- .github/tmp
@@ -32,6 +33,13 @@ jobs:
           echo "archive-sha=$actual"
           test "$actual" = "8ed8f95df5fb6738230d1635bc98af7150e7c26f722ee37dc611ee7dab7027b4"
           gzip --test /tmp/gemini-modular-source.tar.gz
+      - name: Upload reconstruction diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-reconstruction-diagnostics
+          path: /tmp/gemini-reconstruct.log
+          if-no-files-found: error
       - name: Apply modular source
         shell: bash
         run: |
