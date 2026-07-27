@@ -19,16 +19,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: agent/gemini-podcast-modular-source
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
 
       - name: Reconstruct verified source archive
         shell: bash
         run: |
           set -euo pipefail
+          for file in .github/tmp/standalone-build.part-*; do
+            printf '%s bytes=%s blob=%s\n' "$file" "$(wc -c < "$file")" "$(git hash-object "$file")"
+          done
           cat .github/tmp/standalone-build.part-* > /tmp/gemini-standalone-source.tar.gz.b64
-          test "$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)" = "31112"
+          encoded_bytes="$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)"
+          echo "encoded-bytes=$encoded_bytes"
+          test "$encoded_bytes" = "31112"
           base64 --decode /tmp/gemini-standalone-source.tar.gz.b64 > /tmp/gemini-standalone-source.tar.gz
-          test "$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)" = "5147449f4f31b2d614caed77d083cb67825cfe0e73097d655e36c0ea80a5266f"
+          archive_sha="$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)"
+          echo "archive-sha=$archive_sha"
+          test "$archive_sha" = "5147449f4f31b2d614caed77d083cb67825cfe0e73097d655e36c0ea80a5266f"
           gzip --test /tmp/gemini-standalone-source.tar.gz
           tar -xzf /tmp/gemini-standalone-source.tar.gz -C gemini-podcast-studio
 
