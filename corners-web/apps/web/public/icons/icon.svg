@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Уголки Online">
+  <rect width="512" height="512" rx="112" fill="#10131a"/>
+  <rect x="72" y="72" width="368" height="368" rx="96" fill="#695cff"/>
+  <g fill="#ff7b89">
+    <circle cx="174" cy="176" r="22"/>
+    <circle cx="256" cy="176" r="22"/>
+    <circle cx="338" cy="176" r="22"/>
+  </g>
+  <g fill="#f5f6ff">
+    <circle cx="215" cy="256" r="22"/>
+    <circle cx="297" cy="256" r="22"/>
+    <circle cx="256" cy="336" r="22"/>
+  </g>
+</svg>
