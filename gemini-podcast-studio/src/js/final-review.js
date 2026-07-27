@@ -212,6 +212,41 @@ renderScriptMetrics = function renderScriptMetricsWithAudioInvalidationNotice() 
   els.scriptValidation.textContent = appState.audioInvalidationNotice || FINAL_REVIEW_AUDIO_REGENERATION_MESSAGE;
 };
 
+const finalReviewStyle = document.createElement('style');
+finalReviewStyle.dataset.finalReviewStyles = 'true';
+finalReviewStyle.textContent = `
+  [aria-invalid="true"] {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 1px var(--danger);
+  }
+  fieldset[aria-invalid="true"] {
+    padding: 10px;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-md);
+  }
+  .field-error::before { content: "Error: "; }
+  .duplicate-voice-warning {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--outline));
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    overflow-wrap: anywhere;
+  }
+  .speaker-preview-row,
+  #conversationPreviewSection {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  #conversationPreviewSection audio:not([hidden]) { display: block; }
+  @media (max-width: 700px) {
+    #conversationPreviewSection .button-row > *,
+    #conversationPreviewButton,
+    .speaker-preview-row > button { width: 100%; }
+  }
+`;
+document.head.appendChild(finalReviewStyle);
+
 if (appState.projectLoadWarning) {
   queueMicrotask(() => {
     announce(appState.projectLoadWarning);
