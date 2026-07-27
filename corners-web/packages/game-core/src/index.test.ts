@@ -9,13 +9,37 @@ import {
 } from "./index";
 
 describe("corners conventions", () => {
-  it("builds all three homes", () => {
+  it("builds all three homes in the reference diagonal", () => {
     expect(BOARD_CELLS).toHaveLength(64);
     expect(getPieceCount("3x3")).toBe(9);
     expect(getPieceCount("3x4")).toBe(12);
     expect(getPieceCount("1-2-3-4")).toBe(10);
-    expect(getCamps("1-2-3-4")[0].has(indexAt(0, 3))).toBe(true);
-    expect(getCamps("1-2-3-4")[0].has(indexAt(3, 1))).toBe(false);
+
+    for (const homeType of ["3x3", "3x4", "1-2-3-4"] as const) {
+      const [firstHome, secondHome] = getCamps(homeType);
+      expect(firstHome.has(indexAt(0, 7))).toBe(true);
+      expect(firstHome.has(indexAt(0, 0))).toBe(false);
+      expect(secondHome.has(indexAt(7, 0))).toBe(true);
+      expect(secondHome.has(indexAt(7, 7))).toBe(false);
+    }
+  });
+
+  it("mirrors the triangular homes between bottom-left and top-right", () => {
+    const [firstHome, secondHome] = getCamps("1-2-3-4");
+    const firstCoordinates = [
+      [0, 4],
+      [0, 5], [1, 5],
+      [0, 6], [1, 6], [2, 6],
+      [0, 7], [1, 7], [2, 7], [3, 7],
+    ];
+    const secondCoordinates = [
+      [4, 0], [5, 0], [6, 0], [7, 0],
+      [5, 1], [6, 1], [7, 1],
+      [6, 2], [7, 2],
+      [7, 3],
+    ];
+    for (const [x, y] of firstCoordinates) expect(firstHome.has(indexAt(x, y))).toBe(true);
+    for (const [x, y] of secondCoordinates) expect(secondHome.has(indexAt(x, y))).toBe(true);
   });
 
   it("fills the selected home", () => {
@@ -24,6 +48,8 @@ describe("corners conventions", () => {
     expect(state.movementType).toBe("diagonal");
     expect(state.pieces.filter((piece) => piece === 1)).toHaveLength(12);
     expect(state.pieces.filter((piece) => piece === 2)).toHaveLength(12);
+    expect(state.pieces[indexAt(0, 7)]).toBe(1);
+    expect(state.pieces[indexAt(7, 0)]).toBe(2);
   });
 
   it("keeps classic moves orthogonal", () => {
