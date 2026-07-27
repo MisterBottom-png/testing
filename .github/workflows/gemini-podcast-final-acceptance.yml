@@ -19,20 +19,16 @@ jobs:
         with:
           ref: agent/gemini-podcast-modular-source
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: gemini-podcast-studio
-        run: npm install --no-audit --no-fund
-
-      - name: Validate and publish result
+      - name: Install, validate and publish result
         run: |
           set +e
           cd gemini-podcast-studio
           {
+            echo "## Runtime"
+            node --version
+            npm --version
+            echo "## Install"
+            npm install --no-audit --no-fund
             echo "## JavaScript syntax"
             for file in src/js/*.js; do node --check "$file" || exit 91; done
             echo "## Production build, verification and tests"
@@ -48,7 +44,7 @@ jobs:
             {
               echo "status=$status"
               echo
-              tail -n 240 gemini-podcast-studio/final-acceptance.log
+              tail -n 260 gemini-podcast-studio/final-acceptance.log
             } > gemini-podcast-studio/final-acceptance-failure.txt
             rm -f gemini-podcast-studio/final-acceptance.log
             git add gemini-podcast-studio/final-acceptance-failure.txt
