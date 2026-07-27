@@ -1,14 +1,83 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#695cff" />
-    <meta name="description" content="Мобильная мультиплеерная игра в уголки" />
-    <title>Уголки Online</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#111827">
+  <meta name="color-scheme" content="dark light">
+  <title>Уголки · Multiplayer</title>
+  <link rel="stylesheet" href="/game.css">
+</head>
+<body>
+  <main class="app hidden" id="gameApp">
+    <header class="topbar">
+      <div class="brand"><div class="logo">◆</div><div><h1>Уголки</h1><p id="modeLabel">Локальная партия</p></div></div>
+      <div class="icon-row"><button class="icon-btn" id="fullscreenBtn" aria-label="Полный экран">⛶</button><button class="icon-btn" id="rulesBtn" aria-label="Правила">?</button></div>
+    </header>
+    <section class="status-card">
+      <div class="players">
+        <div class="player" id="player0"><div class="token blue"></div><div class="player-info"><div class="player-name" id="name0">Синие</div><div class="player-progress" id="progress0">В цели: 0/10</div></div></div>
+        <div class="turn-pill" id="turnPill">Ход</div>
+        <div class="player" id="player1" style="justify-content:flex-end;text-align:right"><div class="player-info"><div class="player-name" id="name1">Красные</div><div class="player-progress" id="progress1">В цели: 0/10</div></div><div class="token red"></div></div>
+      </div>
+    </section>
+    <section class="board-card">
+      <div class="board-message" id="boardMessage">Выбери фишку</div>
+      <svg id="board" viewBox="0 0 536 610" role="grid" aria-label="Поле для игры в уголки"></svg>
+    </section>
+    <nav class="controls">
+      <button class="control-btn" id="undoBtn"><span>↶</span><span>Отменить</span></button>
+      <button class="control-btn" id="soundBtn"><span>♪</span><span>Звук</span></button>
+      <button class="control-btn" id="restartBtn"><span>↻</span><span>Заново</span></button>
+      <button class="control-btn danger" id="menuBtn"><span>⌂</span><span>Меню</span></button>
+    </nav>
+  </main>
+
+  <section class="overlay" id="welcomeOverlay">
+    <div class="modal">
+      <div class="modal-head"><div><h2>Уголки</h2><p class="lead">Переведи все десять фишек в противоположный треугольник. Простая цель, за которой человечество успешно прячет десятки минут тактической злобы.</p></div></div>
+      <button class="resume hidden" id="resumeBtn">Продолжить сохранённую партию</button>
+      <div class="field-row">
+        <div class="field"><label for="blueName">Имя синих</label><input id="blueName" maxlength="18" value="Игрок 1"></div>
+        <div class="field"><label for="redName">Имя красных</label><input id="redName" maxlength="18" value="Игрок 2"></div>
+      </div>
+      <div class="mode-grid">
+        <button class="mode-btn" data-mode="local"><span class="mode-icon">👥</span><span><strong>На одном телефоне</strong><small>Передавайте устройство после каждого хода</small></span><span class="arrow">›</span></button>
+        <button class="mode-btn" data-mode="bot"><span class="mode-icon">◆</span><span><strong>Против компьютера</strong><small>Красными управляет тактический бот</small></span><span class="arrow">›</span></button>
+        <button class="mode-btn" id="onlineModeBtn"><span class="mode-icon">⌁</span><span><strong>Онлайн P2P</strong><small>Два телефона, без регистрации и сервера игры</small></span><span class="arrow">›</span></button>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="difficulty">Сложность компьютера</label><select id="difficulty"><option value="easy">Спокойная</option><option value="smart" selected>Тактическая</option></select></div>
+    </div>
+  </section>
+
+  <section class="overlay hidden" id="onlineOverlay">
+    <div class="modal">
+      <div class="modal-head"><div><h2>Онлайн P2P</h2><p class="lead">Соединение идёт напрямую между телефонами. Коды длинные, потому что браузеры обожают превращать простую вещь в дипломатический договор.</p></div><button class="close-btn" data-close-online>×</button></div>
+      <div class="tabs"><button class="tab active" data-online-tab="host">Создать игру</button><button class="tab" data-online-tab="guest">Присоединиться</button></div>
+      <div id="hostPanel">
+        <div class="online-step"><div class="step-title"><span class="step-number">1</span>Создай приглашение</div><p class="hint">Нажми кнопку и отправь полученный код второму игроку.</p><div class="action-row"><button class="action" id="createOfferBtn">Создать код</button><button class="action secondary" id="copyOfferBtn" disabled>Копировать</button></div><textarea class="signal-box" id="offerOut" readonly placeholder="Здесь появится код приглашения"></textarea></div>
+        <div class="online-step"><div class="step-title"><span class="step-number">2</span>Вставь ответ соперника</div><p class="hint">Соперник пришлёт ответный код. Вставь его и подключись.</p><textarea class="signal-box" id="answerIn" placeholder="Ответный код"></textarea><button class="action good" id="acceptAnswerBtn">Подключить соперника</button></div>
+      </div>
+      <div id="guestPanel" class="hidden">
+        <div class="online-step"><div class="step-title"><span class="step-number">1</span>Вставь приглашение</div><textarea class="signal-box" id="offerIn" placeholder="Код, который прислал создатель игры"></textarea><button class="action" id="createAnswerBtn">Создать ответ</button></div>
+        <div class="online-step"><div class="step-title"><span class="step-number">2</span>Отправь ответ создателю</div><textarea class="signal-box" id="answerOut" readonly placeholder="Здесь появится ответный код"></textarea><button class="action secondary" id="copyAnswerBtn" disabled>Копировать ответ</button></div>
+      </div>
+      <div class="connection-status" id="connectionStatus">Соединение ещё не создано.</div>
+    </div>
+  </section>
+
+  <section class="overlay hidden" id="rulesOverlay">
+    <div class="modal"><div class="modal-head"><div><h2>Правила</h2><p class="lead">Два игрока занимают противоположные треугольники.</p></div><button class="close-btn" data-close-rules>×</button></div><div class="rules">
+      <h3>Цель</h3><p>Первым перевести все 10 своих фишек в треугольник соперника.</p>
+      <h3>Ход</h3><ul><li>Можно перейти на соседнее свободное поле.</li><li>Можно перепрыгнуть через любую соседнюю фишку на свободное поле сразу за ней.</li><li>За один ход разрешена цепочка из нескольких прыжков. Игра сама показывает все достижимые конечные поля.</li><li>Фишка, попавшая в целевой треугольник, больше не может выйти из него.</li></ul>
+      <h3>Управление</h3><p>Нажми свою фишку, затем зелёное поле. Повторное нажатие на выбранную фишку отменяет выбор.</p>
+    </div></div>
+  </section>
+
+  <section class="overlay hidden" id="winnerOverlay"><div class="modal winner-card"><div class="token winner-token" id="winnerToken"></div><h2 id="winnerTitle">Победа!</h2><p class="lead" id="winnerText"></p><button class="action" id="winnerRestartBtn">Сыграть ещё раз</button><button class="action secondary" id="winnerMenuBtn">Главное меню</button></div></section>
+  <div class="toast" id="toast"></div>
+
+  <script src="/core.js"></script>
+  <script src="/app.js"></script>
+</body>
 </html>
