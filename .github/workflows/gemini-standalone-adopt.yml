@@ -1,4 +1,4 @@
-name: Apply Gemini standalone build
+name: Finalise Gemini standalone build
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-and-verify:
+  verify-and-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Check out target branch
@@ -22,55 +22,17 @@ jobs:
           fetch-depth: 1
           show-progress: false
 
-      - name: Reconstruct verified source archives
+      - name: Apply verified runtime overlay
         shell: bash
         run: |
-          exec > >(tee /tmp/gemini-reconstruct.log) 2>&1
           set -euo pipefail
-
-          base_count="$(find .github/tmp-v2 -type f | wc -l)"
-          echo "base-count=$base_count"
-          test "$base_count" = "11"
-          cat .github/tmp-v2/standalone-build.part-* > /tmp/gemini-standalone-source.tar.gz.b64
-          echo "base-encoded-bytes=$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)"
-          test "$(wc -c < /tmp/gemini-standalone-source.tar.gz.b64)" = "30576"
-          base64 --decode /tmp/gemini-standalone-source.tar.gz.b64 > /tmp/gemini-standalone-source.tar.gz
-          echo "base-sha=$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)"
-          test "$(sha256sum /tmp/gemini-standalone-source.tar.gz | cut -d' ' -f1)" = "23006daf4860cd11f4e2809a8eaa36017877b90cbbeb26ef7524c364f2db40ec"
-          gzip --test /tmp/gemini-standalone-source.tar.gz
-          tar -xzf /tmp/gemini-standalone-source.tar.gz -C gemini-podcast-studio
-
-          v3_count="$(find .github/overlay-v3 -type f | wc -l)"
-          echo "v3-count=$v3_count"
-          test "$v3_count" = "5"
-          cat .github/overlay-v3/standalone-fix.part-* > /tmp/gemini-standalone-overlay.tar.gz.b64
-          echo "v3-encoded-bytes=$(wc -c < /tmp/gemini-standalone-overlay.tar.gz.b64)"
-          test "$(wc -c < /tmp/gemini-standalone-overlay.tar.gz.b64)" = "13412"
-          base64 --decode /tmp/gemini-standalone-overlay.tar.gz.b64 > /tmp/gemini-standalone-overlay.tar.gz
-          echo "v3-sha=$(sha256sum /tmp/gemini-standalone-overlay.tar.gz | cut -d' ' -f1)"
-          test "$(sha256sum /tmp/gemini-standalone-overlay.tar.gz | cut -d' ' -f1)" = "498c916e8b3e977380678c3acb154b4bec97233b249eadef2b0859d425ea3907"
-          gzip --test /tmp/gemini-standalone-overlay.tar.gz
-          tar -xzf /tmp/gemini-standalone-overlay.tar.gz -C gemini-podcast-studio
-
-          v4_count="$(find .github/overlay-v4 -type f | wc -l)"
-          echo "v4-count=$v4_count"
-          test "$v4_count" = "6"
+          test "$(find .github/overlay-v4 -type f | wc -l)" = "6"
           cat .github/overlay-v4/standalone-runtime.part-* > /tmp/gemini-standalone-runtime.tar.gz.b64
-          echo "v4-encoded-bytes=$(wc -c < /tmp/gemini-standalone-runtime.tar.gz.b64)"
           test "$(wc -c < /tmp/gemini-standalone-runtime.tar.gz.b64)" = "17368"
           base64 --decode /tmp/gemini-standalone-runtime.tar.gz.b64 > /tmp/gemini-standalone-runtime.tar.gz
-          echo "v4-sha=$(sha256sum /tmp/gemini-standalone-runtime.tar.gz | cut -d' ' -f1)"
           test "$(sha256sum /tmp/gemini-standalone-runtime.tar.gz | cut -d' ' -f1)" = "5a83ae635c24ef4a1e8d457b54c51d7e2ccffdb6dcac39d0a1d0754f0e0abd64"
           gzip --test /tmp/gemini-standalone-runtime.tar.gz
           tar -xzf /tmp/gemini-standalone-runtime.tar.gz -C gemini-podcast-studio
-
-      - name: Upload reconstruction diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gemini-reconstruction-diagnostics
-          path: /tmp/gemini-reconstruct.log
-          if-no-files-found: warn
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -81,25 +43,18 @@ jobs:
         working-directory: gemini-podcast-studio
         run: npm install --no-audit --no-fund
 
-      - name: Check JavaScript syntax
+      - name: Verify source and standalone output
         working-directory: gemini-podcast-studio
         run: |
           for file in src/js/*.js scripts/*.mjs tests/*.mjs vite.config.js; do node --check "$file"; done
-
-      - name: Run source and build tests
-        working-directory: gemini-podcast-studio
-        run: npm test
-
-      - name: Build verified standalone application
-        working-directory: gemini-podcast-studio
-        run: |
+          npm test
           npm run build
           npm run verify:single
-          test "$(find dist -type f | wc -l)" = "1"
+          test "$(find dist -maxdepth 1 -type f | wc -l)" = "1"
           test -f dist/gemini-podcast-studio.html
           test ! -e .single-file-build
 
-      - name: Run browser runtime verification
+      - name: Verify browser runtime
         working-directory: gemini-podcast-studio
         shell: bash
         run: |
@@ -116,13 +71,14 @@ jobs:
           path: /tmp/gemini-runtime.log
           if-no-files-found: warn
 
-      - name: Commit generated standalone build
+      - name: Commit verified standalone build
         shell: bash
         run: |
           rm -rf .github/tmp .github/tmp-v2 .github/overlay-v3 .github/overlay-v4
           rm -f .github/workflows/gemini-standalone-adopt.yml
+          rm -f .github/workflows/gemini-apply-production-build.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Build standalone Gemini Podcast Studio"
+          git commit -m "Finalise standalone podcast studio"
           git push origin HEAD:agent/gemini-podcast-modular-source
