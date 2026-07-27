@@ -45,14 +45,26 @@ jobs:
 
       - name: Verify source and standalone output
         working-directory: gemini-podcast-studio
+        shell: bash
         run: |
-          for file in src/js/*.js scripts/*.mjs tests/*.mjs vite.config.js; do node --check "$file"; done
-          npm test
-          npm run build
-          npm run verify:single
-          test "$(find dist -maxdepth 1 -type f | wc -l)" = "1"
-          test -f dist/gemini-podcast-studio.html
-          test ! -e .single-file-build
+          set -o pipefail
+          {
+            for file in src/js/*.js scripts/*.mjs tests/*.mjs vite.config.js; do node --check "$file"; done
+            npm test
+            npm run build
+            npm run verify:single
+            test "$(find dist -maxdepth 1 -type f | wc -l)" = "1"
+            test -f dist/gemini-podcast-studio.html
+            test ! -e .single-file-build
+          } 2>&1 | tee /tmp/gemini-verification.log
+
+      - name: Upload source verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-verification-diagnostics
+          path: /tmp/gemini-verification.log
+          if-no-files-found: warn
 
       - name: Verify browser runtime
         working-directory: gemini-podcast-studio
