@@ -42,15 +42,17 @@ function normalizeMovementType(movementType) {
 function isHomeCell(homeType, player, cell) {
   if (homeType === '3x4') {
     return player === 0
-      ? cell.x <= 2 && cell.y <= 3
-      : cell.x >= 5 && cell.y >= 4;
+      ? cell.x <= 2 && cell.y >= 4
+      : cell.x >= 5 && cell.y <= 3;
   }
   if (homeType === '1-2-3-4') {
-    return player === 0 ? cell.x + cell.y <= 3 : cell.x + cell.y >= 11;
+    return player === 0
+      ? cell.y >= 4 && cell.x <= cell.y - 4
+      : cell.y <= 3 && cell.x >= cell.y + 4;
   }
   return player === 0
-    ? cell.x <= 2 && cell.y <= 2
-    : cell.x >= 5 && cell.y >= 5;
+    ? cell.x <= 2 && cell.y >= 5
+    : cell.x >= 5 && cell.y <= 2;
 }
 
 function getCamps(homeType = DEFAULT_HOME_TYPE) {
@@ -94,7 +96,7 @@ function createInitialState(mode = 'local', options = {}) {
   for (const index of camps[0]) pieces[index] = 1;
   for (const index of camps[1]) pieces[index] = 2;
   return {
-    version: 3,
+    version: 4,
     gameId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     mode,
     homeType,
