@@ -153,19 +153,21 @@ jobs:
 
           mapping_test_path = Path('gemini-podcast-studio/tests/script-tts-mapping.test.mjs')
           mapping_source = mapping_test_path.read_text()
-          old_stub = """  services.requestTtsChunk = async (_endpoint, transcript, speakerVoiceConfigs) => {
+          stub_pattern = re.compile(
+              r"  services\.requestTtsChunk = async \(_endpoint, transcript, speakerVoiceConfigs\) => \{\n"
+              r".*?\n"
+              r"  \};\n",
+              re.S
+          )
+          corrected_stub = """  services.generateTtsPcm = async ({ transcript, speakerVoiceConfigs }) => {
             requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
             return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
           };
           """
-          new_stub = """  services.generateTtsPcm = async ({ transcript, speakerVoiceConfigs }) => {
-            requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
-            return { pcmBytes: new Uint8Array([0, 0, 0, 0]), sampleRate: 24000 };
-          };
-          """
-          if mapping_source.count(old_stub) != 1:
-              raise SystemExit(f'Expected one legacy TTS chunk test stub, found {mapping_source.count(old_stub)}.')
-          mapping_test_path.write_text(mapping_source.replace(old_stub, new_stub, 1))
+          mapping_source, stub_count = stub_pattern.subn(corrected_stub, mapping_source, count=1)
+          if stub_count != 1:
+              raise SystemExit(f'Expected one legacy TTS chunk test stub, found {stub_count}.')
+          mapping_test_path.write_text(mapping_source)
           PY
           test "$(sha256sum gemini-podcast-studio/tests/model-configuration.test.mjs | cut -d' ' -f1)" = "6054ec3a76e71543691d464bd9c915bc7ef6a6ccf4fdb1fab03fbd41f153f697"
           rm -rf .github/tmp
