@@ -3,7 +3,7 @@ import path from 'node:path';
 import { parse } from '@babel/parser';
 import traverseModule from '@babel/traverse';
 
-const traverse = traverseModule.default;
+const traverse = traverseModule.default || traverseModule;
 const projectRoot = path.resolve('gemini-podcast-studio');
 const jsRoot = path.join(projectRoot, 'src', 'js');
 const indexHtml = await readFile(path.join(projectRoot, 'src', 'index.html'), 'utf8');
