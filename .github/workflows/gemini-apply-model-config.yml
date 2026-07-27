@@ -1,0 +1,120 @@
+name: Apply Gemini model configuration
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-apply-model-config.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Reconstruct verified test and implementation payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin agent/gemini-model-config-staging:refs/remotes/origin/agent/gemini-model-config-staging
+          git checkout --quiet origin/agent/gemini-model-config-staging -- .github/tmp
+
+          cat .github/tmp/model-config-test.part-* > /tmp/model-configuration.test.mjs.b64
+          test "$(wc -c < /tmp/model-configuration.test.mjs.b64)" -eq 9804
+          base64 --decode /tmp/model-configuration.test.mjs.b64 > /tmp/model-configuration.test.mjs
+          test "$(sha256sum /tmp/model-configuration.test.mjs | cut -d' ' -f1)" = "3b3b6652ab775def7bd65b65821ac770550d413f0cae22723e1034a2cfaae43f"
+
+          cat .github/tmp/model-config-apply.part-* > /tmp/apply-model-config.py.b64
+          test "$(wc -c < /tmp/apply-model-config.py.b64)" -eq 38388
+          base64 --decode /tmp/apply-model-config.py.b64 > /tmp/apply-model-config.py
+          test "$(sha256sum /tmp/apply-model-config.py | cut -d' ' -f1)" = "8e0194b84ff37039921f5cacd28d36015b3150e03a78bbd0aa11b2f735acaa8e"
+          python -m py_compile /tmp/apply-model-config.py
+
+      - name: Prove focused tests fail before implementation
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/model-configuration.test.mjs tests/model-configuration.test.mjs
+          set +e
+          node --test tests/model-configuration.test.mjs > /tmp/model-config-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/model-config-red.log
+          if [ "$status" -eq 0 ]; then
+            echo "Focused model-configuration tests unexpectedly passed before implementation."
+            exit 1
+          fi
+          echo "Focused tests failed as expected before implementation."
+
+      - name: Apply model defaults, selectors, migration and transport adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python /tmp/apply-model-config.py
+          rm -rf .github/tmp
+
+      - name: Run focused and full verification
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          node --test tests/model-configuration.test.mjs tests/project-migration.test.mjs
+          npm test
+          npm run build
+          npm run verify:single
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+          test -f dist/gemini-podcast-studio.html
+          test ! -d .single-file-build
+          grep -q "Gemini 3.5 Flash-Lite" dist/gemini-podcast-studio.html
+          grep -q "Gemini 3.6 Flash" dist/gemini-podcast-studio.html
+          grep -q "Gemini 3.1 Flash TTS Preview" dist/gemini-podcast-studio.html
+          grep -q "approximately 420 spoken words" dist/gemini-podcast-studio.html
+
+          npm run dev -- --port 4173 > /tmp/gemini-model-config-dev.log 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/ > /tmp/gemini-model-config-dev.html; then
+              break
+            fi
+            sleep 1
+          done
+          test -s /tmp/gemini-model-config-dev.html
+          grep -q 'src="./js/main.js"' /tmp/gemini-model-config-dev.html
+          kill "$dev_pid" 2>/dev/null || true
+          wait "$dev_pid" 2>/dev/null || true
+          trap - EXIT
+          git diff --check
+          wc -c dist/gemini-podcast-studio.html
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-model-configuration-diagnostics
+          path: |
+            /tmp/model-config-red.log
+            /tmp/gemini-model-config-dev.log
+          if-no-files-found: ignore
+
+      - name: Commit verified configuration update
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/gemini-apply-model-config.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Update Gemini model defaults and preferences"
+          git push origin HEAD:agent/gemini-podcast-modular-source
+          git push origin --delete agent/gemini-model-config-staging || true
