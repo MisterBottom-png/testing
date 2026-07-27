@@ -7,16 +7,14 @@ on:
     paths:
       - .github/scripts/analyse-gemini-modules.mjs
       - .github/workflows/gemini-module-analysis.yml
-      - gemini-podcast-studio/src/js/**
-      - gemini-podcast-studio/src/index.html
+      - gemini-podcast-studio/**
   pull_request:
     branches:
       - main
     paths:
       - .github/scripts/analyse-gemini-modules.mjs
       - .github/workflows/gemini-module-analysis.yml
-      - gemini-podcast-studio/src/js/**
-      - gemini-podcast-studio/src/index.html
+      - gemini-podcast-studio/**
 
 permissions:
   contents: read
@@ -38,4 +36,11 @@ jobs:
         with:
           name: gemini-module-analysis
           path: module-analysis.json
+          if-no-files-found: error
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-podcast-source
+          path: gemini-podcast-studio
+          include-hidden-files: true
           if-no-files-found: error
