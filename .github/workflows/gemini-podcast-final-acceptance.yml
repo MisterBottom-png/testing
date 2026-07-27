@@ -1,0 +1,177 @@
+name: Gemini Podcast Studio final acceptance
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - gemini-podcast-studio/.run-final-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  final-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+
+      - name: Apply final review refinements
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('gemini-podcast-studio')
+
+          def replace_once(path, old, new):
+              text = path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Expected text not found in {path}: {old[:100]!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          index = root / 'src/index.html'
+          text = index.read_text(encoding='utf-8')
+          if './js/final-review.js' not in text:
+              marker = '  <script defer src="./js/main.js"></script>\n'
+              if marker not in text:
+                  raise SystemExit('main.js script marker not found')
+              text = text.replace(marker, marker + '  <script defer src="./js/final-review.js"></script>\n', 1)
+              index.write_text(text, encoding='utf-8')
+
+          parity = root / 'tests/source-parity.test.mjs'
+          replace_once(
+              parity,
+              "    'ui-status.js', 'ui-events.js', 'voice-preview.js', 'main.js'\n",
+              "    'ui-status.js', 'ui-events.js', 'voice-preview.js', 'main.js', 'final-review.js'\n"
+          )
+
+          preferences = root / 'src/js/preferences.js'
+          text = preferences.read_text(encoding='utf-8')
+          if 'CORRUPT_PROJECT_BACKUP_KEY' not in text:
+              marker = 'function normaliseProjectSpeaker(speaker, index, { legacy = false } = {}) {'
+              helpers = '''const CORRUPT_PROJECT_BACKUP_KEY = `${STORAGE_KEY}.corruptBackup`;
+
+function preserveCorruptProject(rawValue, error, now = new Date().toISOString()) {
+  const raw = String(rawValue ?? '');
+  const details = error?.stack || error?.message || String(error || 'Unknown saved-project error.');
+  try {
+    localStorage.setItem(CORRUPT_PROJECT_BACKUP_KEY, JSON.stringify({ capturedAt: now, raw, details }));
+  } catch {}
+  appState.projectLoadWarning = 'The saved project is corrupt and could not be loaded safely.';
+  appState.projectLoadWarningDetails = details;
+}
+
+function readStoredProjectSafely(now = new Date().toISOString()) {
+  const raw = localStorage.getItem(STORAGE_KEY) || '';
+  if (!raw) return { project: {}, corrupt: false };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved project data is not a project object.');
+    return { project: parsed, corrupt: false };
+  } catch (error) {
+    preserveCorruptProject(raw, error, now);
+    return { project: {}, corrupt: true, error };
+  }
+}
+
+function migrateStoredProjectSafely(savedProject, now = new Date().toISOString()) {
+  try {
+    return migratePodcastProject(savedProject, now);
+  } catch (error) {
+    let raw = '';
+    try { raw = JSON.stringify(savedProject); } catch { raw = String(savedProject); }
+    preserveCorruptProject(raw, error, now);
+    return { project: createDefaultPodcastProject(), migrated: false, failed: true };
+  }
+}
+
+'''
+              if marker not in text:
+                  raise SystemExit('normaliseProjectSpeaker marker not found')
+              text = text.replace(marker, helpers + marker, 1)
+              preferences.write_text(text, encoding='utf-8')
+
+          replace_once(
+              preferences,
+              "function savePreferences(now = new Date().toISOString()) {\n  let stored = {};\n  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { stored = {}; }\n  const previousResult = migratePodcastProject(stored, now);\n",
+              "function savePreferences(now = new Date().toISOString()) {\n  const storedResult = readStoredProjectSafely(now);\n  const stored = storedResult.project;\n  const previousResult = migrateStoredProjectSafely(stored, now);\n"
+          )
+          replace_once(
+              preferences,
+              "function loadPreferences(now = new Date().toISOString()) {\n  let saved = {};\n  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { saved = {}; }\n  const hasSavedProject = Boolean(Object.keys(saved).length);\n  const migration = migratePodcastProject(saved, now);\n",
+              "function loadPreferences(now = new Date().toISOString()) {\n  const storedResult = readStoredProjectSafely(now);\n  const saved = storedResult.project;\n  const hasSavedProject = Boolean(Object.keys(saved).length);\n  const migration = migrateStoredProjectSafely(saved, now);\n"
+          )
+
+          audio = root / 'src/js/audio.js'
+          replace_once(
+              audio,
+              "      const result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);\n      if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');\n",
+              "      let result;\n      try {\n        result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);\n      } catch (error) {\n        const chunkError = createApiError(\n          Number(error?.status || 0),\n          `TTS chunk ${chunk.index + 1} of ${chunks.length} failed. No partial audio was saved.`,\n          error?.details || error?.stack || String(error)\n        );\n        chunkError.cause = error;\n        throw chunkError;\n      }\n      if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');\n"
+          )
+
+          components = root / 'src/styles/components.css'
+          text = components.read_text(encoding='utf-8')
+          if 'Final speaker and preview accessibility refinements' not in text:
+              text += '''
+
+/* Final speaker and preview accessibility refinements */
+@layer components {
+  [aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+  fieldset[aria-invalid="true"] { padding: 10px; border: 1px solid var(--danger); border-radius: var(--radius-md); }
+  .field-error::before { content: "Error: "; }
+  .duplicate-voice-warning { min-width: 0; padding: 14px; border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--outline)); border-radius: var(--radius-md); background: var(--surface); overflow-wrap: anywhere; }
+  .speaker-preview-row, #conversationPreviewSection { min-width: 0; overflow-wrap: anywhere; }
+  #conversationPreviewSection audio:not([hidden]) { display: block; }
+}
+'''
+              components.write_text(text, encoding='utf-8')
+
+          responsive = root / 'src/styles/responsive.css'
+          text = responsive.read_text(encoding='utf-8')
+          if 'Final preview responsiveness' not in text:
+              text += '''
+
+/* Final preview responsiveness */
+@layer responsive {
+  @media (max-width: 700px) {
+    #conversationPreviewSection .button-row > *,
+    #conversationPreviewButton,
+    .speaker-preview-row > button { width: 100%; }
+  }
+}
+'''
+              responsive.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        working-directory: gemini-podcast-studio
+        run: |
+          for file in src/js/*.js; do node --check "$file"; done
+
+      - name: Run production build and full test suite
+        working-directory: gemini-podcast-studio
+        run: npm run check
+
+      - name: Commit accepted implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gemini-podcast-studio/src gemini-podcast-studio/tests gemini-podcast-studio/dist/gemini-podcast-studio.html
+          if git diff --cached --quiet; then
+            echo "Final implementation is already current."
+          else
+            git commit -m "Complete Gemini Podcast Studio speaker acceptance review"
+            git push
+          fi
