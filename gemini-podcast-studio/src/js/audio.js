@@ -183,7 +183,18 @@ async function generatePodcastAudio() {
   try {
     for (const chunk of chunks) {
       if (els.scriptLoadingMessage) els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
-      const result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);
+      let result;
+      try {
+        result = await requestTtsChunk(endpoint, chunk.transcript, speakerVoiceConfigs);
+      } catch (error) {
+        const chunkError = createApiError(
+          Number(error?.status || 0),
+          `TTS chunk ${chunk.index + 1} of ${chunks.length} failed. No partial audio was saved.`,
+          error?.details || error?.stack || String(error)
+        );
+        chunkError.cause = error;
+        throw chunkError;
+      }
       if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
       sampleRate = sampleRate || result.sampleRate;
       pcmParts.push(result.pcmBytes);
