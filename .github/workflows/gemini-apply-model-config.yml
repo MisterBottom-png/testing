@@ -113,40 +113,35 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
+          import re
           path = Path('gemini-podcast-studio/tests/model-configuration.test.mjs')
           source = path.read_text()
-          old_harness = """  return withGlobals({
-            document: { getElementById() { return createElementStub(); } },
-            localStorage,
-            sessionStorage,
-            matchMedia: () => ({ matches: false })
-          }, () => {
-            const services = installServices(createServices(), ['constants', 'textUtilities']);
-            installState(services);
-            installServices(services, ['appHelpers', 'preferences', 'connectionUi']);
-            return { services, localStorage };
-          });
-          """
-          new_harness = """  const globals = {
-            document: { getElementById() { return createElementStub(); } },
-            localStorage,
-            sessionStorage,
-            matchMedia: () => ({ matches: false })
-          };
-          return withGlobals(globals, () => {
-            const services = installServices(createServices(), ['constants', 'textUtilities']);
-            installState(services);
-            installServices(services, ['appHelpers', 'preferences', 'connectionUi']);
-            return {
-              services,
+          harness_pattern = re.compile(r"async function createHarness\(savedProject = null\) \{.*?\n\}\n\n", re.S)
+          corrected_harness = """async function createHarness(savedProject = null) {
+            const localStorage = createStorage(savedProject ? { 'geminiPodcastStudio.preferences.v2': JSON.stringify(savedProject) } : {});
+            const sessionStorage = createStorage();
+            const globals = {
+              document: { getElementById() { return createElementStub(); } },
               localStorage,
-              loadPreferences: () => withGlobals(globals, () => services.loadPreferences())
+              sessionStorage,
+              matchMedia: () => ({ matches: false })
             };
-          });
+            return withGlobals(globals, () => {
+              const services = installServices(createServices(), ['constants', 'textUtilities']);
+              installState(services);
+              installServices(services, ['appHelpers', 'preferences', 'connectionUi']);
+              return {
+                services,
+                localStorage,
+                loadPreferences: () => withGlobals(globals, () => services.loadPreferences())
+              };
+            });
+          }
+
           """
-          if source.count(old_harness) != 1:
-              raise SystemExit(f'Expected one model test harness block, found {source.count(old_harness)}.')
-          source = source.replace(old_harness, new_harness, 1)
+          source, count = harness_pattern.subn(corrected_harness, source, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one createHarness function, found {count}.')
           old_valid = "  const { services } = await createHarness(saved);\n  const migration = services.loadPreferences();"
           new_valid = "  const { services, loadPreferences } = await createHarness(saved);\n  const migration = await loadPreferences();"
           old_invalid = "  const { services, localStorage } = await createHarness(saved);\n  const migration = services.loadPreferences();"
