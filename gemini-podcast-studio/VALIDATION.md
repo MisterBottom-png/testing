@@ -1,12 +1,26 @@
 # Validation
 
-The modular extraction was generated from the working `podcast-studio.html` baseline and validated on GitHub Actions.
+The modular development source is verified through Vite and the Node test suite.
 
-Passed checks:
+Automated checks cover:
 
-- Single-file build generation.
-- No local CSS or JavaScript runtime dependencies in the generated HTML.
-- No duplicate markup IDs.
-- Three-stage workflow markup retained.
-- JavaScript dependency order retained.
-- Node test suite passed.
+- One ES-module browser entry with no ordered classic scripts.
+- Vite production compilation from `src/index.html`.
+- JavaScript syntax for every source and test file.
+- Preservation of the Create, Script and Audio stages.
+- Existing model selection, speaker mapping, script editing, TTS chunk assembly, WAV encoding, persistence, migration, previews and cache behaviour.
+- Diagnostic API-key redaction.
+- DOM independence for API, storage, PCM, WAV, chunking and IndexedDB modules.
+- Absence of application assignments to `window` or `globalThis`.
+- Existing accessibility and responsive protections.
+
+Commands:
+
+```bash
+npm install --no-audit --no-fund
+npm run build
+npm test
+npm run check
+```
+
+Manual browser checks against the preserved monolithic reference remain appropriate for visual comparison. Live script and TTS generation cannot be claimed without a valid Gemini API key.

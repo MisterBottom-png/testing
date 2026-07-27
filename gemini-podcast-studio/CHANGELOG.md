@@ -1,10 +1,12 @@
 # Changelog
 
-## Phase 1: Modular source extraction
+## ES-module source extraction
 
-- Split inline CSS into five source files.
-- Split inline JavaScript into eleven responsibility-based files.
-- Added modular HTML source.
-- Added repeatable single-file build and verification.
-- Added extraction tests and generated distribution output.
-- Preserved the original application behaviour and UI baseline.
+- Replaced shared-scope classic scripts with one ES-module entry.
+- Added an explicit application context for state, services and documented mutable compatibility seams.
+- Split API, error, script, TTS, PCM, WAV, IndexedDB, media-cache and UI responsibilities into focused modules.
+- Changed the default build command to Vite output under `.vite-build/`.
+- Preserved the existing single-file outputs as behavioural references.
+- Added module-boundary and parity tests.
+
+No model, request, retry, TTS, caching, storage, wording or visual behaviour was intentionally changed.

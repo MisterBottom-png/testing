@@ -2,29 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import vm from 'node:vm';
+import { createModuleContext } from './module-harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const constantsSource = await readFile(path.join(root, 'src', 'js', 'constants.js'), 'utf8');
-const utilitiesSource = await readFile(path.join(root, 'src', 'js', 'text-utils.js'), 'utf8');
 const uiSource = await readFile(path.join(root, 'src', 'js', 'ui-create.js'), 'utf8');
-const apiSource = await readFile(path.join(root, 'src', 'js', 'gemini-api.js'), 'utf8');
+const apiSource = await readFile(path.join(root, 'src', 'js', 'script-generation.js'), 'utf8');
 const eventsSource = await readFile(path.join(root, 'src', 'js', 'ui-events.js'), 'utf8');
-
-const context = {};
-vm.runInNewContext(`${constantsSource}\n${utilitiesSource}\n${uiSource}\n;globalThis.__speakerValidation = {
-  GEMINI_TTS_VOICES,
-  getAvailableVoiceTypes,
-  getMatchingVoices,
-  getSpeakerVoiceTypes,
-  getSpeakerVoiceChoices,
-  updateSpeakerField,
-  validateSpeakerRecords,
-  getDuplicateVoiceSignature,
-  approveDuplicateVoice,
-  isDuplicateVoiceApproved,
-  resetDuplicateVoiceApproval
-};`, context);
+const context = createModuleContext(['constants', 'text-utils', 'ui-create'], {
+  appState: { speakers: [] },
+  els: { speakerList: { innerHTML: '' } }
+});
 
 const {
   GEMINI_TTS_VOICES,
@@ -38,7 +25,7 @@ const {
   approveDuplicateVoice,
   isDuplicateVoiceApproved,
   resetDuplicateVoiceApproval
-} = context.__speakerValidation;
+} = context;
 
 const toPlain = value => JSON.parse(JSON.stringify(value));
 const validSpeaker = overrides => ({
@@ -169,5 +156,5 @@ test('UI source contains no-match guidance and both duplicate-voice actions', ()
   assert.match(uiSource, /data-duplicate-voice-action="use-anyway"/);
   assert.match(uiSource, /data-duplicate-voice-action="choose-another"/);
   assert.match(eventsSource, /document\.getElementById\('speakerVoice1'\)\?\.focus\(\)/);
-  assert.match(apiSource, /getDuplicateVoiceSignature\(\) && !isDuplicateVoiceApproved\(\)/);
+  assert.match(apiSource, /ctx\.getDuplicateVoiceSignature\(\) && !ctx\.isDuplicateVoiceApproved\(\)/);
 });

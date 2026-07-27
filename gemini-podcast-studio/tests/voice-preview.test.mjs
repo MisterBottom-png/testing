@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import vm from 'node:vm';
-
-const root = path.resolve(import.meta.dirname, '..');
-const previewSource = await readFile(path.join(root, 'src', 'js', 'voice-preview.js'), 'utf8');
+import { createAppContext } from '../src/js/app-context.js';
+import { installPcmAudio } from '../src/js/pcm-audio.js';
+import { installWavEncoder } from '../src/js/wav-encoder.js';
+import { installGeminiErrors } from '../src/js/gemini-errors.js';
+import { installIndexeddb } from '../src/js/indexeddb.js';
+import { installMediaCache } from '../src/js/media-cache.js';
+import { installVoicePreview } from '../src/js/voice-preview.js';
 
 class FakeClassList {
   values = new Set();
@@ -67,23 +68,10 @@ const voices = {
   Sulafat: { apiName: 'Sulafat', gender: 'female', type: 'warm' },
   Erinome: { apiName: 'Erinome', gender: 'female', type: 'clear' }
 };
-const context = vm.createContext({
-  console,
-  Blob,
-  Buffer,
-  setTimeout,
-  clearTimeout,
-  queueMicrotask,
+const context = createAppContext();
+for (const [name, value] of Object.entries({
   appState,
   els,
-  document: {
-    getElementById: id => elements.get(id) || null,
-    createElement: () => new FakeElement(),
-    querySelectorAll: () => []
-  },
-  window: { addEventListener() {} },
-  URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
-  Audio: function () {},
   renderSpeakerCards() {},
   resetProject() {},
   generateVoiceTest() {},
@@ -95,31 +83,27 @@ const context = vm.createContext({
     for (const character of String(value)) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
     return hash.toString(36);
   },
-  base64ToBytes: base64 => Uint8Array.from(Buffer.from(base64, 'base64')),
-  sampleRateFromMimeType: () => 24000,
-  pcm16ToWavBlob: bytes => new Blob([new Uint8Array(44), bytes], { type: 'audio/wav' }),
-  createApiError(status, message, details = '') {
-    const error = new Error(message);
-    error.status = status;
-    error.details = details;
-    return error;
-  },
-  mapError: error => ({ message: error.message, suggestion: error.status === 429 ? 'Rate limited.' : 'Check configuration.' }),
   showServiceError: value => { serviceError = value; },
   hideServiceError() { serviceError = null; },
   announce: message => { announcements.push(message); }
-});
-vm.runInContext(`${previewSource}\n;globalThis.previewApi = {
-  buildVoicePreviewDescriptor,
-  buildVoicePreviewRequestBody,
-  isValidVoicePreviewRecord,
-  generateVoicePreview,
-  getVoicePreviewState,
-  invalidateStaleVoicePreviewState,
-  setVoicePreviewCacheBackendForTests,
-  VOICE_PREVIEW_FAILURE_MESSAGE
-};`, context);
-const api = context.previewApi;
+})) context.expose(name, value);
+
+globalThis.document = {
+  getElementById: id => elements.get(id) || null,
+  createElement: () => new FakeElement(),
+  querySelectorAll: () => []
+};
+globalThis.window = { addEventListener() {} };
+globalThis.URL = { createObjectURL: () => 'blob:test', revokeObjectURL() {} };
+globalThis.Audio = function () {};
+globalThis.requestAnimationFrame = callback => callback();
+installPcmAudio(context);
+installWavEncoder(context);
+installGeminiErrors(context);
+installIndexeddb(context);
+installMediaCache(context);
+installVoicePreview(context);
+const api = context;
 
 function createCache(initial = []) {
   const map = new Map(initial.map(record => [record.cacheKey, record]));

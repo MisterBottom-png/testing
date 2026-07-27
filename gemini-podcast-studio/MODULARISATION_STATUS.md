@@ -1,34 +1,40 @@
 # Modularisation status
 
-## Completed in this branch
+## Completed
 
-- Extracted the working application markup into `src/index.html`.
-- Split the CSS into five responsibility-based files.
-- Split the JavaScript into eleven responsibility-based files while preserving execution order.
-- Added a repeatable build that produces `dist/gemini-podcast-studio.html`.
-- Added verification for a self-contained output with no local runtime dependencies.
-- Added source-parity tests for the three-stage workflow and script dependency order.
-- Preserved the original root `podcast-studio.html` as the extraction baseline.
+- Kept `src/index.html` as the Vite development entry point.
+- Preserved the existing five-file CSS cascade without redesign or selector reordering.
+- Replaced ordered classic JavaScript files with one ES-module entry.
+- Split JavaScript into responsibility-focused modules for constants, state, text utilities, persistence, API transport, errors, script validation/generation, TTS chunking/generation, PCM/WAV conversion, IndexedDB, media cache, previews and UI concerns.
+- Removed reliance on application symbols living in the browser global scope.
+- Kept `main.js` limited to creating the application context and installing modules.
+- Preserved deliberate late function replacement through the documented application-context bridge.
+- Kept the original monolithic and generated single-file references untouched.
+- Added module-boundary regression tests.
 
-## Deliberately not included
+## Deliberately unchanged
 
-- Model-default changes.
-- Retry or cancellation infrastructure.
-- TTS chunking.
-- IndexedDB caching.
-- Script-generation constraints.
-- Functional or visual redesign beyond the existing baseline.
+- Model choices and defaults.
+- Request payloads and endpoints.
+- Retry behaviour.
+- Existing TTS chunking and preview-cache behaviour.
+- Storage keys and schema.
+- UI structure, wording, IDs and styling.
+- Production single-file generation.
 
-Those changes belong in later focused commits after modular-source parity is accepted.
+## Compatibility bridge still present
+
+A small number of baseline functions are intentionally replaceable during startup, including validation, rendering, error mapping and audio invalidation refinements. `app-context.js` preserves those bindings explicitly. This is safer than converting the baseline's late overrides into a broad behavioural rewrite.
 
 ## Validation
 
-The one-shot GitHub workflow ran:
+Run:
 
 ```text
+npm install --no-audit --no-fund
 npm run build
-npm run verify
 npm test
+npm run check
 ```
 
-All checks passed before the generated project was committed.
+Live Gemini script and TTS requests still require an authorised API key and supported model access.

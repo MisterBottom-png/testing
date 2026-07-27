@@ -1,73 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import vm from 'node:vm';
-
-const root = path.resolve(import.meta.dirname, '..');
-const constants = await readFile(path.join(root, 'src', 'js', 'constants.js'), 'utf8');
-const textUtils = await readFile(path.join(root, 'src', 'js', 'text-utils.js'), 'utf8');
-const uiScript = await readFile(path.join(root, 'src', 'js', 'ui-script.js'), 'utf8');
-const geminiApi = await readFile(path.join(root, 'src', 'js', 'gemini-api.js'), 'utf8');
-const audio = await readFile(path.join(root, 'src', 'js', 'audio.js'), 'utf8');
+import { createAppContext } from '../src/js/app-context.js';
+import { installConstants } from '../src/js/constants.js';
+import { installTextUtils } from '../src/js/text-utils.js';
+import { installUiScript } from '../src/js/ui-script.js';
+import { installScriptValidation } from '../src/js/script-validation.js';
+import { installScriptGeneration } from '../src/js/script-generation.js';
+import { installPcmAudio } from '../src/js/pcm-audio.js';
+import { installWavEncoder } from '../src/js/wav-encoder.js';
+import { installTtsChunking } from '../src/js/tts-chunking.js';
+import { installGeminiErrors } from '../src/js/gemini-errors.js';
+import { installGeminiApi } from '../src/js/gemini-api.js';
+import { installTtsGeneration } from '../src/js/tts-generation.js';
 
 function createHarness() {
   const requests = [];
   const serviceErrors = [];
   const revokedUrls = [];
   let stage = '';
-  const context = vm.createContext({
-    console,
-    Blob,
-    Uint8Array,
-    ArrayBuffer,
-    DataView,
-    Math,
-    JSON,
-    Date,
-    Set,
-    performance: { now: (() => { let value = 0; return () => (value += 10); })() },
-    atob: value => Buffer.from(value, 'base64').toString('binary'),
-    URL: {
-      createObjectURL: () => 'blob:generated',
-      revokeObjectURL: url => revokedUrls.push(url)
-    },
-    requestAnimationFrame: callback => callback(),
-    window: { devicePixelRatio: 1, scrollTo() {} },
-    document: { querySelectorAll: () => [], getElementById: () => null },
-    els: {
-      scriptLoadingMessage: { textContent: '' },
-      scriptMetrics: { innerHTML: '' },
-      scriptValidation: { className: '', textContent: '' },
-      generateAudioButton: { disabled: false }
-    },
-    fetch: async (_url, options) => {
-      requests.push(JSON.parse(options.body));
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({
-          candidates: [{ content: { parts: [{ inlineData: { data: 'AAAAAA==', mimeType: 'audio/pcm;rate=24000' } }] } }]
-        })
-      };
-    },
-    hideServiceError() {},
-    showServiceError(error) { serviceErrors.push(error); return error; },
-    setBusy() {},
-    queueSave() {},
-    __recordStage(value) { stage = value; },
-    createApiError(status, message, details = '') { const error = new Error(message); error.status = status; error.details = details; return error; },
-    handleGenerationError(error) { throw error; },
-    formatDuration: seconds => String(seconds),
-    formatBytes: bytes => String(bytes),
-    escapeHtml: value => String(value ?? ''),
-    announce() {},
-    autoSize() {},
-    getComputedStyle: () => ({ getPropertyValue: () => '' })
-  });
 
-  vm.runInContext(constants, context);
-  vm.runInContext(`globalThis.appState = {
+  globalThis.performance = { now: (() => { let value = 0; return () => (value += 10); })() };
+  globalThis.atob = value => Buffer.from(value, 'base64').toString('binary');
+  globalThis.URL = {
+    createObjectURL: () => 'blob:generated',
+    revokeObjectURL: url => revokedUrls.push(url)
+  };
+  globalThis.requestAnimationFrame = callback => callback();
+  globalThis.window = { devicePixelRatio: 1, scrollTo() {} };
+  globalThis.document = { querySelectorAll: () => [], getElementById: () => null };
+  globalThis.fetch = async (_url, options) => {
+    requests.push(JSON.parse(options.body));
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        candidates: [{ content: { parts: [{ inlineData: { data: 'AAAAAA==', mimeType: 'audio/pcm;rate=24000' } }] } }]
+      })
+    };
+  };
+
+  const appState = {
     currentStage: 'script',
     busy: false,
     lastAction: null,
@@ -88,32 +60,42 @@ function createHarness() {
     audio: { blob: null, url: '', sampleRate: 24000, generationSeconds: 0, durationSeconds: 0, createdAt: null },
     audioCacheReferences: {},
     settings: { theme: 'light', maxTtsCharacters: 12000, speakingRate: 140 }
-  };`, context);
-  vm.runInContext(textUtils, context);
-  vm.runInContext(uiScript, context);
-  vm.runInContext(geminiApi, context);
-  vm.runInContext(audio, context);
-  vm.runInContext(`setStage = value => globalThis.__recordStage(value);`, context);
-  vm.runInContext(`globalThis.__mappingApi = {
-    buildScriptCharacters,
-    buildScriptSchema,
-    buildScriptPrompt,
-    validateScript,
-    validateScriptSpeakers,
-    renameScriptSpeaker,
-    buildSpeakerVoiceConfigs,
-    getSpeakerVoiceMappingSignature,
-    buildTtsRequestBody,
-    createTtsChunks,
-    getTtsSpeakerValidationIssue,
-    invalidatePodcastAudio,
-    invalidateAudioForSpeakerMappingChange,
-    generatePodcastAudio
-  };`, context);
+  };
+  const els = {
+    scriptLoadingMessage: { textContent: '' },
+    scriptMetrics: { innerHTML: '' },
+    scriptValidation: { className: '', textContent: '' },
+    generateAudioButton: { disabled: false },
+    liveStatus: { textContent: '' }
+  };
+  const context = createAppContext();
+  context.expose('appState', appState);
+  context.expose('els', els);
+  installConstants(context);
+  installTextUtils(context);
+  installUiScript(context);
+  installScriptValidation(context);
+  installScriptGeneration(context);
+  installPcmAudio(context);
+  installWavEncoder(context);
+  installTtsChunking(context);
+  installGeminiErrors(context);
+  installGeminiApi(context);
+  context.expose('hideServiceError', () => {});
+  context.expose('showServiceError', error => { serviceErrors.push(error); return error; });
+  context.expose('setBusy', () => {});
+  context.expose('queueSave', () => {});
+  context.expose('handleGenerationError', error => { throw error; });
+  context.expose('setStage', value => { stage = value; });
+  context.expose('formatDuration', seconds => String(seconds));
+  context.expose('formatBytes', bytes => String(bytes));
+  context.expose('escapeHtml', value => String(value ?? ''));
+  context.expose('announce', () => {});
+  installTtsGeneration(context);
 
   return {
     context,
-    api: context.__mappingApi,
+    api: context,
     requests,
     serviceErrors,
     revokedUrls,

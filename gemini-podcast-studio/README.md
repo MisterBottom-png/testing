@@ -1,16 +1,25 @@
 # Gemini Podcast Studio
 
-Maintainable development source extracted from the working single-file application.
-
-- `src/index.html` contains markup.
-- `src/styles/` contains the original CSS layers.
-- `src/js/` contains JavaScript split by responsibility in preserved execution order.
-- `dist/gemini-podcast-studio.html` is generated and must not be edited manually.
-
-The extraction deliberately uses ordered deferred scripts to preserve baseline behaviour. Converting the shared scope to explicit ES-module imports is a separate refactor after parity is confirmed, rather than mixing architecture and functional changes in one hazardous blob.
+Gemini Podcast Studio now runs from focused HTML, CSS and ES-module JavaScript source while preserving the established interface and behaviour.
 
 ```bash
 npm install
 npm run dev
+```
+
+Vite serves `src/index.html`. The editable source is organised as follows:
+
+- `src/styles/` retains the existing token, base, layout, component and responsive cascade.
+- `src/js/main.js` is the startup coordinator.
+- `src/js/app-context.js` carries explicit state and services between modules without browser globals.
+- Remaining JavaScript files are separated by constants, state, persistence, API transport, script handling, TTS, PCM/WAV audio, IndexedDB/media cache and UI responsibilities.
+
+Validation commands:
+
+```bash
+npm run build
+npm test
 npm run check
 ```
+
+The Vite build is written to `.vite-build/`. Existing files under `dist/` are preserved references and must not be edited manually. The portable production single-file builder is deliberately deferred.

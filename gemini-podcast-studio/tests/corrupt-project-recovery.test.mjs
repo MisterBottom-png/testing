@@ -1,12 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import vm from 'node:vm';
-
-const root = path.resolve(import.meta.dirname, '..');
-const constantsSource = await readFile(path.join(root, 'src', 'js', 'constants.js'), 'utf8');
-const preferencesSource = await readFile(path.join(root, 'src', 'js', 'preferences.js'), 'utf8');
+import { createAppContext } from '../src/js/app-context.js';
+import { installConstants } from '../src/js/constants.js';
+import { installTextUtils } from '../src/js/text-utils.js';
+import { installPreferences } from '../src/js/preferences.js';
 
 function createStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -21,31 +18,28 @@ function createStorage(initial = {}) {
 function createHarness(rawProject) {
   const localStorage = createStorage({ 'geminiPodcastStudio.preferences.v2': rawProject });
   const sessionStorage = createStorage();
-  const context = vm.createContext({
-    console,
-    localStorage,
-    sessionStorage,
-    matchMedia: () => ({ matches: false }),
-    deepClone: value => value == null ? value : JSON.parse(JSON.stringify(value)),
-    normaliseWhitespace: value => String(value ?? '').replace(/\s+/g, ' ').trim(),
-    escapeHtml: value => String(value ?? '')
-  });
-  vm.runInContext(constantsSource, context);
-  vm.runInContext(`globalThis.appState = {
-    schemaVersion: PODCAST_PROJECT_SCHEMA_VERSION,
+  globalThis.localStorage = localStorage;
+  globalThis.sessionStorage = sessionStorage;
+  globalThis.matchMedia = () => ({ matches: false });
+
+  const context = createAppContext();
+  installConstants(context);
+  context.expose('appState', {
+    schemaVersion: context.PODCAST_PROJECT_SCHEMA_VERSION,
     connection: { apiKey: '', rememberKey: false, textModel: 'gemini-3.6-flash', customTextModel: '', ttsModel: 'gemini-3.1-flash-tts-preview', customTtsModel: '' },
     podcast: { topic: '', durationMinutes: 5, language: 'English', customLanguage: '', format: 'Friendly conversation', customFormat: '', tones: ['Informative', 'Casual'], instructions: '' },
-    speakers: createDefaultPodcastSpeakers(),
+    speakers: context.createDefaultPodcastSpeakers(),
     script: null,
     originalScript: null,
     legacyScript: null,
     audioCacheReferences: {},
     lastModified: '',
-    settings: { theme: 'light', maxTtsCharacters: DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
-  };`, context);
-  vm.runInContext(preferencesSource, context);
-  vm.runInContext(`globalThis.recoveryApi = { loadPreferences, STORAGE_KEY, CORRUPT_PROJECT_BACKUP_KEY };`, context);
-  return { context, localStorage, api: context.recoveryApi };
+    settings: { theme: 'light', maxTtsCharacters: context.DEFAULT_MAX_TTS_CHARACTERS, speakingRate: 140 }
+  });
+  context.expose('els', {});
+  installTextUtils(context);
+  installPreferences(context);
+  return { context, localStorage, api: context };
 }
 
 test('corrupt saved JSON is backed up and loading falls back safely without deleting the original project value', () => {

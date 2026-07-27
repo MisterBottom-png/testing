@@ -1,11 +1,12 @@
 # Deferred phases
 
-After modular-source parity is reviewed, later pull requests can address:
+After modular-source parity is accepted, separate tasks may address:
 
-1. ES-module dependency boundaries.
-2. Model defaults and saved-preference migration.
-3. Script output constraints and local validation.
-4. Retry, cancellation and duplicate suppression.
-5. Sequential TTS chunking and PCM assembly.
-6. IndexedDB caching and resumable generation jobs.
-7. Further UI progress, cache and privacy messaging.
+1. Further reduction of the documented mutable application-context bridge.
+2. A production single-file inlining pipeline sourced from the Vite application.
+3. Model-default and saved-preference migrations.
+4. Retry, cancellation and generation-job infrastructure.
+5. TTS and media-cache optimisation.
+6. Further UI or accessibility improvements.
+
+None of those changes are part of the modular extraction.

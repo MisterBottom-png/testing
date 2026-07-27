@@ -2,43 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import vm from 'node:vm';
+import { createModuleContext } from './module-harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const constants = await readFile(path.join(root, 'src', 'js', 'constants.js'), 'utf8');
-const textUtils = await readFile(path.join(root, 'src', 'js', 'text-utils.js'), 'utf8');
-const uiCreate = await readFile(path.join(root, 'src', 'js', 'ui-create.js'), 'utf8');
 const uiEvents = await readFile(path.join(root, 'src', 'js', 'ui-events.js'), 'utf8');
-
-const context = {
-  appState: {
-    speakers: [],
-    podcast: { topic: '', durationMinutes: 3, language: 'English', customLanguage: '', format: 'conversation', customFormat: '', tones: [], instructions: '' },
-    settings: { speakingRate: 140, theme: 'light', maxTtsCharacters: 12000 },
-    connection: { apiKey: '', textModel: '', customTextModel: '', ttsModel: '', customTtsModel: '' },
-    audio: { url: '' }
-  },
-  els: { speakerList: { innerHTML: '' } },
-  console
+const appState = {
+  speakers: [],
+  podcast: { topic: '', durationMinutes: 3, language: 'English', customLanguage: '', format: 'conversation', customFormat: '', tones: [], instructions: '' },
+  settings: { speakingRate: 140, theme: 'light', maxTtsCharacters: 12000 },
+  connection: { apiKey: '', textModel: '', customTextModel: '', ttsModel: '', customTtsModel: '' },
+  audio: { url: '' }
 };
-vm.runInNewContext(`${constants}\n${textUtils}\n${uiCreate}\n;globalThis.__speakerUi = {
-  createDefaultPodcastSpeakers,
-  renderSpeakerCards,
-  updateSpeakerField,
-  getSpeakerVoiceTypes,
-  getSpeakerVoiceChoices
-};`, context);
-
+const els = { speakerList: { innerHTML: '' } };
+const context = createModuleContext(['constants', 'text-utils', 'ui-create'], { appState, els, console });
 const {
   createDefaultPodcastSpeakers,
   renderSpeakerCards,
   updateSpeakerField
-} = context.__speakerUi;
+} = context;
 
 function renderWith(speakers = createDefaultPodcastSpeakers()) {
-  context.appState.speakers = JSON.parse(JSON.stringify(speakers));
+  appState.speakers = JSON.parse(JSON.stringify(speakers));
   renderSpeakerCards();
-  return context.els.speakerList.innerHTML;
+  return els.speakerList.innerHTML;
 }
 
 test('renders two distinguishable speaker configuration cards with all required controls', () => {
@@ -126,7 +112,7 @@ test('native labelled controls provide keyboard navigation semantics', () => {
 });
 
 test('speaker input events use the shared updater and persist through the existing save queue', () => {
-  assert.match(uiEvents, /updateSpeakerField\(speaker, field, event\.target\.value\)/);
-  assert.match(uiEvents, /queueSave\(\)/);
-  assert.match(uiEvents, /renderSpeakerCards\(\)/);
+  assert.match(uiEvents, /ctx\.updateSpeakerField\(speaker, field, event\.target\.value\)/);
+  assert.match(uiEvents, /ctx\.queueSave\(\)/);
+  assert.match(uiEvents, /ctx\.renderSpeakerCards\(\)/);
 });

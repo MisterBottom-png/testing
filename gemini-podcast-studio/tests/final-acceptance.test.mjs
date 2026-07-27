@@ -5,15 +5,16 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = relative => readFile(path.join(root, relative), 'utf8');
-const [html, finalReview, preferences, audio, components, responsive, main, preview] = await Promise.all([
+const [html, finalReview, preferences, audio, components, responsive, main, preview, entry] = await Promise.all([
   read('src/index.html'),
   read('src/js/final-review.js'),
   read('src/js/preferences.js'),
-  read('src/js/audio.js'),
+  read('src/js/tts-generation.js'),
   read('src/styles/components.css'),
   read('src/styles/responsive.css'),
-  read('src/js/main.js'),
-  read('src/js/voice-preview.js')
+  read('src/js/conversation-preview.js'),
+  read('src/js/voice-preview.js'),
+  read('src/js/main.js')
 ]);
 
 test('final validation messages use the accepted human-readable wording', () => {
@@ -64,7 +65,7 @@ test('TTS chunk failures identify the failed chunk and never publish partial aud
   assert.match(audio, /TTS chunk \$\{chunk\.index \+ 1\} of \$\{chunks\.length\} failed/);
   assert.match(audio, /No partial audio was saved/);
   const loopPosition = audio.indexOf('for (const chunk of chunks)');
-  const publishPosition = audio.indexOf('appState.audio =', loopPosition);
+  const publishPosition = audio.indexOf('ctx.appState.audio =', loopPosition);
   assert.ok(loopPosition >= 0 && publishPosition > loopPosition, 'audio is published only after the chunk loop');
 });
 
@@ -78,11 +79,11 @@ test('audio invalidation preserves project data and clearly requires regeneratio
 test('individual and conversation previews retain deterministic isolated caching', () => {
   assert.match(preview, /VOICE_PREVIEW_GENERATION_VERSION/);
   assert.match(preview, /voicePreviewInFlightRequests/);
-  assert.match(preview, /removeVoicePreviewCache\(descriptor\.cacheKey/);
+  assert.match(preview, /ctx\.removeVoicePreviewCache\(descriptor\.cacheKey/);
   assert.match(main, /CONVERSATION_PREVIEW_TEMPLATE_VERSION/);
   assert.match(main, /conversationPreviewTask/);
-  assert.match(main, /removeVoicePreviewCache\(descriptor\.cacheKey/);
-  assert.doesNotMatch(main, /clearVoicePreviewCache\(/);
+  assert.match(main, /ctx\.removeVoicePreviewCache\(descriptor\.cacheKey/);
+  assert.doesNotMatch(main, /ctx\.clearVoicePreviewCache\(/);
 });
 
 test('responsive, zoom-friendly and reduced-motion protections remain present', () => {
@@ -102,9 +103,9 @@ test('native audio controls and preview live regions remain accessible', () => {
 });
 
 test('final source order loads review refinements after application initialisation code', () => {
-  const mainIndex = html.indexOf('./js/main.js');
-  const reviewIndex = html.indexOf('./js/final-review.js');
-  assert.ok(mainIndex >= 0 && reviewIndex > mainIndex);
+  const previewIndex = entry.indexOf('./conversation-preview.js');
+  const reviewIndex = entry.indexOf('./final-review.js');
+  assert.ok(previewIndex >= 0 && reviewIndex > previewIndex);
 });
 
 test('no automatic voice recommendations or permanent aliases were introduced', () => {
