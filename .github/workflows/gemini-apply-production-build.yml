@@ -1,0 +1,72 @@
+name: Apply Gemini production build
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-apply-production-build.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/gemini-apply-production-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Reconstruct verified source overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin agent/gemini-production-build-staging:refs/remotes/origin/agent/gemini-production-build-staging
+          git checkout --quiet origin/agent/gemini-production-build-staging -- .github/tmp
+          cat .github/tmp/gemini-production-source.part-* > /tmp/gemini-production-source.tar.gz.b64
+          encoded_bytes=$(wc -c < /tmp/gemini-production-source.tar.gz.b64)
+          echo "encoded-bytes=$encoded_bytes"
+          test "$encoded_bytes" = "32620"
+          base64 --decode /tmp/gemini-production-source.tar.gz.b64 > /tmp/gemini-production-source.tar.gz
+          actual=$(sha256sum /tmp/gemini-production-source.tar.gz | cut -d' ' -f1)
+          echo "archive-sha=$actual"
+          test "$actual" = "3c9ee938e055b1732a32b1478c5e64601693cc56c21bbf100e75fce04aa54f1e"
+          gzip --test /tmp/gemini-production-source.tar.gz
+
+      - name: Apply source and remove transport files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/gemini-production-source.tar.gz -C gemini-podcast-studio
+          rm -f .tmp-ignore-test
+          rm -f .github/workflows/gemini-apply-production-build.yml
+          rm -rf .github/tmp
+
+      - name: Build and verify standalone application
+        working-directory: gemini-podcast-studio
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+          npm run verify:single
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+          test -f dist/gemini-podcast-studio.html
+          test ! -d .single-file-build
+          git diff --check
+
+      - name: Commit production build
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build standalone podcast studio"
+          git push origin HEAD:agent/gemini-podcast-modular-source
+          git push origin --delete agent/gemini-production-build-staging || true
