@@ -37,5 +37,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gemini-module-analysis
-          path: .module-analysis.json
+          path: module-analysis.json
           if-no-files-found: error
