@@ -59,7 +59,19 @@ jobs:
         run: npm run typecheck --workspace @corners/server
 
       - name: Type check web client
-        run: npm run typecheck --workspace @corners/web
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck --workspace @corners/web 2>&1 | tee web-typecheck.log
+
+      - name: Upload web type-check log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: corners-web-typecheck-log
+          path: corners-web/web-typecheck.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build web PWA
         run: npm run build
