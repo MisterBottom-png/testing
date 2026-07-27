@@ -17,13 +17,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/gemini-podcast-modular-source
-          fetch-depth: 0
+          fetch-depth: 1
           show-progress: false
       - name: Reconstruct verified source archive
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --quiet origin agent/gemini-podcast-modular-staging
+          git fetch --quiet origin agent/gemini-podcast-modular-staging:refs/remotes/origin/agent/gemini-podcast-modular-staging
           git checkout --quiet origin/agent/gemini-podcast-modular-staging -- .github/tmp
           cat .github/tmp/gemini-modular-source.part-* > /tmp/gemini-modular-source.tar.gz.b64
           echo "encoded-bytes=$(wc -c < /tmp/gemini-modular-source.tar.gz.b64)"
