@@ -23,12 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install module migration tooling
-        run: npm install --no-save --no-package-lock @babel/parser @babel/traverse @babel/generator @babel/types
-      - name: Upload module migration tooling
+      - name: Install project dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+      - name: Upload project dependencies
         uses: actions/upload-artifact@v4
         with:
-          name: gemini-module-tooling
-          path: node_modules
+          name: gemini-vite-dependencies
+          path: gemini-podcast-studio/node_modules
           include-hidden-files: true
           if-no-files-found: error
