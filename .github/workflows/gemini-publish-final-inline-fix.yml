@@ -1,0 +1,78 @@
+name: Publish final Gemini inline fix
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-publish-final-inline-fix.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/gemini-publish-final-inline-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Apply final script-tag extraction regression fix
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          build_path = Path('scripts/build-single-file.mjs')
+          build = build_path.read_text()
+          old_line = r'''  const scriptPattern = /<script\b[^>]*\bsrc=(["'])(.*?)\1[^>]*>\s*<\/script>/gi;'''
+          new_line = r'''  const scriptPattern = /^[\t ]*<script\b[^>]*\bsrc=(["'])(.*?)\1[^>]*>\s*<\/script>[\t ]*(?:\r?\n)?/gim;'''
+          if build.count(old_line) != 1:
+              raise SystemExit('Expected exactly one legacy script-tag pattern.')
+          build_path.write_text(build.replace(old_line, new_line, 1))
+
+          test_path = Path('tests/single-file-build.test.mjs')
+          tests = test_path.read_text()
+          marker = "  assert.ok(inlineScriptIndex > bodyIndex, 'inline JavaScript must execute after the body has been parsed');\n"
+          assertion = "  assert.doesNotMatch(html, /[ \\t]+$/m, 'generated output must not contain trailing whitespace');\n"
+          if tests.count(marker) != 1:
+              raise SystemExit('Expected exactly one inline-script placement assertion.')
+          if assertion in tests:
+              raise SystemExit('Trailing-whitespace assertion already exists unexpectedly.')
+          test_path.write_text(tests.replace(marker, marker + assertion, 1))
+          PY
+
+      - name: Build and verify final standalone application
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run check
+          npm run verify:single
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 1
+          test -f dist/gemini-podcast-studio.html
+          test ! -d .single-file-build
+          test "$(wc -c < dist/gemini-podcast-studio.html)" -eq 169376
+          git diff --check
+
+      - name: Commit final production output
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/gemini-publish-final-inline-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Harden standalone script inlining"
+          git push origin HEAD:agent/gemini-podcast-modular-source
