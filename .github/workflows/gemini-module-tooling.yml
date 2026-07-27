@@ -1,0 +1,29 @@
+name: Gemini module tooling
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-module-tooling.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package-tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install module migration tooling
+        run: npm install --no-save --no-package-lock @babel/parser @babel/traverse @babel/generator @babel/types
+      - name: Upload module migration tooling
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-module-tooling
+          path: node_modules
+          include-hidden-files: true
+          if-no-files-found: error
