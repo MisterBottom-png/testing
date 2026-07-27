@@ -41,7 +41,19 @@ jobs:
         run: npm test
 
       - name: Type check game core
-        run: npm run typecheck --workspace @corners/game-core
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck --workspace @corners/game-core 2>&1 | tee game-core-typecheck.log
+
+      - name: Upload game-core type-check log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: corners-game-core-typecheck-log
+          path: corners-web/game-core-typecheck.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Type check server
         run: npm run typecheck --workspace @corners/server
