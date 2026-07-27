@@ -120,8 +120,11 @@ export function installScriptUi(services) {
     } catch (error) {
       chunkError = error;
     }
-    services.els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 ? ' warning' : ''}`;
-    services.els.scriptValidation.textContent = chunkError ? chunkError.message : chunkCount > 1 ? `Script is ready and will be generated in ${chunkCount} TTS chunks.` : 'Script is ready for audio generation.';
+    const scriptWarnings = services.refreshScriptWarnings(services.appState.script);
+    const readinessMessage = chunkError ? chunkError.message : chunkCount > 1 ? `Script is ready and will be generated in ${chunkCount} TTS chunks.` : 'Script is ready for audio generation.';
+    const warningMessages = scriptWarnings.map(warning => warning.message);
+    services.els.scriptValidation.className = `validation-status${chunkError || chunkCount > 1 || warningMessages.length ? ' warning' : ''}`;
+    services.els.scriptValidation.textContent = [...warningMessages, readinessMessage].join(' ');
     services.els.generateAudioButton.disabled = Boolean(chunkError) || services.appState.busy;
   }
   function segmentMenu(index) {

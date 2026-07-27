@@ -76,7 +76,7 @@ test('script generation uses human names and never exposes Gemini voice identifi
 test('validated script dialogue preserves configured human names', () => {
   const { services } = createHarness();
   const script = services.validateScript({
-    title: 'Human names', summary: '', language: 'English', estimatedWords: 4,
+    title: 'Human names', summary: '',
     segments: [{ speaker: 'James', direction: '', text: 'Welcome.' }, { speaker: 'Anna', direction: '', text: 'Let us begin.' }]
   });
   assert.deepEqual(script.segments.map(segment => segment.speaker), ['James', 'Anna']);

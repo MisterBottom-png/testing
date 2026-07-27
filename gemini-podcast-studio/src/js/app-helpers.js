@@ -8,17 +8,42 @@ export function installAppHelpers(services) {
   function getLanguage() {
     return services.appState.podcast.language === 'custom' ? services.appState.podcast.customLanguage.trim() : services.appState.podcast.language;
   }
+  function getLanguageLocale(language = getLanguage()) {
+    return services.normaliseLanguageLocale(language);
+  }
   function getPodcastFormat() {
     return services.appState.podcast.format === 'custom' ? services.appState.podcast.customFormat.trim() : services.appState.podcast.format;
   }
-  function getWordCount(script = services.appState.script) {
-    return script?.segments?.reduce((total, segment) => total + (services.normaliseWhitespace(segment.text).match(/\S+/g) || []).length, 0) || 0;
+  function getWordCount(script = services.appState.script, locale = getLanguageLocale()) {
+    return script?.segments?.reduce((total, segment) => total + services.countWords(segment?.text, locale), 0) || 0;
   }
   function getEstimatedSeconds(words = getWordCount()) {
     return words / Math.max(1, services.appState.settings.speakingRate) * 60;
   }
+  function calculateTargetWords(durationMinutes = services.DEFAULT_DURATION_MINUTES, speakingRate = services.DEFAULT_SPEAKING_RATE) {
+    const duration = Math.max(0, Number(durationMinutes) || 0);
+    const rate = Math.max(1, Number(speakingRate) || services.DEFAULT_SPEAKING_RATE);
+    return Math.round(duration * rate);
+  }
   function getTargetWords() {
-    return Math.round(services.appState.podcast.durationMinutes * services.appState.settings.speakingRate);
+    return calculateTargetWords(services.appState.podcast.durationMinutes, services.appState.settings.speakingRate);
+  }
+  function calculateScriptOutputTokenLimit(targetWords = getTargetWords()) {
+    const dynamicLimit = Math.ceil(Math.max(0, Number(targetWords) || 0) * services.SCRIPT_TOKENS_PER_TARGET_WORD);
+    return Math.min(services.MAX_SCRIPT_OUTPUT_TOKENS, Math.max(services.MIN_SCRIPT_OUTPUT_TOKENS, dynamicLimit));
+  }
+  function getScriptOutputTokenLimit() {
+    return calculateScriptOutputTokenLimit(getTargetWords());
+  }
+  function calculateMaxScriptSegments(durationMinutes = services.appState.podcast.durationMinutes) {
+    const estimated = Math.ceil(Math.max(0, Number(durationMinutes) || 0) * services.SCRIPT_SEGMENTS_PER_MINUTE);
+    return Math.min(services.MAX_SCRIPT_SEGMENTS, Math.max(services.MIN_SCRIPT_SEGMENTS, estimated));
+  }
+  function getMaxScriptSegments() {
+    return calculateMaxScriptSegments(services.appState.podcast.durationMinutes);
+  }
+  function getScriptThinkingLevel(model = getTextModel()) {
+    return model === services.DEFAULT_TEXT_MODEL ? 'minimal' : 'low';
   }
   function voiceDescription(name) {
     return services.getGeminiTtsVoice(name)?.description || '';
@@ -67,10 +92,17 @@ export function installAppHelpers(services) {
     getTextModel,
     getTtsModel,
     getLanguage,
+    getLanguageLocale,
     getPodcastFormat,
     getWordCount,
     getEstimatedSeconds,
+    calculateTargetWords,
     getTargetWords,
+    calculateScriptOutputTokenLimit,
+    getScriptOutputTokenLimit,
+    calculateMaxScriptSegments,
+    getMaxScriptSegments,
+    getScriptThinkingLevel,
     voiceDescription,
     buildEpisodeFilename,
     downloadBlob,

@@ -1,4 +1,14 @@
 export function installScriptGeneration(services) {
+  function buildScriptRequestOptions(prompt, actionLabel) {
+    return {
+      prompt,
+      schema: services.buildScriptSchema(),
+      actionLabel,
+      maxOutputTokens: services.getScriptOutputTokenLimit(),
+      thinkingLevel: services.getScriptThinkingLevel(),
+      validate: services.validateScript
+    };
+  }
   async function generatePodcastScript() {
     services.syncCreateInputs();
     const namesBeforeValidation = services.appState.speakers.map(speaker => speaker.speakerName);
@@ -20,23 +30,23 @@ export function installScriptGeneration(services) {
     services.clearValidation();
     if (services.getDuplicateVoiceSignature() && !services.isDuplicateVoiceApproved()) return services.showDuplicateVoiceWarning();
     services.hideServiceError();
-    services.revokeAudioUrl();
-    services.appState.audioCacheReferences = {};
     services.appState.lastAction = 'generate-script';
     services.setBusy(true, 'script', services.SCRIPT_PROGRESS_MESSAGES);
     try {
-      services.appState.script = services.validateScript(await services.generateStructuredScript({
-        prompt: services.buildScriptPrompt(),
-        schema: services.buildScriptSchema(),
-        actionLabel: 'generating the podcast script'
-      }));
+      const generatedScript = await services.generateStructuredScript(buildScriptRequestOptions(
+        services.buildScriptPrompt(),
+        'generating the podcast script'
+      ));
+      services.revokeAudioUrl();
+      services.appState.audioCacheReferences = {};
+      services.appState.script = generatedScript;
       services.appState.legacyScript = null;
-      services.appState.originalScript = services.deepClone(services.appState.script);
+      services.appState.originalScript = services.deepClone(generatedScript);
       services.resetHistory();
       services.queueSave();
       services.setStage('script');
     } catch (error) {
-      services.handleGenerationError(error, 'Script generation failed', 'Try a clearer topic or select a different text model.', generatePodcastScript);
+      services.handleGenerationError(error, 'Script generation failed', 'Review the generation details and adjust the brief or model.', generatePodcastScript);
     } finally {
       services.setBusy(false);
     }
@@ -55,27 +65,26 @@ export function installScriptGeneration(services) {
     services.appState.lastAction = `refine:${action}`;
     services.hideServiceError();
     services.setBusy(true, 'refine', services.SCRIPT_PROGRESS_MESSAGES);
-    const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these human speaker names: ${services.buildScriptCharacters().map(character => character.name).join(' and ')}.\nNever replace them with Gemini voice identifiers.\nKeep all dialogue in ${services.getLanguage()}.\nKeep performance tags sparse and subtle.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(services.appState.script)}`;
+    const prompt = `Transform the existing podcast script according to this instruction:\n${instructions[action]}\n\nKeep exactly these human speaker names: ${services.buildScriptCharacters().map(character => character.name).join(' and ')}.\nNever replace them with Gemini voice identifiers.\nKeep all dialogue in ${services.getLanguage()}.\nKeep every spoken segment at or below ${services.MAX_SEGMENT_WORDS} words.\nUse only short TTS performance directions or an empty string.\nReturn only JSON matching the supplied schema.\n\nCURRENT SCRIPT\n${JSON.stringify(services.toStructuredScriptPayload())}`;
     try {
-      services.snapshotScript();
-      services.appState.script = services.validateScript(await services.generateStructuredScript({
+      const generatedScript = await services.generateStructuredScript(buildScriptRequestOptions(
         prompt,
-        schema: services.buildScriptSchema(),
-        actionLabel: 'refining the podcast script'
-      }));
-      services.snapshotScript({
-        force: true
-      });
+        'refining the podcast script'
+      ));
+      services.snapshotScript();
+      services.appState.script = generatedScript;
+      services.snapshotScript({ force: true });
       services.invalidatePodcastAudio('script-refined');
       services.queueSave();
       services.renderScriptStage();
     } catch (error) {
-      services.handleGenerationError(error, 'Script refinement failed', 'Try again or edit the script manually.', () => refineScript(action));
+      services.handleGenerationError(error, 'Script refinement failed', 'Review the generation details or edit the script manually.', () => refineScript(action));
     } finally {
       services.setBusy(false);
     }
   }
   Object.assign(services, {
+    buildScriptRequestOptions,
     generatePodcastScript,
     refineScript
   });
