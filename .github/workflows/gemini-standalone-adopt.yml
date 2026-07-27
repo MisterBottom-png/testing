@@ -73,9 +73,18 @@ jobs:
         working-directory: gemini-podcast-studio
         shell: bash
         run: |
+          set -o pipefail
           chromium_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           test -n "$chromium_path"
-          CHROMIUM_PATH="$chromium_path" npm run test:runtime
+          CHROMIUM_PATH="$chromium_path" npm run test:runtime 2>&1 | tee /tmp/gemini-runtime.log
+
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-runtime-diagnostics
+          path: /tmp/gemini-runtime.log
+          if-no-files-found: warn
 
       - name: Commit generated standalone build
         shell: bash
