@@ -44,7 +44,6 @@ jobs:
         run: npm run check
 
       - name: Commit refreshed production build
-        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
