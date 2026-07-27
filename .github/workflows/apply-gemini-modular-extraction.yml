@@ -1,20 +1,17 @@
 name: Apply Gemini modular extraction
 
 on:
-  push:
-    branches:
-      - agent/gemini-podcast-modular-source
-    paths:
-      - .github/workflows/apply-gemini-modular-extraction.yml
-      - .github/scripts/apply-gemini-modular-extraction.cjs
-      - .github/tmp/gemini-module-support.zip
   pull_request:
     branches:
       - main
     paths:
       - .github/workflows/apply-gemini-modular-extraction.yml
       - .github/scripts/apply-gemini-modular-extraction.cjs
-      - .github/tmp/gemini-module-support.zip
+      - .github/tmp/gemini-module-support.part-*
+
+concurrency:
+  group: gemini-modular-extraction
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -37,8 +34,10 @@ jobs:
       - name: Install extraction parser
         run: npm install --no-save --no-package-lock --prefix /tmp/gemini-tools typescript@5
 
-      - name: Verify support archive
-        run: unzip -t .github/tmp/gemini-module-support.zip
+      - name: Reconstruct verified support archive
+        run: |
+          cat .github/tmp/gemini-module-support.part-* | base64 --decode > /tmp/gemini-module-support.zip
+          unzip -t /tmp/gemini-module-support.zip
 
       - name: Extract ES modules mechanically
         env:
@@ -48,7 +47,7 @@ jobs:
       - name: Apply verified tests and documentation
         run: |
           rm -rf gemini-podcast-studio/tests
-          unzip -oq .github/tmp/gemini-module-support.zip -d gemini-podcast-studio
+          unzip -oq /tmp/gemini-module-support.zip -d gemini-podcast-studio
 
       - name: Confirm protected references are unchanged
         run: |
@@ -94,9 +93,11 @@ jobs:
           rm -f gemini-podcast-studio/package-lock.json
           rm -f .github/scripts/analyse-gemini-modules.mjs
           rm -f .github/workflows/gemini-module-analysis.yml
+          rm -f .github/workflows/gemini-module-tooling.yml
           rm -f .github/scripts/apply-gemini-modular-extraction.cjs
           rm -f .github/workflows/apply-gemini-modular-extraction.yml
           rm -f .github/tmp/gemini-module-support.zip
+          rm -f .github/tmp/gemini-module-support.part-*
           rmdir .github/tmp 2>/dev/null || true
 
       - name: Commit verified extraction
