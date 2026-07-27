@@ -1,5 +1,17 @@
 const BOARD_SIZE = 8;
-const PIECES_PER_PLAYER = 9;
+const DEFAULT_HOME_TYPE = '3x3';
+const DEFAULT_MOVEMENT_TYPE = 'classic';
+
+const HOME_TYPES = Object.freeze({
+  '3x3': { label: '3×3', description: 'Квадрат, 9 шашек' },
+  '3x4': { label: '3×4', description: 'Прямоугольник, 12 шашек' },
+  '1-2-3-4': { label: '1–2–3–4', description: 'Треугольник, 10 шашек' },
+});
+
+const MOVEMENT_TYPES = Object.freeze({
+  classic: { label: 'Классические', description: 'Только по вертикали и горизонтали' },
+  diagonal: { label: 'Диагональные', description: 'Также разрешены диагонали' },
+});
 
 const HOLES = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => ({
   x: index % BOARD_SIZE,
@@ -7,15 +19,63 @@ const HOLES = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => ({
 }));
 
 const INDEX_BY_COORD = new Map(HOLES.map((cell, index) => [`${cell.x},${cell.y}`, index]));
-const CAMPS = [
-  new Set(HOLES.map((cell, index) => (cell.x < 3 && cell.y < 3 ? index : -1)).filter((index) => index >= 0)),
-  new Set(HOLES.map((cell, index) => (cell.x >= 5 && cell.y >= 5 ? index : -1)).filter((index) => index >= 0)),
-];
 
-const STEP_DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const CAMP_CACHE = new Map();
+const ORTHOGONAL_DIRECTIONS = Object.freeze([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+const DIAGONAL_DIRECTIONS = Object.freeze([
+  ...ORTHOGONAL_DIRECTIONS,
+  [1, 1], [1, -1], [-1, 1], [-1, -1],
+]);
 
 function indexAt(x, y) {
   return INDEX_BY_COORD.get(`${x},${y}`) ?? -1;
+}
+
+function normalizeHomeType(homeType) {
+  return Object.hasOwn(HOME_TYPES, homeType) ? homeType : DEFAULT_HOME_TYPE;
+}
+
+function normalizeMovementType(movementType) {
+  return Object.hasOwn(MOVEMENT_TYPES, movementType) ? movementType : DEFAULT_MOVEMENT_TYPE;
+}
+
+function isHomeCell(homeType, player, cell) {
+  if (homeType === '3x4') {
+    return player === 0
+      ? cell.x <= 2 && cell.y <= 3
+      : cell.x >= 5 && cell.y >= 4;
+  }
+  if (homeType === '1-2-3-4') {
+    return player === 0 ? cell.x + cell.y <= 3 : cell.x + cell.y >= 11;
+  }
+  return player === 0
+    ? cell.x <= 2 && cell.y <= 2
+    : cell.x >= 5 && cell.y >= 5;
+}
+
+function getCamps(homeType = DEFAULT_HOME_TYPE) {
+  const normalized = normalizeHomeType(homeType);
+  if (!CAMP_CACHE.has(normalized)) {
+    CAMP_CACHE.set(normalized, [0, 1].map((player) => new Set(
+      HOLES
+        .map((cell, index) => (isHomeCell(normalized, player, cell) ? index : -1))
+        .filter((index) => index >= 0),
+    )));
+  }
+  return CAMP_CACHE.get(normalized);
+}
+
+const CAMPS = getCamps(DEFAULT_HOME_TYPE);
+const PIECES_PER_PLAYER = CAMPS[0].size;
+
+function getPieceCount(homeType = DEFAULT_HOME_TYPE) {
+  return getCamps(homeType)[0].size;
+}
+
+function directionsFor(state) {
+  return normalizeMovementType(state.movementType) === 'diagonal'
+    ? DIAGONAL_DIRECTIONS
+    : ORTHOGONAL_DIRECTIONS;
 }
 
 function cloneState(state) {
@@ -26,14 +86,19 @@ function cloneState(state) {
   };
 }
 
-function createInitialState(mode = 'local') {
+function createInitialState(mode = 'local', options = {}) {
+  const homeType = normalizeHomeType(options.homeType);
+  const movementType = normalizeMovementType(options.movementType);
+  const camps = getCamps(homeType);
   const pieces = Array(HOLES.length).fill(0);
-  for (const index of CAMPS[0]) pieces[index] = 1;
-  for (const index of CAMPS[1]) pieces[index] = 2;
+  for (const index of camps[0]) pieces[index] = 1;
+  for (const index of camps[1]) pieces[index] = 2;
   return {
-    version: 2,
+    version: 3,
     gameId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     mode,
+    homeType,
+    movementType,
     phase: 'playing',
     pieces,
     currentPlayer: 0,
@@ -52,7 +117,7 @@ function jumpDestinations(state, fromIndex) {
   while (queue.length) {
     const current = queue.shift();
     const cell = HOLES[current];
-    for (const [dx, dy] of STEP_DIRECTIONS) {
+    for (const [dx, dy] of directionsFor(state)) {
       const middle = indexAt(cell.x + dx, cell.y + dy);
       const landing = indexAt(cell.x + dx * 2, cell.y + dy * 2);
       if (middle < 0 || landing < 0 || state.pieces[middle] === 0) continue;
@@ -76,8 +141,7 @@ function getLegalDestinations(state, fromIndex, { ignoreTurn = false } = {}) {
 
   const from = HOLES[fromIndex];
   const results = new Set();
-
-  for (const [dx, dy] of STEP_DIRECTIONS) {
+  for (const [dx, dy] of directionsFor(state)) {
     const destination = indexAt(from.x + dx, from.y + dy);
     if (destination >= 0 && state.pieces[destination] === 0) results.add(destination);
   }
@@ -86,7 +150,7 @@ function getLegalDestinations(state, fromIndex, { ignoreTurn = false } = {}) {
 }
 
 function isWinningPosition(state, player) {
-  const targetCamp = CAMPS[player === 0 ? 1 : 0];
+  const targetCamp = getCamps(state.homeType)[player === 0 ? 1 : 0];
   for (const index of targetCamp) {
     if (state.pieces[index] !== player + 1) return false;
   }
@@ -126,21 +190,30 @@ function getAllLegalMoves(state, player = state.currentPlayer) {
   return moves;
 }
 
-function distanceToTarget(player, index) {
+function distanceToTarget(state, player, index) {
   const cell = HOLES[index];
-  const target = player === 0 ? { x: 6, y: 6 } : { x: 1, y: 1 };
-  return Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y);
+  const targetCamp = getCamps(state.homeType)[player === 0 ? 1 : 0];
+  let best = Infinity;
+  for (const targetIndex of targetCamp) {
+    const target = HOLES[targetIndex];
+    const dx = Math.abs(cell.x - target.x);
+    const dy = Math.abs(cell.y - target.y);
+    const distance = state.movementType === 'diagonal' ? Math.max(dx, dy) : dx + dy;
+    best = Math.min(best, distance);
+  }
+  return best;
 }
 
 function evaluateState(state, player) {
-  const ownTarget = CAMPS[player === 0 ? 1 : 0];
-  const ownHome = CAMPS[player];
+  const camps = getCamps(state.homeType);
+  const ownTarget = camps[player === 0 ? 1 : 0];
+  const ownHome = camps[player];
   let score = 0;
   for (let index = 0; index < state.pieces.length; index += 1) {
     if (state.pieces[index] !== player + 1) continue;
-    score -= distanceToTarget(player, index) * 8;
-    if (ownTarget.has(index)) score += 65;
-    if (!ownHome.has(index)) score += 5;
+    score -= distanceToTarget(state, player, index) * 9;
+    if (ownTarget.has(index)) score += 70;
+    if (!ownHome.has(index)) score += 6;
   }
   return score;
 }
@@ -159,7 +232,7 @@ function chooseBotMove(state, difficulty = 'smart') {
 
     const opponentMoves = getAllLegalMoves(simulated, simulated.currentPlayer);
     let opponentBest = -Infinity;
-    for (const response of opponentMoves.slice(0, 40)) {
+    for (const response of opponentMoves.slice(0, 48)) {
       const reply = cloneState(simulated);
       applyMove(reply, response.from, response.to);
       opponentBest = Math.max(opponentBest, evaluateState(reply, simulated.currentPlayer));
