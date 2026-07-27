@@ -93,7 +93,7 @@ async function inlineStylesheets(html) {
 }
 
 async function inlineScripts(html) {
-  const scriptPattern = /<script\b[^>]*\bsrc=(["'])(.*?)\1[^>]*>\s*<\/script>/gi;
+  const scriptPattern = /^[\t ]*<script\b[^>]*\bsrc=(["'])(.*?)\1[^>]*>\s*<\/script>[\t ]*(?:\r?\n)?/gim;
   const matches = [...html.matchAll(scriptPattern)];
   if (!matches.length) return html;
 

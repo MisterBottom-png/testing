@@ -147,6 +147,7 @@ test('single-file builder bundles, inlines, verifies and cleans temporary output
   const inlineScriptIndex = html.search(/<script\b(?![^>]*\bsrc=)/i);
   assert.ok(bodyIndex >= 0, 'standalone output must contain a body element');
   assert.ok(inlineScriptIndex > bodyIndex, 'inline JavaScript must execute after the body has been parsed');
+  assert.doesNotMatch(html, /[ \t]+$/m, 'generated output must not contain trailing whitespace');
   assert.doesNotMatch(html, /<script\b[^>]*\bsrc=/i);
   assert.doesNotMatch(html, /<link\b[^>]*\brel=["'][^"']*stylesheet/i);
   assert.doesNotMatch(html, /<script\b[^>]*\btype=["']module["']/i);
