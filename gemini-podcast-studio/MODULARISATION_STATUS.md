@@ -6,16 +6,15 @@
 - Preserved the five existing CSS layers without selector reordering or redesign.
 - Replaced the ordered classic-script list with one ES-module entry point.
 - Converted JavaScript responsibilities into focused modules with explicit exports.
-- Removed reliance on browser global declarations between source files.
-- Kept `main.js` as a thin composition root.
-- Passed application state and cross-module services explicitly.
 - Kept low-level Gemini transport, persistence, IndexedDB, PCM and WAV code independent of UI modules and the DOM.
-- Added tests for module boundaries, source entry-point parity and an acyclic static import graph.
-- Preserved the repository-root monolithic reference and frozen `dist/` output.
+- Added module-boundary and import-cycle regression tests.
+- Added a deterministic production bundle, HTML inlining and standalone-output verifier.
+- Generated one stable distribution at `dist/gemini-podcast-studio.html`.
+- Preserved the repository-root monolithic reference.
 
 ## Compatibility bridge still present
 
-The application-scoped service registry in `runtime.js` preserves existing late function decoration used by preview and final-review behaviour. It replaces implicit globals but is intentionally not a dependency-injection framework or a reason to rewrite working behaviour. Removing it requires a separate parity-focused refactor.
+The application-scoped service registry in `runtime.js` preserves existing late function decoration used by preview and final-review behaviour. Removing it requires a separate parity-focused refactor.
 
 ## Not included
 
@@ -24,4 +23,4 @@ The application-scoped service registry in `runtime.js` preserves existing late 
 - New TTS chunking behaviour.
 - New caching behaviour.
 - UI or wording optimisation.
-- Production single-file generation.
+- Free-tier optimisation.

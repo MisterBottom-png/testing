@@ -75,11 +75,12 @@ test('the static ES-module import graph is acyclic', async () => {
   for (const file of files) visit(file);
 });
 
-test('package scripts use Vite for modular development and do not refresh dist', async () => {
+test('package scripts preserve Vite development and produce the verified standalone distribution', async () => {
   const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   assert.equal(packageJson.scripts.dev, 'vite --host 0.0.0.0');
-  assert.equal(packageJson.scripts.build, 'vite build');
-  assert.equal(packageJson.scripts.preview, 'vite preview --host 0.0.0.0');
-  assert.equal(packageJson.scripts.check, 'npm run build && npm test');
-  assert.ok(!Object.values(packageJson.scripts).some(command => /build-single-file|verify-single-file/.test(command)), 'single-file pipeline must not be part of this phase');
+  assert.equal(packageJson.scripts.test, 'node --test tests/*.test.mjs');
+  assert.equal(packageJson.scripts.build, 'node scripts/build-single-file.mjs');
+  assert.equal(packageJson.scripts.preview, 'node scripts/serve-dist.mjs');
+  assert.equal(packageJson.scripts['verify:single'], 'node scripts/verify-single-file.mjs');
+  assert.equal(packageJson.scripts.check, 'npm test && npm run build');
 });

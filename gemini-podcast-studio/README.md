@@ -6,14 +6,19 @@ The editable application source lives under `src/` and runs as an explicit ES-mo
 - `src/styles/` preserves the existing CSS layers and cascade order.
 - `src/js/main.js` is the thin composition root.
 - `src/js/` contains focused modules with explicit exports and injected dependencies.
-- `dist/gemini-podcast-studio.html` is a frozen generated artefact and must not be edited manually in this phase.
-- The repository-root `podcast-studio.html` remains the temporary monolithic behavioural reference.
+- `dist/gemini-podcast-studio.html` is the generated, self-contained distribution.
+- The repository-root `podcast-studio.html` remains the original monolithic behavioural reference.
 
 ```bash
 npm install
 npm run dev
-npm run check
+npm test
+npm run build
+npm run verify:single
+npm run test:runtime
 npm run preview
 ```
 
-`npm run build` creates a normal Vite development bundle under `.vite-build/`. It does not refresh `dist/` or build a production single-file application.
+`npm run build` asks Vite to bundle `src/index.html` into `.single-file-build/`, inlines the generated CSS, JavaScript and local assets, writes `dist/gemini-podcast-studio.html`, verifies that it has no runtime application dependencies, and removes the temporary bundle.
+
+Do not edit `dist/gemini-podcast-studio.html` directly. Change `src/`, rebuild and review the generated diff.
