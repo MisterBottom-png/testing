@@ -7,6 +7,12 @@ on:
     paths:
       - .github/workflows/apply-gemini-modular-extraction.yml
       - .github/scripts/apply-gemini-modular-extraction.cjs
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-gemini-modular-extraction.yml
+      - .github/scripts/apply-gemini-modular-extraction.cjs
 
 permissions:
   contents: write
