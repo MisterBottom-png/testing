@@ -7,6 +7,22 @@
   <meta name="color-scheme" content="dark light">
   <title>Уголки · Multiplayer</title>
   <link rel="stylesheet" href="/game.css">
+  <style>
+    .token.blue{background:linear-gradient(145deg,#fff,#b9bec7)}
+    .token.red{background:linear-gradient(145deg,#666b74,#050608)}
+    .cell.home-blue{stroke:rgba(255,255,255,.88);stroke-width:3}
+    .cell.home-red{stroke:rgba(28,31,37,.95);stroke-width:4}
+    .piece.blue{fill:#f1f2f4}
+    .piece.red{fill:#111318}
+  </style>
+  <script>
+    try {
+      if (localStorage.getItem('corners-reference-layout-v1') !== '1') {
+        localStorage.removeItem('corners-game-save-v4');
+        localStorage.setItem('corners-reference-layout-v1', '1');
+      }
+    } catch {}
+  </script>
 </head>
 <body>
   <main class="app hidden" id="gameApp">
@@ -16,9 +32,9 @@
     </header>
     <section class="status-card">
       <div class="players">
-        <div class="player" id="player0"><div class="token blue"></div><div class="player-info"><div class="player-name" id="name0">Синие</div><div class="player-progress" id="progress0">В цели: 0/9</div></div></div>
+        <div class="player" id="player0"><div class="token blue"></div><div class="player-info"><div class="player-name" id="name0">Белые</div><div class="player-progress" id="progress0">В цели: 0/9</div></div></div>
         <div class="turn-pill" id="turnPill">Ход</div>
-        <div class="player" id="player1" style="justify-content:flex-end;text-align:right"><div class="player-info"><div class="player-name" id="name1">Красные</div><div class="player-progress" id="progress1">В цели: 0/9</div></div><div class="token red"></div></div>
+        <div class="player" id="player1" style="justify-content:flex-end;text-align:right"><div class="player-info"><div class="player-name" id="name1">Чёрные</div><div class="player-progress" id="progress1">В цели: 0/9</div></div><div class="token red"></div></div>
       </div>
     </section>
     <section class="board-card">
@@ -38,8 +54,8 @@
       <div class="modal-head"><div><h2>Уголки</h2><p class="lead">Выбери форму дома и правила движения, затем переведи все свои шашки в противоположный угол раньше соперника.</p></div></div>
       <button class="resume hidden" id="resumeBtn">Продолжить сохранённую партию</button>
       <div class="field-row">
-        <div class="field"><label for="blueName">Имя синих</label><input id="blueName" maxlength="18" value="Игрок 1"></div>
-        <div class="field"><label for="redName">Имя красных</label><input id="redName" maxlength="18" value="Игрок 2"></div>
+        <div class="field"><label for="blueName">Имя белых</label><input id="blueName" maxlength="18" value="Игрок 1"></div>
+        <div class="field"><label for="redName">Имя чёрных</label><input id="redName" maxlength="18" value="Игрок 2"></div>
       </div>
 
       <section class="setup-section" aria-labelledby="homeTypeTitle">
@@ -59,7 +75,7 @@
           </label>
           <label class="choice-card">
             <input type="radio" name="homeType" value="1-2-3-4">
-            <span class="mini-board" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i></span>
+            <span class="mini-board" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span>
             <span class="choice-copy"><strong>Дом 1–2–3–4</strong><small>10 шашек · треугольная гальма</small></span>
             <span class="choice-check">✓</span>
           </label>
@@ -86,7 +102,7 @@
 
       <div class="mode-grid">
         <button class="mode-btn" data-mode="local"><span class="mode-icon">👥</span><span><strong>На одном телефоне</strong><small>Передавайте устройство после каждого хода</small></span><span class="arrow">›</span></button>
-        <button class="mode-btn" data-mode="bot"><span class="mode-icon">◆</span><span><strong>Против компьютера</strong><small>Красными управляет тактический бот</small></span><span class="arrow">›</span></button>
+        <button class="mode-btn" data-mode="bot"><span class="mode-icon">◆</span><span><strong>Против компьютера</strong><small>Чёрными управляет тактический бот</small></span><span class="arrow">›</span></button>
         <button class="mode-btn" id="onlineModeBtn"><span class="mode-icon">⌁</span><span><strong>Онлайн P2P</strong><small>Два телефона, без регистрации и сервера игры</small></span><span class="arrow">›</span></button>
       </div>
       <div class="field" style="margin-top:14px"><label for="difficulty">Сложность компьютера</label><select id="difficulty"><option value="easy">Спокойная</option><option value="smart" selected>Тактическая</option></select></div>
