@@ -21,5 +21,16 @@
  D audit-output/single-file-verify.status
  D audit-output/source-parts.sha256
  D audit-output/source.tar.gz.b64.part-aa
+ D audit-output/source.tar.gz.b64.part-ab
+ D audit-output/source.tar.gz.b64.part-ac
+ D audit-output/source.tar.gz.b64.part-ad
+ D audit-output/source.tar.gz.b64.part-ae
+ D audit-output/source.tar.gz.b64.part-af
+ D audit-output/source.tar.gz.b64.part-ag
+ D audit-output/source.tar.gz.b64.part-ah
+ D audit-output/source.tar.gz.b64.part-ai
+ D audit-output/source.tar.gz.b64.part-aj
+ D audit-output/source.tar.gz.b64.part-ak
+ D audit-output/source.tar.gz.b64.part-al
  D audit-output/suspicious-patterns.status
  D audit-output/suspicious-patterns.txt

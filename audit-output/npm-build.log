@@ -10,5 +10,5 @@ computing gzip size...
 [2m../.single-file-build/[22m[32mindex.html        [39m[1m[2m 17.79 kB[22m[1m[22m[2m │ gzip:  4.13 kB[22m
 [2m../.single-file-build/[22m[2massets/[22m[35mstyle.css  [39m[1m[2m 22.55 kB[22m[1m[22m[2m │ gzip:  5.45 kB[22m
 [2m../.single-file-build/[22m[2massets/[22m[36mapp.js     [39m[1m[2m138.14 kB[22m[1m[22m[2m │ gzip: 40.19 kB[22m
-[32m✓ built in 680ms[39m
+[32m✓ built in 626ms[39m
 Built dist/gemini-podcast-studio.html (178555 bytes).
