@@ -1,0 +1,43 @@
+name: Gemini Podcast Studio bug repairs RED
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-bug-repairs
+    paths:
+      - gemini-podcast-studio/tests/bug-repairs.test.mjs
+      - .github/workflows/gemini-bug-repairs-red.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-bug-repairs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: gemini-podcast-studio
+        run: npm install --no-audit --no-fund
+      - name: Confirm regression suite is red
+        working-directory: gemini-podcast-studio
+        shell: bash
+        run: |
+          set +e
+          node --test tests/bug-repairs.test.mjs > /tmp/red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/red.log
+          if [ "$status" -eq 0 ]; then
+            echo "Regression suite unexpectedly passed before repairs." >&2
+            exit 1
+          fi
+          grep -q "failed audio regeneration preserves" /tmp/red.log
+          grep -q "TTS transport retries transient" /tmp/red.log
+          echo "RED confirmed: audited defects reproduce before production changes."
