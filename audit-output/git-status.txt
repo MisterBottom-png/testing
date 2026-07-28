@@ -1,1 +1,25 @@
-?? audit-output/
+ D audit-output/dist-files.txt
+ D audit-output/dist-size.txt
+ D audit-output/dom-id-audit.status
+ D audit-output/dom-id-audit.txt
+ D audit-output/file-manifest.txt
+ M audit-output/git-status.txt
+ M audit-output/head-sha.txt
+ D audit-output/node-check.log
+ D audit-output/node-check.status
+ D audit-output/npm-audit.json
+ D audit-output/npm-audit.status
+ D audit-output/npm-build.log
+ D audit-output/npm-build.status
+ D audit-output/npm-install.log
+ D audit-output/npm-install.status
+ D audit-output/npm-test.log
+ D audit-output/npm-test.status
+ D audit-output/runtime-smoke.log
+ D audit-output/runtime-smoke.status
+ D audit-output/single-file-verify.log
+ D audit-output/single-file-verify.status
+ D audit-output/source-parts.sha256
+ D audit-output/source.tar.gz.b64.part-aa
+ D audit-output/suspicious-patterns.status
+ D audit-output/suspicious-patterns.txt
