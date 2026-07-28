@@ -38,15 +38,13 @@ jobs:
       - name: Apply deterministic velocity repair
         run: python .github/scripts/repair-drum-kit-bugfix-task1-runner.py
 
-      - name: Commit source repair and restore CI
+      - name: Commit source repair
         run: |
-          git checkout origin/main -- .github/workflows/drum-kit-android-validation.yml
-          rm -f .github/workflows/drum-kit-bugfix-task1.yml
-          rm -f .github/scripts/apply-drum-kit-bugfix-task1.py
-          rm -f .github/scripts/repair-drum-kit-bugfix-task1-runner.py
-          rm -f task1-runner.txt task1-tests.txt task1-runner.log task1-tests.log
           git config user.name "chatgpt-bugfix-agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add drum-kit-android/core-model/src/main/java/com/vitautas/drumkit/model/KitModels.kt
+          git add drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/DrumSurfaceView.kt
+          git add drum-kit-android/engine-input/src/main/java/com/vitautas/drumkit/input/StrikeVelocityEstimator.kt
+          git add drum-kit-android/engine-input/src/test/java/com/vitautas/drumkit/input/StrikeVelocityEstimatorTest.kt
           git commit -m "fix: make drum strike velocity deterministic"
           git push origin HEAD:agent/drum-kit-current-bug-fixes
