@@ -43,7 +43,12 @@ const MAX_DIRECTION_CHARACTERS = 120;
     if (supportedModels.includes(selected)) return { selection: selected, customValue: '' };
     return { selection: fallbackModel, customValue: '' };
   }
-  const DEFAULT_MAX_TTS_CHARACTERS = 12000;
+  // Gemini 3.1 Flash TTS Preview has an 8,192-token input context. A tested
+  // 24,000-character request target leaves headroom for tokenisation variance
+  // while avoiding the unnecessary requests caused by the former 12,000 limit.
+  const DEFAULT_MAX_TTS_CHARACTERS = 24000;
+  const MIN_TTS_CHUNK_CHARACTERS = 4000;
+  const MAX_TTS_CHUNK_CHARACTERS = 30000;
   const MAX_HISTORY = 30;
   const SCRIPT_PROGRESS_MESSAGES = ['Planning the episode…', 'Defining the discussion…', 'Writing the dialogue…', 'Checking the structure…'];
   const AUDIO_PROGRESS_MESSAGES = ['Preparing the transcript…', 'Assigning character voices…', 'Generating the conversation…', 'Processing the audio…'];
@@ -351,6 +356,8 @@ const MAX_DIRECTION_CHARACTERS = 120;
     isValidCustomModelId,
     normaliseModelSelection,
     DEFAULT_MAX_TTS_CHARACTERS,
+    MIN_TTS_CHUNK_CHARACTERS,
+    MAX_TTS_CHUNK_CHARACTERS,
     MAX_HISTORY,
     SCRIPT_PROGRESS_MESSAGES,
     AUDIO_PROGRESS_MESSAGES,
