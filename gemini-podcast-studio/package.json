@@ -9,8 +9,8 @@
     "build": "node scripts/build-single-file.mjs",
     "preview": "node scripts/serve-dist.mjs",
     "verify:single": "node scripts/verify-single-file.mjs",
-    "test:runtime": "node scripts/runtime-smoke.mjs",
-    "check": "npm test && npm run build"
+    "test:runtime": "node scripts/runtime-smoke-repaired.mjs",
+    "check": "npm test && npm run build && npm run verify:single && npm run test:runtime"
   },
   "devDependencies": {
     "vite": "^7.0.0"
