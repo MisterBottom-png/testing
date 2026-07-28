@@ -1,6 +1,7 @@
 package com.vitautas.drumkit
 
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,8 @@ class MainActivity : ComponentActivity() {
     private val audioAvailableState = mutableStateOf(true)
     private val kitSessionController = DrumKitSessionController()
     private lateinit var audioSessionController: AudioSessionController
+    private var diagnosticTouchObserver: DiagnosticTouchObserver? = null
+    private var diagnosticLifecycleObserver: DiagnosticLifecycleObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,31 +32,73 @@ class MainActivity : ComponentActivity() {
         audioSessionController = AudioSessionController(this) { available ->
             audioAvailableState.value = available
         }
-        val showDiagnostics = BuildConfig.DEBUG
         setContent {
             NativeDrumKitTheme {
-                DrumKitScreen(
-                    onStrike = AudioEngine::trigger,
-                    onMasterVolumeChanged = AudioEngine::setMasterVolume,
-                    onRoomMixChanged = AudioEngine::setRoomMix,
-                    diagnosticsProvider = AudioEngine::diagnostics,
-                    sessionController = kitSessionController,
-                    audioAvailable = audioAvailableState.value,
-                    showDiagnostics = showDiagnostics,
-                )
+                if (BuildConfig.DEBUG) {
+                    DiagnosticDrumKitScreen(
+                        sessionController = kitSessionController,
+                        audioAvailable = audioAvailableState.value,
+                        onTouchObserverChanged = { observer -> diagnosticTouchObserver = observer },
+                        onPerformanceLifecycleObserverChanged = { observer ->
+                            diagnosticLifecycleObserver = observer
+                        },
+                    )
+                } else {
+                    DrumKitScreen(
+                        onStrike = AudioEngine::trigger,
+                        onMasterVolumeChanged = AudioEngine::setMasterVolume,
+                        onRoomMixChanged = AudioEngine::setRoomMix,
+                        diagnosticsProvider = AudioEngine::diagnostics,
+                        sessionController = kitSessionController,
+                        audioAvailable = audioAvailableState.value,
+                        showDiagnostics = false,
+                    )
+                }
             }
         }
     }
 
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(event)
+        if (BuildConfig.DEBUG) {
+            diagnosticTouchObserver?.invoke(event, window.decorView.width, window.decorView.height)
+        }
+        return handled
+    }
+
     override fun onStart() {
         super.onStart()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.START)
         audioSessionController.start()
     }
 
+    override fun onResume() {
+        super.onResume()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.RESUME)
+    }
+
+    override fun onPause() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.PAUSE)
+        super.onPause()
+    }
+
     override fun onStop() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.STOP)
         kitSessionController.onAppStopping()
         audioSessionController.stop()
         super.onStop()
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.RESTART)
+    }
+
+    override fun onDestroy() {
+        diagnosticLifecycleObserver?.invoke(DiagnosticLifecycleEvent.DESTROY)
+        diagnosticTouchObserver = null
+        diagnosticLifecycleObserver = null
+        super.onDestroy()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

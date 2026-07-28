@@ -17,6 +17,9 @@ namespace {
 
 constexpr int kChannelCount = 2;
 constexpr int kEventCapacity = 128;
+constexpr int kDiagnosticOutcomeCapacity = 512;
+constexpr int kDiagnosticOutcomeIntFieldCount = 5;
+constexpr int kDiagnosticOutcomeFloatFieldCount = 3;
 constexpr int kMaxVoices = 48;
 constexpr int kDelayBufferSize = 65536;
 constexpr int kSnareArticulationCount = 5;
@@ -32,12 +35,32 @@ constexpr float kLimiterRelease = 0.00045f;
 constexpr char kSnareAssetPath[] = "snare/snare-bank.pcm";
 constexpr std::array<char, 8> kBankMagic = {'S', 'N', 'A', 'R', 'E', 'P', 'C', 'M'};
 
+enum TriggerStatus : int {
+    kTriggerEngineStopped = 0,
+    kTriggerInvalidInput = 1,
+    kTriggerQueueFull = 2,
+    kTriggerEnqueued = 3,
+};
+
 struct StrikeEvent {
     int instrument = 0;
     int articulation = 0;
     float velocity = 0.8f;
     float x = 0.5f;
     float y = 0.5f;
+    uint64_t diagnosticToken = 0;
+};
+
+struct NativeDispatchOutcome {
+    uint64_t diagnosticToken = 0;
+    int lowerRoundRobinIndex = -1;
+    int upperRoundRobinIndex = -1;
+    int activeVoiceCount = 0;
+    bool voiceStealOccurred = false;
+    bool sampledVoice = false;
+    float pitchVariation = 0.0f;
+    float gainVariation = 0.0f;
+    float filterVariation = 0.0f;
 };
 
 struct StereoSample {
@@ -198,6 +221,11 @@ struct Voice {
     std::array<SamplePlayback, 2> sampleLayers{};
 };
 
+struct VoiceAcquisition {
+    Voice* voice = nullptr;
+    bool stoleVoice = false;
+};
+
 class NativeAudioEngine final : public oboe::AudioStreamDataCallback,
                                 public oboe::AudioStreamErrorCallback {
 public:
@@ -239,25 +267,26 @@ public:
         }
     }
 
-    void trigger(
+    int trigger(
         int instrument,
         int articulation,
         float velocity,
         float x,
-        float y
+        float y,
+        uint64_t diagnosticToken
     ) {
         if (!running_.load(std::memory_order_acquire)) {
-            return;
+            return kTriggerEngineStopped;
         }
         if (!std::isfinite(velocity) || !std::isfinite(x) ||
             !std::isfinite(y)) {
-            return;
+            return kTriggerInvalidInput;
         }
 
         const auto write = writeIndex_.load(std::memory_order_relaxed);
         const auto next = (write + 1U) % kEventCapacity;
         if (next == readIndex_.load(std::memory_order_acquire)) {
-            return;
+            return kTriggerQueueFull;
         }
 
         events_[write] = StrikeEvent{
@@ -270,8 +299,48 @@ public:
             .velocity = std::clamp(velocity, 0.05f, 1.0f),
             .x = std::clamp(x, 0.0f, 1.0f),
             .y = std::clamp(y, 0.0f, 1.0f),
+            .diagnosticToken = diagnosticToken,
         };
         writeIndex_.store(next, std::memory_order_release);
+        return kTriggerEnqueued;
+    }
+
+    int drainDiagnosticOutcomes(
+        jlong* tokens,
+        jint* integers,
+        jfloat* floats,
+        int capacity
+    ) {
+        if (tokens == nullptr || integers == nullptr || floats == nullptr ||
+            capacity <= 0) {
+            return 0;
+        }
+
+        auto read = diagnosticOutcomeReadIndex_.load(std::memory_order_relaxed);
+        const auto write = diagnosticOutcomeWriteIndex_.load(std::memory_order_acquire);
+        int count = 0;
+        while (read != write && count < capacity) {
+            const auto& outcome = diagnosticOutcomes_[read];
+            const int integerOffset = count * kDiagnosticOutcomeIntFieldCount;
+            const int floatOffset = count * kDiagnosticOutcomeFloatFieldCount;
+            tokens[count] = static_cast<jlong>(outcome.diagnosticToken);
+            integers[integerOffset] = outcome.lowerRoundRobinIndex;
+            integers[integerOffset + 1] = outcome.upperRoundRobinIndex;
+            integers[integerOffset + 2] = outcome.activeVoiceCount;
+            integers[integerOffset + 3] = outcome.voiceStealOccurred ? 1 : 0;
+            integers[integerOffset + 4] = outcome.sampledVoice ? 1 : 0;
+            floats[floatOffset] = outcome.pitchVariation;
+            floats[floatOffset + 1] = outcome.gainVariation;
+            floats[floatOffset + 2] = outcome.filterVariation;
+            read = (read + 1U) % kDiagnosticOutcomeCapacity;
+            count += 1;
+        }
+        diagnosticOutcomeReadIndex_.store(read, std::memory_order_release);
+        return count;
+    }
+
+    int droppedDiagnosticOutcomeCount() const {
+        return droppedDiagnosticOutcomeCount_.load(std::memory_order_acquire);
     }
 
     void setMasterVolume(float value) {
@@ -463,6 +532,9 @@ private:
     void clearRealtimeState() {
         readIndex_.store(0, std::memory_order_relaxed);
         writeIndex_.store(0, std::memory_order_relaxed);
+        diagnosticOutcomeReadIndex_.store(0, std::memory_order_relaxed);
+        diagnosticOutcomeWriteIndex_.store(0, std::memory_order_relaxed);
+        droppedDiagnosticOutcomeCount_.store(0, std::memory_order_relaxed);
         delayLeft_.fill(0.0f);
         delayRight_.fill(0.0f);
         delayIndex_ = 0;
@@ -486,25 +558,51 @@ private:
         readIndex_.store(read, std::memory_order_release);
     }
 
-    Voice& acquireVoice() {
+    VoiceAcquisition acquireVoice() {
         for (auto& voice : voices_) {
             if (!voice.active) {
-                return voice;
+                return VoiceAcquisition{
+                    .voice = &voice,
+                    .stoleVoice = false,
+                };
             }
         }
-        return voices_[voiceStealIndex_++ % voices_.size()];
+        return VoiceAcquisition{
+            .voice = &voices_[voiceStealIndex_++ % voices_.size()],
+            .stoleVoice = true,
+        };
     }
 
     void startVoice(const StrikeEvent& event) {
-        Voice& voice = acquireVoice();
+        const VoiceAcquisition acquisition = acquireVoice();
+        if (acquisition.voice == nullptr) {
+            return;
+        }
+
+        NativeDispatchOutcome outcome{
+            .diagnosticToken = event.diagnosticToken,
+            .voiceStealOccurred = acquisition.stoleVoice,
+        };
+        NativeDispatchOutcome* outcomeTarget =
+            event.diagnosticToken == 0U ? nullptr : &outcome;
+
         if (event.instrument == kSnareInstrument) {
-            startSnareVoice(voice, event);
+            startSnareVoice(*acquisition.voice, event, outcomeTarget);
         } else {
-            startSynthVoice(voice, event);
+            startSynthVoice(*acquisition.voice, event);
+        }
+
+        if (outcomeTarget != nullptr) {
+            outcome.activeVoiceCount = activeVoiceCount();
+            publishDiagnosticOutcome(outcome);
         }
     }
 
-    void startSnareVoice(Voice& voice, const StrikeEvent& event) {
+    void startSnareVoice(
+        Voice& voice,
+        const StrikeEvent& event,
+        NativeDispatchOutcome* outcome
+    ) {
         voice = Voice{};
         voice.active = true;
         voice.sampled = true;
@@ -543,15 +641,16 @@ private:
             static_cast<float>(kSnareSourceSampleRate) / outputRate *
             pitchVariation;
 
-        configureSampleLayer(
+        const int lowerRoundRobin = configureSampleLayer(
             voice.sampleLayers[0],
             event.articulation,
             lowerLayer,
             lowerWeight * gainVariation * velocityGain,
             increment
         );
+        int upperRoundRobin = -1;
         if (upperLayer != lowerLayer && upperWeight > 0.0001f) {
-            configureSampleLayer(
+            upperRoundRobin = configureSampleLayer(
                 voice.sampleLayers[1],
                 event.articulation,
                 upperLayer,
@@ -567,15 +666,25 @@ private:
             0.91f,
             0.85f,
         };
+        const float filterBase =
+            kFilterBase[static_cast<size_t>(event.articulation)];
         voice.filterCoefficient = std::clamp(
-            kFilterBase[static_cast<size_t>(event.articulation)] +
-                randomSigned() * 0.018f,
+            filterBase + randomSigned() * 0.018f,
             0.68f,
             0.96f
         );
+
+        if (outcome != nullptr) {
+            outcome->sampledVoice = true;
+            outcome->lowerRoundRobinIndex = lowerRoundRobin;
+            outcome->upperRoundRobinIndex = upperRoundRobin;
+            outcome->pitchVariation = pitchVariation;
+            outcome->gainVariation = gainVariation;
+            outcome->filterVariation = voice.filterCoefficient - filterBase;
+        }
     }
 
-    void configureSampleLayer(
+    int configureSampleLayer(
         SamplePlayback& playback,
         int articulation,
         int layer,
@@ -601,6 +710,7 @@ private:
         playback.increment = increment;
         playback.gain = gain;
         playback.active = true;
+        return roundRobin;
     }
 
     void startSynthVoice(Voice& voice, const StrikeEvent& event) {
@@ -625,6 +735,29 @@ private:
             -1.0f /
             (instrumentDecay(event.instrument) * static_cast<float>(rate))
         );
+    }
+
+    int activeVoiceCount() const {
+        return static_cast<int>(std::count_if(
+            voices_.begin(),
+            voices_.end(),
+            [](const Voice& voice) { return voice.active; }
+        ));
+    }
+
+    void publishDiagnosticOutcome(const NativeDispatchOutcome& outcome) {
+        if (outcome.diagnosticToken == 0U) {
+            return;
+        }
+        const auto write =
+            diagnosticOutcomeWriteIndex_.load(std::memory_order_relaxed);
+        const auto next = (write + 1U) % kDiagnosticOutcomeCapacity;
+        if (next == diagnosticOutcomeReadIndex_.load(std::memory_order_acquire)) {
+            droppedDiagnosticOutcomeCount_.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        diagnosticOutcomes_[write] = outcome;
+        diagnosticOutcomeWriteIndex_.store(next, std::memory_order_release);
     }
 
     StereoSample renderVoice(Voice& voice, int sampleRate) {
@@ -845,6 +978,12 @@ private:
     std::atomic<uint32_t> readIndex_{0};
     std::atomic<uint32_t> writeIndex_{0};
 
+    std::array<NativeDispatchOutcome, kDiagnosticOutcomeCapacity>
+        diagnosticOutcomes_{};
+    std::atomic<uint32_t> diagnosticOutcomeReadIndex_{0};
+    std::atomic<uint32_t> diagnosticOutcomeWriteIndex_{0};
+    std::atomic<int> droppedDiagnosticOutcomeCount_{0};
+
     std::array<Voice, kMaxVoices> voices_{};
     size_t voiceStealIndex_ = 0;
     uint32_t randomState_ = 0x12345678U;
@@ -883,7 +1022,7 @@ Java_com_vitautas_drumkit_audio_AudioEngine_nativeStop(
     engine.stop();
 }
 
-extern "C" JNIEXPORT void JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_com_vitautas_drumkit_audio_AudioEngine_nativeTrigger(
     JNIEnv* env,
     jobject instance,
@@ -891,17 +1030,85 @@ Java_com_vitautas_drumkit_audio_AudioEngine_nativeTrigger(
     jint articulation,
     jfloat velocity,
     jfloat normalizedX,
-    jfloat normalizedY
+    jfloat normalizedY,
+    jlong diagnosticToken
 ) {
     (void)env;
     (void)instance;
-    engine.trigger(
+    const uint64_t safeDiagnosticToken = diagnosticToken > 0
+        ? static_cast<uint64_t>(diagnosticToken)
+        : 0U;
+    return engine.trigger(
         instrument,
         articulation,
         velocity,
         normalizedX,
-        normalizedY
+        normalizedY,
+        safeDiagnosticToken
     );
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_vitautas_drumkit_audio_AudioEngine_nativeDrainDiagnosticDispatchOutcomes(
+    JNIEnv* env,
+    jobject instance,
+    jlongArray tokenArray,
+    jintArray integerArray,
+    jfloatArray floatArray
+) {
+    (void)instance;
+    if (tokenArray == nullptr || integerArray == nullptr || floatArray == nullptr) {
+        return 0;
+    }
+
+    const jsize tokenLength = env->GetArrayLength(tokenArray);
+    const jsize integerLength = env->GetArrayLength(integerArray);
+    const jsize floatLength = env->GetArrayLength(floatArray);
+    const int capacity = std::min({
+        static_cast<int>(tokenLength),
+        static_cast<int>(integerLength) / kDiagnosticOutcomeIntFieldCount,
+        static_cast<int>(floatLength) / kDiagnosticOutcomeFloatFieldCount,
+    });
+    if (capacity <= 0) {
+        return 0;
+    }
+
+    jlong* tokens = env->GetLongArrayElements(tokenArray, nullptr);
+    jint* integers = env->GetIntArrayElements(integerArray, nullptr);
+    jfloat* floats = env->GetFloatArrayElements(floatArray, nullptr);
+    if (tokens == nullptr || integers == nullptr || floats == nullptr) {
+        if (tokens != nullptr) {
+            env->ReleaseLongArrayElements(tokenArray, tokens, 0);
+        }
+        if (integers != nullptr) {
+            env->ReleaseIntArrayElements(integerArray, integers, 0);
+        }
+        if (floats != nullptr) {
+            env->ReleaseFloatArrayElements(floatArray, floats, 0);
+        }
+        return 0;
+    }
+
+    const int count = engine.drainDiagnosticOutcomes(
+        tokens,
+        integers,
+        floats,
+        capacity
+    );
+    env->ReleaseLongArrayElements(tokenArray, tokens, 0);
+    env->ReleaseIntArrayElements(integerArray, integers, 0);
+    env->ReleaseFloatArrayElements(floatArray, floats, 0);
+    return count;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_vitautas_drumkit_audio_AudioEngine_nativeGetDroppedDiagnosticOutcomeCount(
+    JNIEnv* env,
+    jobject instance
+) {
+    (void)env;
+    (void)instance;
+    return engine.droppedDiagnosticOutcomeCount();
 }
 
 extern "C" JNIEXPORT void JNICALL

@@ -64,4 +64,5 @@ jobs:
           :engine-input:testDebugUnitTest
           :engine-audio:testDebugUnitTest
           :feature-kit:testDebugUnitTest
+          :app:testDebugUnitTest
           :app:compileDebugKotlin

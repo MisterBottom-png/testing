@@ -433,7 +433,7 @@ object StudioKitDefinition {
                 HitRegionInsets(left = 0.06f, top = 0.08f, right = 0.06f, bottom = 0.08f)
 
             InstrumentId.KICK ->
-                HitRegionInsets(left = 0.18f, top = 0.18f, right = 0.08f, bottom = 0.10f)
+                HitRegionInsets(left = 0.18f, top = 0.10f, right = 0.08f, bottom = 0.10f)
         }
         val hitBounds = inset(surfaceBounds, insets)
         return EllipseHitRegion(bounds = hitBounds)
@@ -487,7 +487,6 @@ object StudioKitDefinition {
             pan = pan,
         )
     }
-
 }
 
 data class DrumStrike(

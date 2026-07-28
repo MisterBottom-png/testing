@@ -30,8 +30,8 @@ The application is already functional. The remaining work is primarily repositor
 
 ## Implementation Status
 
-- **Step 1.1 — partially complete (2026-07-25):** PRs #7, #8, and #9 were audited. PR #9 now targets `main` as the authoritative implementation line. PR #8 is included by ancestry; PR #7's required sample-first snare, tooling, attribution, tests, and workflow capabilities are present or superseded in PR #9. The roadmap, `README.md`, `AGENTS.md`, and `docs/source-mapping.md` are aligned. The updated head passes JVM quick checks, Android unit/Kotlin validation, and Android lint. PRs #7 and #8 are closed as superseded. A fresh exact-head APK build is queued; physical-device installation, launch, audio-start diagnostics, and multi-touch acceptance have not been rerun after consolidation.
-- **Step 1.2 — not started:** no diagnostic-session recorder implementation has begun.
+- **Step 1.1 — complete (2026-07-25):** PR #9 was squash-merged into `main` as `fb926431c0d279a5024caafc1085225995c693b6`. PRs #7 and #8 were audited, marked superseded, and closed. The roadmap and production-renderer documentation are aligned. JVM checks, Android unit/Kotlin validation, lint, native arm64 compilation, snare-bank verification, and fresh APK assembly passed. Physical-device installation, launch, audio output, multi-touch behaviour, and valid audio diagnostics were confirmed by the user.
+- **Step 1.2 — partially complete (2026-07-25):** PR #10 adds a debug-only diagnostic-session foundation with start/stop controls, accepted-strike capture after audio dispatch, periodic audio diagnostics, user markers, device/build metadata, fixed-capacity buffers with dropped-data counters, background ZIP/checksum export, and unit tests. Raw accepted/rejected touch logging, articulation/sample-selection tracing, rendering telemetry, native generated-output WAV capture, guided tests, lifecycle recovery, explicit share/save, deletion, and physical-device bundle review remain.
 
 ---
 

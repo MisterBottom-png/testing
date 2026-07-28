@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val gitCommitSha = providers.environmentVariable("DRUM_KIT_GIT_SHA")
+    .orElse(providers.environmentVariable("GITHUB_SHA"))
+    .orElse("unknown")
+
 android {
     namespace = "com.vitautas.drumkit"
     compileSdk = 37
@@ -14,6 +18,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "GIT_COMMIT_SHA", "\"${gitCommitSha.get()}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,4 +75,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }

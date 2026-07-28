@@ -111,6 +111,21 @@ class HitRegionTest {
     }
 
     @Test
+    fun physicalDeviceKickFacePointsResolveToKick() {
+        val deviceAspectRatio = 2_340f / 1_080f
+        val recordedMissedHitPoints = listOf(
+            0.48266602f to 0.5500488f,
+            0.5253906f to 0.5317383f,
+            0.5671387f to 0.53759766f,
+        )
+
+        for ((x, y) in recordedMissedHitPoints) {
+            assertEquals(1, StudioKitDefinition.matchingInstrumentCount(x, y, deviceAspectRatio))
+            assertEquals(InstrumentId.KICK, StudioKitDefinition.hitTest(x, y, deviceAspectRatio)?.id)
+        }
+    }
+
+    @Test
     fun rackTomsFlankKickAndPlayerSidePiecesRemainReachable() {
         val highTom = definition(InstrumentId.TOM_HIGH).layout.drawBounds
         val midTom = definition(InstrumentId.TOM_MID).layout.drawBounds
