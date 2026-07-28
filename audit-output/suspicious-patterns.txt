@@ -1,0 +1,24 @@
+src/js/conversation-preview.js:316:    } catch {}
+src/js/conversation-preview.js:319:    } catch {}
+src/js/preferences.js:20:    } catch {}
+src/js/final-review.js:302:    } catch {}
+src/js/voice-preview.js:127:    } catch {}
+src/js/voice-preview.js:130:    } catch {}
+src/js/voice-preview.js:231:      } catch {}
+src/js/voice-preview.js:430:    services.clearVoicePreviewCache().catch(error => console.warn('Voice preview cache could not be cleared.', error));
+scripts/verify-single-file.mjs:166:    console.log(`Single-file verification passed: ${path.relative(projectRoot, result.outputPath)} (${result.sizeBytes} bytes).`);
+scripts/verify-single-file.mjs:168:    console.error(error.message);
+scripts/serve-dist.mjs:47:    console.log(`Serving dist/${STABLE_OUTPUT_FILENAME} at ${running.url}`);
+scripts/serve-dist.mjs:55:    console.error(error.stack ?? error.message);
+scripts/build-single-file.mjs:173:    if (!silent) console.log(`Built ${path.relative(projectRoot, outputPath)} (${verified.sizeBytes} bytes).`);
+scripts/build-single-file.mjs:184:    console.error(error.stack ?? error.message);
+scripts/runtime-smoke.mjs:103:    } catch {}
+scripts/runtime-smoke.mjs:141:        console.error(`CDP event handler failed for ${message.method}: ${error.message}`);
+scripts/runtime-smoke.mjs:233:        console.warn(`Unable to remove Chromium profile directory after retries: ${error.message}`);
+scripts/runtime-smoke.mjs:319:    } catch {}
+scripts/runtime-smoke.mjs:573:      console.warn(`Unable to remove runtime download directory after retries: ${error.message}`);
+scripts/runtime-smoke.mjs:579:  console.log(`\n${report.mode === 'http' ? 'Local HTTP server' : 'Direct file://'}: ${report.url}`);
+scripts/runtime-smoke.mjs:582:    console.log(`  ${label.padEnd(7)} ${result.name}${result.details ? ` — ${result.details}` : ''}`);
+scripts/runtime-smoke.mjs:621:    console.log('\nRuntime smoke verification passed with any browser-policy limitations reported above.');
+scripts/runtime-smoke.mjs:632:    console.error(error.stack ?? error.message);
+tests/single-file-build.test.mjs:75:    ['module script', validHtml({ script: '<script type="module">console.log("x")</script>' }), /module script/i],

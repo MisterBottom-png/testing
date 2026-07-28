@@ -1,0 +1,16 @@
+
+> gemini-podcast-studio@0.1.0 test:runtime
+> node scripts/runtime-smoke.mjs
+
+
+Local HTTP server: http://127.0.0.1:35811/gemini-podcast-studio.html
+  FAIL    Runtime execution — Timed out waiting for page condition: document.getElementById('scriptStage')?.classList.contains('active') && document.querySelectorAll('#scriptPanel textarea[data-segment-field="text"]').length >= 2
+
+Direct file://: file:///home/runner/work/testing/testing/gemini-podcast-studio/dist/gemini-podcast-studio.html
+  FAIL    Runtime execution — Timed out waiting for page condition: document.getElementById('scriptStage')?.classList.contains('active') && document.querySelectorAll('#scriptPanel textarea[data-segment-field="text"]').length >= 2
+Error: Runtime smoke verification failed:
+- http: Runtime execution (Timed out waiting for page condition: document.getElementById('scriptStage')?.classList.contains('active') && document.querySelectorAll('#scriptPanel textarea[data-segment-field="text"]').length >= 2)
+- file: Runtime execution (Timed out waiting for page condition: document.getElementById('scriptStage')?.classList.contains('active') && document.querySelectorAll('#scriptPanel textarea[data-segment-field="text"]').length >= 2)
+    at runRuntimeSmoke (file:///home/runner/work/testing/testing/gemini-podcast-studio/scripts/runtime-smoke.mjs:620:32)
+    at async runCli (file:///home/runner/work/testing/testing/gemini-podcast-studio/scripts/runtime-smoke.mjs:630:5)
+    at async file:///home/runner/work/testing/testing/gemini-podcast-studio/scripts/runtime-smoke.mjs:637:90

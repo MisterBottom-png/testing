@@ -1,0 +1,4 @@
+HTML IDs: 92
+State references: 67
+Missing in HTML: []
+Unreferenced HTML IDs: ['briefTitle', 'connectionSettingsTitle', 'connectionSetupTitle', 'createErrorTitle', 'duration2', 'duration3', 'duration5', 'duration7', 'durationCustom', 'editorTab', 'episodePanelTitle', 'generationSettingsTitle', 'settingsTitle', 'speakersTitle', 'toneCalm', 'toneCasual', 'toneCurious', 'toneDramatic', 'toneEnergetic', 'toneHumorous', 'toneInformative', 'toneSerious', 'topicHelp', 'transcriptTab', 'ttsTab']

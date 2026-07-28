@@ -1,0 +1,795 @@
+
+> gemini-podcast-studio@0.1.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: uses both human speaker names and never exposes Gemini voice IDs as dialogue names
+ok 1 - uses both human speaker names and never exposes Gemini voice IDs as dialogue names
+  ---
+  duration_ms: 2.435308
+  type: 'test'
+  ...
+# Subtest: preserves Host 1 and Host 2 voice mapping and speaker order
+ok 2 - preserves Host 1 and Host 2 voice mapping and speaker order
+  ---
+  duration_ms: 0.471482
+  type: 'test'
+  ...
+# Subtest: uses selected language, both delivery instructions and current TTS model
+ok 3 - uses selected language, both delivery instructions and current TTS model
+  ---
+  duration_ms: 0.38995
+  type: 'test'
+  ...
+# Subtest: cache key changes for every required invalidation input
+ok 4 - cache key changes for every required invalidation input
+  ---
+  duration_ms: 1.918071
+  type: 'test'
+  ...
+# Subtest: stable serialisation does not depend on object property order
+ok 5 - stable serialisation does not depend on object property order
+  ---
+  duration_ms: 0.158657
+  type: 'test'
+  ...
+# Subtest: rejects an unknown speaker in the preview script
+ok 6 - rejects an unknown speaker in the preview script
+  ---
+  duration_ms: 0.198852
+  type: 'test'
+  ...
+# Subtest: request body uses Gemini multi-speaker TTS configuration
+ok 7 - request body uses Gemini multi-speaker TTS configuration
+  ---
+  duration_ms: 0.43273
+  type: 'test'
+  ...
+# Subtest: button states and duplicate-request suppression are implemented
+ok 8 - button states and duplicate-request suppression are implemented
+  ---
+  duration_ms: 0.199984
+  type: 'test'
+  ...
+# Subtest: cache replay, broken-entry replacement and unrelated-cache preservation are implemented
+ok 9 - cache replay, broken-entry replacement and unrelated-cache preservation are implemented
+  ---
+  duration_ms: 0.354283
+  type: 'test'
+  ...
+# Subtest: duplicate voice warning supports Use anyway and Choose another voice focus
+ok 10 - duplicate voice warning supports Use anyway and Choose another voice focus
+  ---
+  duration_ms: 0.477864
+  type: 'test'
+  ...
+# Subtest: validation, accessibility announcements and failure handling are wired
+ok 11 - validation, accessibility announcements and failure handling are wired
+  ---
+  duration_ms: 0.275555
+  type: 'test'
+  ...
+# Subtest: corrupt saved JSON is backed up and loading falls back safely without deleting the original project value
+ok 12 - corrupt saved JSON is backed up and loading falls back safely without deleting the original project value
+  ---
+  duration_ms: 2.722897
+  type: 'test'
+  ...
+# Subtest: diagnostic strings redact configured keys, headers and query parameters
+ok 13 - diagnostic strings redact configured keys, headers and query parameters
+  ---
+  duration_ms: 1.45844
+  type: 'test'
+  ...
+# Subtest: diagnostic objects omit sensitive request fields and error secrets
+ok 14 - diagnostic objects omit sensitive request fields and error secrets
+  ---
+  duration_ms: 0.815126
+  type: 'test'
+  ...
+# Subtest: Gemini source endpoints do not place API keys in query parameters
+ok 15 - Gemini source endpoints do not place API keys in query parameters
+  ---
+  duration_ms: 13.599305
+  type: 'test'
+  ...
+# Subtest: final validation messages use the accepted human-readable wording
+ok 16 - final validation messages use the accepted human-readable wording
+  ---
+  duration_ms: 1.223921
+  type: 'test'
+  ...
+# Subtest: speaker fields expose required state and validation focuses the first invalid control
+ok 17 - speaker fields expose required state and validation focuses the first invalid control
+  ---
+  duration_ms: 0.341089
+  type: 'test'
+  ...
+# Subtest: speaker and conversation warnings are keyboard-addressable alert dialogs
+ok 18 - speaker and conversation warnings are keyboard-addressable alert dialogs
+  ---
+  duration_ms: 0.221274
+  type: 'test'
+  ...
+# Subtest: unknown script speakers use the accepted blocking message
+ok 19 - unknown script speakers use the accepted blocking message
+  ---
+  duration_ms: 0.145973
+  type: 'test'
+  ...
+# Subtest: corrupt saved projects are backed up rather than silently discarded
+ok 20 - corrupt saved projects are backed up rather than silently discarded
+  ---
+  duration_ms: 0.954407
+  type: 'test'
+  ...
+# Subtest: TTS chunk failures identify the failed chunk and never publish partial audio
+ok 21 - TTS chunk failures identify the failed chunk and never publish partial audio
+  ---
+  duration_ms: 0.208781
+  type: 'test'
+  ...
+# Subtest: audio invalidation preserves project data and clearly requires regeneration
+ok 22 - audio invalidation preserves project data and clearly requires regeneration
+  ---
+  duration_ms: 0.276909
+  type: 'test'
+  ...
+# Subtest: individual and conversation previews retain deterministic isolated caching
+ok 23 - individual and conversation previews retain deterministic isolated caching
+  ---
+  duration_ms: 0.164608
+  type: 'test'
+  ...
+# Subtest: responsive, zoom-friendly and reduced-motion protections remain present
+ok 24 - responsive, zoom-friendly and reduced-motion protections remain present
+  ---
+  duration_ms: 0.330729
+  type: 'test'
+  ...
+# Subtest: native audio controls and preview live regions remain accessible
+ok 25 - native audio controls and preview live regions remain accessible
+  ---
+  duration_ms: 0.455243
+  type: 'test'
+  ...
+# Subtest: final review decorators are installed after application initialisation
+ok 26 - final review decorators are installed after application initialisation
+  ---
+  duration_ms: 0.201748
+  type: 'test'
+  ...
+# Subtest: no automatic voice recommendations or permanent aliases were introduced
+ok 27 - no automatic voice recommendations or permanent aliases were introduced
+  ---
+  duration_ms: 0.481351
+  type: 'test'
+  ...
+# Subtest: clean sessions use central model, duration and speaking-rate defaults
+ok 28 - clean sessions use central model, duration and speaking-rate defaults
+  ---
+  duration_ms: 2.726336
+  type: 'test'
+  ...
+# Subtest: model selectors expose only the required supported and custom options
+ok 29 - model selectors expose only the required supported and custom options
+  ---
+  duration_ms: 2.850706
+  type: 'test'
+  ...
+# Subtest: supported built-in models and unrelated saved settings survive migration
+ok 30 - supported built-in models and unrelated saved settings survive migration
+  ---
+  duration_ms: 2.743386
+  type: 'test'
+  ...
+# Subtest: unsupported saved built-ins fall back safely and clear associated custom fields
+ok 31 - unsupported saved built-ins fall back safely and clear associated custom fields
+  ---
+  duration_ms: 0.714335
+  type: 'test'
+  ...
+# Subtest: valid custom model selections remain custom across migration and reload
+ok 32 - valid custom model selections remain custom across migration and reload
+  ---
+  duration_ms: 3.037726
+  type: 'test'
+  ...
+# Subtest: invalid custom selections migrate before runtime merge
+ok 33 - invalid custom selections migrate before runtime merge
+  ---
+  duration_ms: 1.669866
+  type: 'test'
+  ...
+# Subtest: feature-level Gemini transport functions construct requests with selected models
+ok 34 - feature-level Gemini transport functions construct requests with selected models
+  ---
+  duration_ms: 2.070566
+  type: 'test'
+  ...
+# Subtest: development HTML uses one ES-module entry point instead of ordered classic scripts
+ok 35 - development HTML uses one ES-module entry point instead of ordered classic scripts
+  ---
+  duration_ms: 6.796613
+  type: 'test'
+  ...
+# Subtest: focused extraction modules exist and expose explicit module syntax
+ok 36 - focused extraction modules exist and expose explicit module syntax
+  ---
+  duration_ms: 9.965625
+  type: 'test'
+  ...
+# Subtest: main is a thin composition root
+ok 37 - main is a thin composition root
+  ---
+  duration_ms: 1.979646
+  type: 'test'
+  ...
+# Subtest: low-level transport, storage and audio modules do not depend on the DOM or UI rendering
+ok 38 - low-level transport, storage and audio modules do not depend on the DOM or UI rendering
+  ---
+  duration_ms: 3.621991
+  type: 'test'
+  ...
+# Subtest: the static ES-module import graph is acyclic
+ok 39 - the static ES-module import graph is acyclic
+  ---
+  duration_ms: 14.212766
+  type: 'test'
+  ...
+# Subtest: package scripts preserve Vite development and produce the verified standalone distribution
+ok 40 - package scripts preserve Vite development and produce the verified standalone distribution
+  ---
+  duration_ms: 1.506833
+  type: 'test'
+  ...
+# Subtest: new projects use schema version 2 and the required default speaker model
+ok 41 - new projects use schema version 2 and the required default speaker model
+  ---
+  duration_ms: 2.237108
+  type: 'test'
+  ...
+# Subtest: legacy projects migrate names, valid voices, catalogue metadata, scripts, settings and selected models
+ok 42 - legacy projects migrate names, valid voices, catalogue metadata, scripts, settings and selected models
+  ---
+  duration_ms: 1.131659
+  type: 'test'
+  ...
+# Subtest: unknown legacy voices remain preserved and are marked unavailable without guessed metadata
+ok 43 - unknown legacy voices remain preserved and are marked unavailable without guessed metadata
+  ---
+  duration_ms: 0.364422
+  type: 'test'
+  ...
+# Subtest: migration is idempotent and does not change an already migrated project timestamp
+ok 44 - migration is idempotent and does not change an already migrated project timestamp
+  ---
+  duration_ms: 0.465732
+  type: 'test'
+  ...
+# Subtest: loading migrates legacy storage once and preserves unsupported legacy script values
+ok 45 - loading migrates legacy storage once and preserves unsupported legacy script values
+  ---
+  duration_ms: 1.008448
+  type: 'test'
+  ...
+# Subtest: saving and loading preserve every new speaker field independently
+ok 46 - saving and loading preserve every new speaker field independently
+  ---
+  duration_ms: 1.098978
+  type: 'test'
+  ...
+# Subtest: lastModified changes only when project content genuinely changes
+ok 47 - lastModified changes only when project content genuinely changes
+  ---
+  duration_ms: 1.439265
+  type: 'test'
+  ...
+# Subtest: counts English, Estonian and Russian words with locale-aware segmentation
+ok 48 - counts English, Estonian and Russian words with locale-aware segmentation
+  ---
+  duration_ms: 49.417669
+  type: 'test'
+  ...
+# Subtest: calculates target words and clamps dynamic script output tokens
+ok 49 - calculates target words and clamps dynamic script output tokens
+  ---
+  duration_ms: 0.442128
+  type: 'test'
+  ...
+# Subtest: calculates dynamic segment limits between 16 and 100
+ok 50 - calculates dynamic segment limits between 16 and 100
+  ---
+  duration_ms: 0.293559
+  type: 'test'
+  ...
+# Subtest: normalises distinct speaker names and uses them in a strict dynamic schema
+ok 51 - normalises distinct speaker names and uses them in a strict dynamic schema
+  ---
+  duration_ms: 1.431179
+  type: 'test'
+  ...
+# Subtest: every script request sets token and thinking limits without sampling controls
+ok 52 - every script request sets token and thinking limits without sampling controls
+  ---
+  duration_ms: 1.21815
+  type: 'test'
+  ...
+# Subtest: rejects empty dialogue, unknown speakers, missing fields and unexpected fields locally
+ok 53 - rejects empty dialogue, unknown speakers, missing fields and unexpected fields locally
+  ---
+  duration_ms: 1.024678
+  type: 'test'
+  ...
+# Subtest: rejects segment counts above the duration-specific maximum
+ok 54 - rejects segment counts above the duration-specific maximum
+  ---
+  duration_ms: 0.47536
+  type: 'test'
+  ...
+# Subtest: preserves editable output and adds over-length, short-script and direction warnings
+ok 55 - preserves editable output and adds over-length, short-script and direction warnings
+  ---
+  duration_ms: 227.078407
+  type: 'test'
+  ...
+# Subtest: classifies token truncation before attempting to parse candidate JSON
+ok 56 - classifies token truncation before attempting to parse candidate JSON
+  ---
+  duration_ms: 1.129965
+  type: 'test'
+  ...
+# Subtest: distinguishes safety, missing, empty and malformed candidates
+ok 57 - distinguishes safety, missing, empty and malformed candidates
+  ---
+  duration_ms: 1.455124
+  type: 'test'
+  ...
+# Subtest: distinguishes valid JSON that fails local validation
+ok 58 - distinguishes valid JSON that fails local validation
+  ---
+  duration_ms: 0.56659
+  type: 'test'
+  ...
+# Subtest: generation failure preserves the existing editable script and does not automatically retry
+ok 59 - generation failure preserves the existing editable script and does not automatically retry
+  ---
+  duration_ms: 1.253877
+  type: 'test'
+  ...
+# Subtest: script generation uses human names and never exposes Gemini voice identifiers as character names
+ok 60 - script generation uses human names and never exposes Gemini voice identifiers as character names
+  ---
+  duration_ms: 3.158463
+  type: 'test'
+  ...
+# Subtest: validated script dialogue preserves configured human names
+ok 61 - validated script dialogue preserves configured human names
+  ---
+  duration_ms: 16.130256
+  type: 'test'
+  ...
+# Subtest: human speakers map deterministically to exact Gemini API voices in configured order
+ok 62 - human speakers map deterministically to exact Gemini API voices in configured order
+  ---
+  duration_ms: 0.442738
+  type: 'test'
+  ...
+# Subtest: renaming a speaker updates structured script labels while keeping the selected voice attached
+ok 63 - renaming a speaker updates structured script labels while keeping the selected voice attached
+  ---
+  duration_ms: 0.446466
+  type: 'test'
+  ...
+# Subtest: unknown visible script speakers block TTS before any network request with a clear error
+ok 64 - unknown visible script speakers block TTS before any network request with a clear error
+  ---
+  duration_ms: 0.661067
+  type: 'test'
+  ...
+# Subtest: long scripts retain segment order and stable speaker-to-voice mapping across every chunk
+ok 65 - long scripts retain segment order and stable speaker-to-voice mapping across every chunk
+  ---
+  duration_ms: 4.382083
+  type: 'test'
+  ...
+# Subtest: changing one voice invalidates completed audio and all dependent chunk references without altering the other speaker
+ok 66 - changing one voice invalidates completed audio and all dependent chunk references without altering the other speaker
+  ---
+  duration_ms: 0.720639
+  type: 'test'
+  ...
+# Subtest: speakerName and geminiVoiceName remain independent fields
+ok 67 - speakerName and geminiVoiceName remain independent fields
+  ---
+  duration_ms: 0.328174
+  type: 'test'
+  ...
+# Subtest: standalone verifier accepts one valid self-contained application
+ok 68 - standalone verifier accepts one valid self-contained application
+  ---
+  duration_ms: 32.813209
+  type: 'test'
+  ...
+# Subtest: standalone verifier rejects escaped runtime dependencies and missing embedded requirements
+    # Subtest: local script src
+    ok 1 - local script src
+      ---
+      duration_ms: 5.69999
+      type: 'test'
+      ...
+    # Subtest: local stylesheet href
+    ok 2 - local stylesheet href
+      ---
+      duration_ms: 4.644324
+      type: 'test'
+      ...
+    # Subtest: runtime dynamic import
+    ok 3 - runtime dynamic import
+      ---
+      duration_ms: 3.797469
+      type: 'test'
+      ...
+    # Subtest: entity-escaped dynamic import
+    ok 4 - entity-escaped dynamic import
+      ---
+      duration_ms: 6.781112
+      type: 'test'
+      ...
+    # Subtest: module script
+    ok 5 - module script
+      ---
+      duration_ms: 7.053555
+      type: 'test'
+      ...
+    # Subtest: static module import
+    ok 6 - static module import
+      ---
+      duration_ms: 2.429728
+      type: 'test'
+      ...
+    # Subtest: local runtime fetch
+    ok 7 - local runtime fetch
+      ---
+      duration_ms: 9.404986
+      type: 'test'
+      ...
+    # Subtest: remote runtime application request
+    ok 8 - remote runtime application request
+      ---
+      duration_ms: 5.270115
+      type: 'test'
+      ...
+    # Subtest: remote application asset
+    ok 9 - remote application asset
+      ---
+      duration_ms: 3.355933
+      type: 'test'
+      ...
+    # Subtest: vite development path
+    ok 10 - vite development path
+      ---
+      duration_ms: 5.028834
+      type: 'test'
+      ...
+    # Subtest: missing application root
+    ok 11 - missing application root
+      ---
+      duration_ms: 3.601953
+      type: 'test'
+      ...
+    # Subtest: missing inline css
+    ok 12 - missing inline css
+      ---
+      duration_ms: 9.19334
+      type: 'test'
+      ...
+    # Subtest: missing inline javascript
+    ok 13 - missing inline javascript
+      ---
+      duration_ms: 5.392878
+      type: 'test'
+      ...
+    # Subtest: inline javascript before body
+    ok 14 - inline javascript before body
+      ---
+      duration_ms: 3.352336
+      type: 'test'
+      ...
+    # Subtest: missing generated warning
+    ok 15 - missing generated warning
+      ---
+      duration_ms: 1.74674
+      type: 'test'
+      ...
+    # Subtest: missing embedded icon
+    ok 16 - missing embedded icon
+      ---
+      duration_ms: 10.560108
+      type: 'test'
+      ...
+    1..16
+ok 69 - standalone verifier rejects escaped runtime dependencies and missing embedded requirements
+  ---
+  duration_ms: 93.809529
+  type: 'test'
+  ...
+# Subtest: standalone verifier enforces the stable filename and exactly one production file
+ok 70 - standalone verifier enforces the stable filename and exactly one production file
+  ---
+  duration_ms: 14.213715
+  type: 'test'
+  ...
+# Subtest: Vite production configuration emits one deterministic temporary bundle
+ok 71 - Vite production configuration emits one deterministic temporary bundle
+  ---
+  duration_ms: 1.729638
+  type: 'test'
+  ...
+# Subtest: single-file script insertion preserves JavaScript replacement tokens
+ok 72 - single-file script insertion preserves JavaScript replacement tokens
+  ---
+  duration_ms: 193.501904
+  type: 'test'
+  ...
+# Subtest: single-file builder bundles, inlines, verifies and cleans temporary output
+ok 73 - single-file builder bundles, inlines, verifies and cleans temporary output
+  ---
+  duration_ms: 648.669294
+  type: 'test'
+  ...
+# Subtest: generated output policy and package scripts describe source-owned standalone builds
+ok 74 - generated output policy and package scripts describe source-owned standalone builds
+  ---
+  duration_ms: 2.026263
+  type: 'test'
+  ...
+# Subtest: runtime smoke harness covers HTTP and direct-file standalone capabilities
+ok 75 - runtime smoke harness covers HTTP and direct-file standalone capabilities
+  ---
+  duration_ms: 1.043573
+  type: 'test'
+  ...
+# Subtest: runtime smoke treats administrator browser blocks as limitations and verifies HTTP delivery independently
+ok 76 - runtime smoke treats administrator browser blocks as limitations and verifies HTTP delivery independently
+  ---
+  duration_ms: 52.4897
+  type: 'test'
+  ...
+# Subtest: standalone verifier allows only static Gemini API remote requests
+ok 77 - standalone verifier allows only static Gemini API remote requests
+  ---
+  duration_ms: 11.270659
+  type: 'test'
+  ...
+# Subtest: runtime smoke retries transient Chromium profile cleanup failures
+ok 78 - runtime smoke retries transient Chromium profile cleanup failures
+  ---
+  duration_ms: 3.475897
+  type: 'test'
+  ...
+# Subtest: runtime smoke reports direct-file reload storage loss as a limitation while keeping HTTP strict
+ok 79 - runtime smoke reports direct-file reload storage loss as a limitation while keeping HTTP strict
+  ---
+  duration_ms: 2.055097
+  type: 'test'
+  ...
+# Subtest: modular source preserves the three workflow stages
+ok 80 - modular source preserves the three workflow stages
+  ---
+  duration_ms: 4.942762
+  type: 'test'
+  ...
+# Subtest: javascript starts from one explicit ES-module composition root
+ok 81 - javascript starts from one explicit ES-module composition root
+  ---
+  duration_ms: 1.779681
+  type: 'test'
+  ...
+# Subtest: renders two distinguishable speaker configuration cards with all required controls
+ok 82 - renders two distinguishable speaker configuration cards with all required controls
+  ---
+  duration_ms: 1.692338
+  type: 'test'
+  ...
+# Subtest: speaker names are editable and update only the intended speaker record
+ok 83 - speaker names are editable and update only the intended speaker record
+  ---
+  duration_ms: 0.365755
+  type: 'test'
+  ...
+# Subtest: voice dropdown retains exact Gemini API values and displays descriptions
+ok 84 - voice dropdown retains exact Gemini API values and displays descriptions
+  ---
+  duration_ms: 0.493303
+  type: 'test'
+  ...
+# Subtest: changing a voice leaves speaker identity and behavioural instructions unchanged
+ok 85 - changing a voice leaves speaker identity and behavioural instructions unchanged
+  ---
+  duration_ms: 0.187101
+  type: 'test'
+  ...
+# Subtest: changing gender preserves personality and delivery instructions
+ok 86 - changing gender preserves personality and delivery instructions
+  ---
+  duration_ms: 0.177832
+  type: 'test'
+  ...
+# Subtest: dependent controls expose clear disabled states and preview is disabled without a selected voice
+ok 87 - dependent controls expose clear disabled states and preview is disabled without a selected voice
+  ---
+  duration_ms: 0.305252
+  type: 'test'
+  ...
+# Subtest: native labelled controls provide keyboard navigation semantics
+ok 88 - native labelled controls provide keyboard navigation semantics
+  ---
+  duration_ms: 0.342591
+  type: 'test'
+  ...
+# Subtest: speaker input events use the shared updater and persist through the existing save queue
+ok 89 - speaker input events use the shared updater and persist through the existing save queue
+  ---
+  duration_ms: 0.179256
+  type: 'test'
+  ...
+# Subtest: catalogue contains all 30 supported Gemini TTS voices with required metadata
+ok 90 - catalogue contains all 30 supported Gemini TTS voices with required metadata
+  ---
+  duration_ms: 1.083418
+  type: 'test'
+  ...
+# Subtest: API names and preview cache keys are unique
+ok 91 - API names and preview cache keys are unique
+  ---
+  duration_ms: 0.165239
+  type: 'test'
+  ...
+# Subtest: gender filtering returns only the requested documented voices
+ok 92 - gender filtering returns only the requested documented voices
+  ---
+  duration_ms: 0.360745
+  type: 'test'
+  ...
+# Subtest: voice type filtering supports type-only and combined filters
+ok 93 - voice type filtering supports type-only and combined filters
+  ---
+  duration_ms: 0.738162
+  type: 'test'
+  ...
+# Subtest: available voice types are derived from the catalogue and sorted
+ok 94 - available voice types are derived from the catalogue and sorted
+  ---
+  duration_ms: 0.381694
+  type: 'test'
+  ...
+# Subtest: invalid catalogue entries are ignored without crashing the application
+ok 95 - invalid catalogue entries are ignored without crashing the application
+  ---
+  duration_ms: 0.336681
+  type: 'test'
+  ...
+# Subtest: legacy duplicated VOICES catalogue has been removed
+ok 96 - legacy duplicated VOICES catalogue has been removed
+  ---
+  duration_ms: 0.246602
+  type: 'test'
+  ...
+# Subtest: gender filtering returns only voices of the selected gender
+ok 97 - gender filtering returns only voices of the selected gender
+  ---
+  duration_ms: 1.216207
+  type: 'test'
+  ...
+# Subtest: voice types are derived from the catalogue and voice type narrows matching voices
+ok 98 - voice types are derived from the catalogue and voice type narrows matching voices
+  ---
+  duration_ms: 0.960027
+  type: 'test'
+  ...
+# Subtest: changing gender clears incompatible type and voice without changing identity or delivery fields
+ok 99 - changing gender clears incompatible type and voice without changing identity or delivery fields
+  ---
+  duration_ms: 0.402464
+  type: 'test'
+  ...
+# Subtest: changing gender preserves a compatible type but clears an incompatible voice
+ok 100 - changing gender preserves a compatible type but clears an incompatible voice
+  ---
+  duration_ms: 0.173404
+  type: 'test'
+  ...
+# Subtest: changing voice type clears an incompatible selected voice without silently choosing another
+ok 101 - changing voice type clears an incompatible selected voice without silently choosing another
+  ---
+  duration_ms: 0.247033
+  type: 'test'
+  ...
+# Subtest: speaker validation trims names, rejects empty names and rejects duplicates case-insensitively
+ok 102 - speaker validation trims names, rejects empty names and rejects duplicates case-insensitively
+  ---
+  duration_ms: 0.436998
+  type: 'test'
+  ...
+# Subtest: speaker validation rejects missing selections, unknown voices and metadata mismatches
+ok 103 - speaker validation rejects missing selections, unknown voices and metadata mismatches
+  ---
+  duration_ms: 0.558957
+  type: 'test'
+  ...
+# Subtest: duplicate voices create a warning signature and Use anyway explicitly approves continuation
+ok 104 - duplicate voices create a warning signature and Use anyway explicitly approves continuation
+  ---
+  duration_ms: 0.375734
+  type: 'test'
+  ...
+# Subtest: UI source contains no-match guidance and both duplicate-voice actions
+ok 105 - UI source contains no-match guidance and both duplicate-voice actions
+  ---
+  duration_ms: 0.418834
+  type: 'test'
+  ...
+# Subtest: preview descriptor includes language, voice, delivery instructions, model and generation version
+ok 106 - preview descriptor includes language, voice, delivery instructions, model and generation version
+  ---
+  duration_ms: 1.539211
+  type: 'test'
+  ...
+# Subtest: preview request sends the selected Gemini voice, language instructions and current TTS model
+ok 107 - preview request sends the selected Gemini voice, language instructions and current TTS model
+  ---
+  duration_ms: 1.929943
+  type: 'test'
+  ...
+# Subtest: loading state disables the button and duplicate simultaneous requests share one API call
+ok 108 - loading state disables the button and duplicate simultaneous requests share one API call
+  ---
+  duration_ms: 7.80456
+  type: 'test'
+  ...
+# Subtest: successful previews are cached and replay without another API request
+ok 109 - successful previews are cached and replay without another API request
+  ---
+  duration_ms: 2.352831
+  type: 'test'
+  ...
+# Subtest: language, voice, delivery and TTS model changes invalidate the active preview key
+ok 110 - language, voice, delivery and TTS model changes invalidate the active preview key
+  ---
+  duration_ms: 0.789298
+  type: 'test'
+  ...
+# Subtest: broken cache entries are removed and replaced safely
+ok 111 - broken cache entries are removed and replaced safely
+  ---
+  duration_ms: 1.655038
+  type: 'test'
+  ...
+# Subtest: cached playback failures remove the broken entry and generate one replacement
+ok 112 - cached playback failures remove the broken entry and generate one replacement
+  ---
+  duration_ms: 0.706513
+  type: 'test'
+  ...
+# Subtest: API and empty-audio failures show a useful error without automatic retry
+ok 113 - API and empty-audio failures show a useful error without automatic retry
+  ---
+  duration_ms: 0.933467
+  type: 'test'
+  ...
+# Subtest: one speaker preview does not overwrite the other speaker cache entry
+ok 114 - one speaker preview does not overwrite the other speaker cache entry
+  ---
+  duration_ms: 1.788278
+  type: 'test'
+  ...
+1..114
+# tests 130
+# suites 0
+# pass 130
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2548.650347
