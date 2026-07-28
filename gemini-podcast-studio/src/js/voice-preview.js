@@ -274,12 +274,8 @@ export function installVoicePreview(services) {
       throw services.createApiError(response.status, 'Gemini returned non-JSON voice-preview data.', raw);
     }
     if (!response.ok) throw services.createApiError(response.status, data?.error?.message || `Voice preview failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
-    const part = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData?.data);
-    if (!part) throw services.createApiError(response.status, 'Gemini returned an empty voice-preview audio response.', JSON.stringify(data, null, 2));
-    const pcmBytes = services.base64ToBytes(part.inlineData.data);
-    if (pcmBytes.byteLength < 2) throw new Error('Gemini returned empty voice-preview audio.');
-    const sampleRate = services.sampleRateFromMimeType(part.inlineData.mimeType);
-    const blob = services.pcm16ToWavBlob(pcmBytes, sampleRate, 1);
+    const { pcmBytes, sampleRate, channels } = services.parseGeminiAudioResponse(data);
+    const blob = services.pcm16ToWavBlob(pcmBytes, sampleRate, channels);
     if (!blob || blob.size <= 44) throw new Error('Gemini returned invalid voice-preview audio.');
     return {
       cacheKey: descriptor.cacheKey,

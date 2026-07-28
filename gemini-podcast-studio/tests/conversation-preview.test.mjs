@@ -147,7 +147,7 @@ test('validation, accessibility announcements and failure handling are wired', (
   assert.match(source, /focusFirstConversationPreviewError/);
   assert.match(source, /role="status" aria-live="polite"/);
   assert.match(source, /audio[^>]+controls[^>]+aria-label="Two-speaker conversation preview"/);
-  assert.match(source, /finishReason !== 'STOP'/);
-  assert.match(source, /empty conversation-preview audio response/);
+  assert.match(source, /parseGeminiAudioResponse\(data\)/);
+  assert.match(source, /parseGeminiAudioResponse\(data\)/);
   assert.match(source, /retry: null/);
 });

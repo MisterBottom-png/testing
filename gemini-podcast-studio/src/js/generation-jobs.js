@@ -62,6 +62,18 @@ export function installGenerationJobs(services) {
     if (!chunks.length) return;
     const speakerVoiceConfigs = services.buildSpeakerVoiceConfigs();
     const mappingSignature = services.getSpeakerVoiceMappingSignature();
+    const ttsModel = services.getTtsModel();
+    chunks = chunks.map(chunk => ({
+      ...chunk,
+      cacheKey: services.buildTtsChunkCacheKey({
+        ttsModel,
+        transcript: chunk.transcript,
+        mappingSignature,
+        requestFormatVersion: services.TTS_REQUEST_FORMAT_VERSION,
+        index: chunk.index
+      })
+    }));
+    await services.retainTtsChunkCache?.(chunks.map(chunk => chunk.cacheKey));
     services.hideServiceError();
     services.invalidatePodcastAudio('audio-regeneration');
     services.appState.lastAction = 'generate-audio';
@@ -72,15 +84,31 @@ export function installGenerationJobs(services) {
     try {
       for (const chunk of chunks) {
         if (services.els.scriptLoadingMessage) services.els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
-        let result;
+        let result = (await services.readTtsChunkCache?.(chunk.cacheKey))?.record || null;
         try {
-          result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });
+          if (!result) {
+            result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });
+            const record = {
+              cacheKey: chunk.cacheKey,
+              pcmBytes: result.pcmBytes,
+              sampleRate: result.sampleRate,
+              createdAt: new Date().toISOString()
+            };
+            if (services.isValidTtsChunkCacheRecord && !services.isValidTtsChunkCacheRecord(record, chunk.cacheKey)) {
+              throw new Error('Gemini returned an invalid PCM audio chunk.');
+            }
+            const cacheError = await services.writeTtsChunkCache?.(record);
+            if (cacheError) services.logDiagnostic?.('tts-chunk-cache-write-failed', cacheError);
+          }
         } catch (error) {
           const chunkError = services.createApiError(Number(error?.status || 0), `TTS chunk ${chunk.index + 1} of ${chunks.length} failed. No partial audio was saved.`, error?.details || error?.stack || String(error));
           chunkError.cause = error;
           throw chunkError;
         }
-        if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+        if (sampleRate && result.sampleRate !== sampleRate) {
+          await services.removeTtsChunkCache?.(chunk.cacheKey);
+          throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+        }
         sampleRate = sampleRate || result.sampleRate;
         pcmParts.push(result.pcmBytes);
       }
@@ -98,11 +126,7 @@ export function installGenerationJobs(services) {
         voiceMappingSignature: mappingSignature,
         chunks: chunks.map(chunk => ({
           index: chunk.index,
-          cacheKey: services.buildTtsChunkCacheKey({
-            transcript: chunk.transcript,
-            mappingSignature,
-            index: chunk.index
-          }),
+          cacheKey: chunk.cacheKey,
           speakerOrder: speakerVoiceConfigs.map(config => config.speaker)
         }))
       };
@@ -115,8 +139,65 @@ export function installGenerationJobs(services) {
       services.setBusy(false);
     }
   }
-  function generateVoiceTest(index, options) {
-    return services.generateVoicePreview(index, options);
+  async function generateVoiceTest(index) {
+    const speaker = services.appState.speakers[index];
+    if (!services.appState.connection.apiKey.trim()) return services.showServiceError({
+      title: 'API key required',
+      message: 'Add a Gemini API key before generating a voice test.',
+      suggestion: 'Open connection settings.',
+      details: '',
+      retry: null
+    });
+    if (!services.getGeminiTtsVoice(speaker.geminiVoiceName)) return services.showServiceError({
+      title: 'Voice selection required',
+      message: 'This saved Gemini voice is unavailable.',
+      suggestion: 'Select an available Gemini voice.',
+      details: '',
+      retry: null
+    });
+    services.hideServiceError();
+    services.setBusy(true, 'voice', services.AUDIO_PROGRESS_MESSAGES);
+    const prompt = `${speaker.deliveryInstructions || 'Speak naturally and clearly.'}\n${speaker.accent || ''}\nRead exactly: Hello, I am ${speaker.speakerName}. This is a short voice preview for the podcast.`;
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': services.appState.connection.apiKey
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: speaker.geminiVoiceName
+                }
+              }
+            }
+          }
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw services.createApiError(response.status, data?.error?.message || 'Voice test failed.', JSON.stringify(data, null, 2));
+      const { pcmBytes, sampleRate, channels } = services.parseGeminiAudioResponse(data);
+      const url = URL.createObjectURL(services.pcm16ToWavBlob(pcmBytes, sampleRate, channels));
+      const audio = new Audio(url);
+      audio.addEventListener('ended', () => URL.revokeObjectURL(url), {
+        once: true
+      });
+      await audio.play();
+    } catch (error) {
+      services.handleGenerationError(error, 'Voice test failed', 'Try another voice or TTS model.', () => services.generateVoiceTest(index));
+    } finally {
+      services.setBusy(false);
+    }
   }
   Object.assign(services, {
     invalidatePodcastAudio,

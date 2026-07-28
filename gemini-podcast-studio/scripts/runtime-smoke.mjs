@@ -197,7 +197,7 @@ function ttsGeminiResponse() {
   return {
     candidates: [{
       content: {
-        parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: pcmFixtureBase64() } }]
+        parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000;channels=1', data: pcmFixtureBase64() } }]
       }
     }]
   };

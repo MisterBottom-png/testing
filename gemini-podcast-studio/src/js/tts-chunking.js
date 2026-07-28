@@ -1,4 +1,5 @@
 export function installTtsChunking(services) {
+  const TTS_REQUEST_FORMAT_VERSION = 1;
   function hashTtsCacheValue(value) {
     let hash = 2166136261;
     const text = String(value ?? '');
@@ -9,11 +10,20 @@ export function installTtsChunking(services) {
     return (hash >>> 0).toString(36);
   }
   function buildTtsChunkCacheKey({
+    ttsModel,
     transcript,
     mappingSignature,
+    requestFormatVersion = TTS_REQUEST_FORMAT_VERSION,
     index
   }) {
-    return `tts-${index}-${hashTtsCacheValue(`${mappingSignature}\n${transcript}`)}`;
+    const generationInputs = JSON.stringify({
+      ttsModel: String(ttsModel ?? ''),
+      transcript: String(transcript ?? ''),
+      mappingSignature: String(mappingSignature ?? ''),
+      requestFormatVersion: String(requestFormatVersion),
+      index: Number(index)
+    });
+    return `tts-pcm-${requestFormatVersion}-${index}-${hashTtsCacheValue(generationInputs)}`;
   }
   function createTtsChunks(script = services.appState.script, maxCharacters = services.appState.settings.maxTtsCharacters) {
     if (!Array.isArray(script?.segments) || !script.segments.length) return [];
@@ -54,6 +64,7 @@ export function installTtsChunking(services) {
     }));
   }
   Object.assign(services, {
+    TTS_REQUEST_FORMAT_VERSION,
     hashTtsCacheValue,
     buildTtsChunkCacheKey,
     createTtsChunks
