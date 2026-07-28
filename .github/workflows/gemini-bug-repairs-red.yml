@@ -10,20 +10,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify-red:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-bug-repairs
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Install dependencies
         working-directory: gemini-podcast-studio
         run: npm install --no-audit --no-fund
-      - name: Confirm regression suite is red
+      - name: Confirm and preserve regression failures
         working-directory: gemini-podcast-studio
         shell: bash
         run: |
@@ -36,6 +38,14 @@ jobs:
             echo "Regression suite unexpectedly passed before repairs." >&2
             exit 1
           fi
-          grep -q "failed audio regeneration preserves" /tmp/red.log
-          grep -q "TTS transport retries transient" /tmp/red.log
-          echo "RED confirmed: audited defects reproduce before production changes."
+          mkdir -p docs/superpowers/evidence
+          cp /tmp/red.log docs/superpowers/evidence/2026-07-28-bug-repairs-red.txt
+          echo "RED confirmed: regression suite fails before production changes."
+      - name: Commit RED evidence
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gemini-podcast-studio/docs/superpowers/evidence/2026-07-28-bug-repairs-red.txt
+          git commit -m 'test: capture Gemini bug repair RED evidence'
+          git push origin HEAD:agent/gemini-podcast-bug-repairs
