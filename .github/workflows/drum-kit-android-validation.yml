@@ -62,12 +62,12 @@ jobs:
           cache-cleanup: on-success
 
       - name: Apply deterministic velocity repair
-        id: apply-repair
+        id: apply_repair
         continue-on-error: true
         run: python ../.github/scripts/repair-drum-kit-bugfix-task1-runner.py > ../task1-runner.log 2>&1
 
       - name: Persist patch-runner failure
-        if: steps.apply-repair.outcome == 'failure'
+        if: steps.apply_repair.outcome == 'failure'
         working-directory: .
         run: |
           git config user.name "chatgpt-bugfix-agent"
@@ -78,7 +78,7 @@ jobs:
           exit 1
 
       - name: Run Android unit tests and compile app
-        if: steps.apply-repair.outcome == 'success'
+        if: steps.apply_repair.outcome == 'success'
         run: >-
           gradle --no-daemon --console=plain --warning-mode=fail
           :engine-input:testDebugUnitTest
@@ -87,7 +87,7 @@ jobs:
           :app:compileDebugKotlin
 
       - name: Commit verified repair
-        if: steps.apply-repair.outcome == 'success'
+        if: steps.apply_repair.outcome == 'success'
         working-directory: .
         run: |
           git checkout origin/main -- .github/workflows/drum-kit-android-validation.yml
