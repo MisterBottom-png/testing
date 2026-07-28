@@ -141,7 +141,7 @@ test('feature-level Gemini transport functions construct requests with selected 
     calls.push({ url, options });
     const isTts = String(url).includes(services.DEFAULT_TTS_MODEL);
     const payload = isTts
-      ? { candidates: [{ content: { parts: [{ inlineData: { data: 'AAA=', mimeType: 'audio/pcm;rate=24000' } }] } }] }
+      ? { candidates: [{ content: { parts: [{ inlineData: { data: 'AAA=', mimeType: 'audio/pcm;rate=24000;channels=1' } }] } }] }
       : { candidates: [{ content: { parts: [{ text: '{"title":"Test","segments":[]}' }] } }] };
     return { ok: true, status: 200, text: async () => JSON.stringify(payload) };
   } }, async () => {

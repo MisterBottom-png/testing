@@ -396,16 +396,8 @@ export function installConversationPreview(services) {
       throw services.createApiError(response.status, 'Gemini returned non-JSON conversation-preview data.', raw);
     }
     if (!response.ok) throw services.createApiError(response.status, data?.error?.message || `Conversation preview failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
-    const candidate = data?.candidates?.[0];
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
-      throw services.createApiError(response.status, `Conversation preview ended unexpectedly with finish reason ${candidate.finishReason}.`, JSON.stringify(data, null, 2));
-    }
-    const part = data?.candidates?.flatMap(item => item?.content?.parts || []).find(item => item?.inlineData?.data);
-    if (!part) throw services.createApiError(response.status, 'Gemini returned an empty conversation-preview audio response.', JSON.stringify(data, null, 2));
-    const pcmBytes = services.base64ToBytes(part.inlineData.data);
-    if (pcmBytes.byteLength < 2 || pcmBytes.byteLength % 2 !== 0) throw new Error('Gemini returned invalid conversation-preview PCM audio.');
-    const sampleRate = services.sampleRateFromMimeType(part.inlineData.mimeType);
-    const blob = services.pcm16ToWavBlob(pcmBytes, sampleRate, 1);
+    const { pcmBytes, sampleRate, channels } = services.parseGeminiAudioResponse(data);
+    const blob = services.pcm16ToWavBlob(pcmBytes, sampleRate, channels);
     if (!blob || blob.size <= 44) throw new Error('Gemini returned invalid conversation-preview audio.');
     return {
       cacheKey: descriptor.cacheKey,
