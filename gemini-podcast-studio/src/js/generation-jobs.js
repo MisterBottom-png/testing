@@ -62,6 +62,18 @@ export function installGenerationJobs(services) {
     if (!chunks.length) return;
     const speakerVoiceConfigs = services.buildSpeakerVoiceConfigs();
     const mappingSignature = services.getSpeakerVoiceMappingSignature();
+    const ttsModel = services.getTtsModel();
+    chunks = chunks.map(chunk => ({
+      ...chunk,
+      cacheKey: services.buildTtsChunkCacheKey({
+        ttsModel,
+        transcript: chunk.transcript,
+        mappingSignature,
+        requestFormatVersion: services.TTS_REQUEST_FORMAT_VERSION,
+        index: chunk.index
+      })
+    }));
+    await services.retainTtsChunkCache?.(chunks.map(chunk => chunk.cacheKey));
     services.hideServiceError();
     services.invalidatePodcastAudio('audio-regeneration');
     services.appState.lastAction = 'generate-audio';
@@ -72,15 +84,31 @@ export function installGenerationJobs(services) {
     try {
       for (const chunk of chunks) {
         if (services.els.scriptLoadingMessage) services.els.scriptLoadingMessage.textContent = chunks.length > 1 ? `Generating audio chunk ${chunk.index + 1} of ${chunks.length}…` : 'Generating the conversation…';
-        let result;
+        let result = (await services.readTtsChunkCache?.(chunk.cacheKey))?.record || null;
         try {
-          result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });
+          if (!result) {
+            result = await services.generateTtsPcm({ transcript: chunk.transcript, speakerVoiceConfigs });
+            const record = {
+              cacheKey: chunk.cacheKey,
+              pcmBytes: result.pcmBytes,
+              sampleRate: result.sampleRate,
+              createdAt: new Date().toISOString()
+            };
+            if (services.isValidTtsChunkCacheRecord && !services.isValidTtsChunkCacheRecord(record, chunk.cacheKey)) {
+              throw new Error('Gemini returned an invalid PCM audio chunk.');
+            }
+            const cacheError = await services.writeTtsChunkCache?.(record);
+            if (cacheError) services.logDiagnostic?.('tts-chunk-cache-write-failed', cacheError);
+          }
         } catch (error) {
           const chunkError = services.createApiError(Number(error?.status || 0), `TTS chunk ${chunk.index + 1} of ${chunks.length} failed. No partial audio was saved.`, error?.details || error?.stack || String(error));
           chunkError.cause = error;
           throw chunkError;
         }
-        if (sampleRate && result.sampleRate !== sampleRate) throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+        if (sampleRate && result.sampleRate !== sampleRate) {
+          await services.removeTtsChunkCache?.(chunk.cacheKey);
+          throw new Error('Gemini returned inconsistent audio sample rates between TTS chunks.');
+        }
         sampleRate = sampleRate || result.sampleRate;
         pcmParts.push(result.pcmBytes);
       }
@@ -98,11 +126,7 @@ export function installGenerationJobs(services) {
         voiceMappingSignature: mappingSignature,
         chunks: chunks.map(chunk => ({
           index: chunk.index,
-          cacheKey: services.buildTtsChunkCacheKey({
-            transcript: chunk.transcript,
-            mappingSignature,
-            index: chunk.index
-          }),
+          cacheKey: chunk.cacheKey,
           speakerOrder: speakerVoiceConfigs.map(config => config.speaker)
         }))
       };
