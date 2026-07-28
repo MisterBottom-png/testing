@@ -4,9 +4,9 @@
 
 **Goal:** Add a checksum-covered `generated-output.wav` to normal Step 1.2 diagnostic bundles by capturing the native post-room, post-master, post-limiter stereo output without compromising the real-time audio callback.
 
-**Architecture:** A platform-neutral, fixed-capacity native SPSC ring stores complete stereo float frames together with logical frame indices. Kotlin drains contiguous runs through bounded JNI calls and writes PCM16 into a seekable cache file on `Dispatchers.IO`; a final ZIP augmenter streams the WAV into the diagnostic bundle, updates manifest and summary metadata, and recomputes checksums. Capture failures remain subordinate to playing and to the rest of diagnostic export.
+**Architecture:** A platform-neutral, fixed-capacity native SPSC ring stores complete stereo float frames together with logical frame indices. Kotlin drains contiguous runs through bounded JNI calls and writes PCM16 into a seekable cache file on `Dispatchers.IO`; a final streaming ZIP augmenter adds the WAV, updates manifest and summary metadata, and recomputes checksums. Capture failure remains subordinate to playing and to the rest of diagnostic export.
 
-**Tech Stack:** C++20, Oboe, JNI, Kotlin/JVM, Android API 26+, Java `RandomAccessFile`, Kotlin coroutines already supplied transitively by Compose, JUnit 4, Gradle 9.5.0, Android Gradle Plugin 9.3.x, GitHub Actions.
+**Tech Stack:** C++20, Oboe, JNI, Kotlin/JVM, Android API 26+, Java `RandomAccessFile`, Kotlin coroutines already used by the app, JUnit 4, Gradle 9.5.0, Android Gradle Plugin 9.3.x, GitHub Actions.
 
 ## Global Constraints
 
@@ -24,63 +24,35 @@
 
 ---
 
-## File Structure
+## File Map
 
-### Native capture and JNI
+### Native and engine-audio
 
-- Create `drum-kit-android/engine-audio/src/main/cpp/diagnostic-output-capture.h`
-  - Header-only platform-neutral ring and state machine, templated by capacity so host tests can use tiny rings.
-- Create `drum-kit-android/engine-audio/src/test/cpp/diagnostic-output-capture-test.cpp`
-  - Dependency-free host executable covering state, ordering, overflow, duration, format changes, and audio-stop behaviour.
-- Create `drum-kit-android/tools/test_diagnostic_output_capture.sh`
-  - Reproducible local/CI host compilation and execution command.
-- Modify `drum-kit-android/engine-audio/src/main/cpp/sampled-audio-engine.cpp`
-  - Own the runtime capture instance, copy post-limiter output into it, and expose JNI start/drain/stop/status operations.
-- Modify `.github/workflows/drum-kit-android-validation.yml`
-  - Run the host C++ test before Android Gradle validation.
+- Create `drum-kit-android/engine-audio/src/main/cpp/diagnostic-output-capture.h` for the header-only platform-neutral ring and state machine.
+- Create `drum-kit-android/engine-audio/src/test/cpp/diagnostic-output-capture-test.cpp` for dependency-free host tests.
+- Create `drum-kit-android/tools/test_diagnostic_output_capture.sh` for the reproducible host compile/run command.
+- Modify `.github/workflows/drum-kit-android-validation.yml` to run the host test before Gradle validation.
+- Modify `drum-kit-android/engine-audio/src/main/cpp/sampled-audio-engine.cpp` to own the runtime ring, copy post-limiter frames, preserve buffered data across stream errors, and expose JNI operations.
+- Create `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/DiagnosticOutputCapture.kt` for Kotlin wire models and decoding.
+- Create `drum-kit-android/engine-audio/src/test/java/com/vitautas/drumkit/audio/DiagnosticOutputCaptureDecoderTest.kt` for strict decoder tests.
+- Modify `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/AudioEngine.kt` for reusable metadata buffers and synchronised capture operations.
 
-### Engine-audio Kotlin protocol
+### App persistence and export
 
-- Create `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/DiagnosticOutputCapture.kt`
-  - Producer-state/stop-reason enums, start/status/drain models, and strict metadata decoding.
-- Create `drum-kit-android/engine-audio/src/test/java/com/vitautas/drumkit/audio/DiagnosticOutputCaptureDecoderTest.kt`
-  - Wire-value, sentinel, count, and invalid-metadata tests.
-- Modify `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/AudioEngine.kt`
-  - Reusable metadata buffers and synchronised public capture operations.
-
-### PCM/WAV persistence and session coordination
-
-- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticPcm16WavWriter.kt`
-  - Seekable 44-byte-header writer, deterministic float conversion, silence writing, and finalisation.
-- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticPcm16WavWriterTest.kt`
-  - Byte-exact PCM and RIFF tests.
-- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorder.kt`
-  - Preparation, native start, bounded drain, gap substitution, terminal result, file cleanup, and finalisation.
-- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorderTest.kt`
-  - Fake-source tests for normal, overflow, partial, unavailable, and failed captures.
-- Modify `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticSessionRecorder.kt`
-  - Retain the monotonic session-start timestamp in `DiagnosticSessionCapture` for WAV alignment.
-- Modify `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionRecorderTest.kt`
-  - Verify the monotonic timestamp is captured and preserved.
-
-### Bundle and UI integration
-
-- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenter.kt`
-  - Streaming ZIP rewrite, manifest/summary transformation, WAV insertion, and SHA-256 recomputation.
-- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenterTest.kt`
-  - Successful, partial, unavailable, checksum, and large-stream tests.
-- Modify `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticDrumKitScreen.kt`
-  - Prepare/start capture with the diagnostic session, drain during recording, stop producer first, finalise before ZIP augmentation, and expose compact status text.
-- Modify `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionBundleRecorderTest.kt`
-  - Update the expected planned-file text after final generated-output augmentation tests own WAV assertions.
-- Modify `drum-kit-android/README.md`
-  - Document generated-output capture and its bounded failure behaviour.
-- Modify `drum-kit-android/docs/Drum_Kit_Recovery_and_Development_Roadmap.md`
-  - Mark the generated-output implementation as implemented/automated-validated but physically unverified until a device bundle is reviewed.
+- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticPcm16WavWriter.kt` for PCM conversion, silence writing, RIFF finalisation, and abort cleanup.
+- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticPcm16WavWriterTest.kt` for byte-exact WAV tests.
+- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorder.kt` for preparation, native start/drain/stop, gap substitution, terminal results, and file cleanup.
+- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorderTest.kt` for deterministic fake-source/fake-sink tests.
+- Modify `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticSessionRecorder.kt` to preserve the monotonic session start in `DiagnosticSessionCapture`.
+- Modify `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionRecorderTest.kt` to verify monotonic alignment data.
+- Create `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenter.kt` for a streaming final ZIP rewrite.
+- Create `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenterTest.kt` for entry, metadata, streaming, and checksum tests.
+- Modify `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticDrumKitScreen.kt` to order preparation/start/live drain/stop/finalisation around the existing recorders.
+- Modify `drum-kit-android/README.md`, `drum-kit-android/docs/Drum_Kit_Recovery_and_Development_Roadmap.md`, and PR #10 status after validation.
 
 ---
 
-### Task 1: Platform-Neutral Native Capture Ring
+### Task 1: Build and Prove the Native Capture Ring
 
 **Files:**
 - Create: `drum-kit-android/engine-audio/src/main/cpp/diagnostic-output-capture.h`
@@ -89,22 +61,52 @@
 - Modify: `.github/workflows/drum-kit-android-validation.yml:37-70`
 
 **Interfaces:**
-- Consumes: final stereo float samples, current sample rate/channel count, and a monotonic frame timestamp supplied by the native audio engine.
-- Produces:
-  - `enum class DiagnosticOutputProducerState : int32_t { Idle = 0, Capturing = 1, Stopped = 2 }`
-  - `enum class DiagnosticOutputStopReason : int32_t { None = 0, StoppedByUser = 1, DurationLimit = 2, FormatChanged = 3, AudioStopped = 4, StartFailed = 5 }`
-  - `template <size_t CapacityFrames> class DiagnosticOutputCapture`
-  - `bool start(int32_t sampleRate, int32_t channelCount, int64_t activationNanos)`
-  - `void writeFrame(float left, float right, int32_t sampleRate, int32_t channelCount, int64_t frameNanos)`
-  - `DiagnosticOutputDrainResult drain(float* destination, size_t destinationFrameCapacity)`
-  - `void stop(DiagnosticOutputStopReason reason)`
-  - `void markAudioStopped()`
-  - `DiagnosticOutputStatus status() const`
-  - `using RuntimeDiagnosticOutputCapture = DiagnosticOutputCapture<32768>`
 
-- [ ] **Step 1: Write the failing host tests**
+```cpp
+enum class DiagnosticOutputProducerState : int32_t {
+    Idle = 0,
+    Capturing = 1,
+    Stopped = 2,
+};
 
-Create a dependency-free test executable with a small assertion helper and explicit cases. Use a tiny template capacity to force wrap and overflow:
+enum class DiagnosticOutputStopReason : int32_t {
+    None = 0,
+    StoppedByUser = 1,
+    DurationLimit = 2,
+    FormatChanged = 3,
+    AudioStopped = 4,
+    StartFailed = 5,
+};
+
+template <size_t CapacityFrames>
+class DiagnosticOutputCapture {
+public:
+    bool start(int32_t sampleRate, int32_t channelCount, int64_t activationNanos);
+    bool startForMaximumFramesForTest(
+        int32_t sampleRate,
+        int32_t channelCount,
+        int64_t activationNanos,
+        uint64_t maximumLogicalFrames
+    );
+    void writeFrame(
+        float left,
+        float right,
+        int32_t sampleRate,
+        int32_t channelCount,
+        int64_t frameNanos
+    );
+    DiagnosticOutputDrainResult drain(float* destination, size_t destinationFrameCapacity);
+    void stop(DiagnosticOutputStopReason reason);
+    void markAudioStopped();
+    DiagnosticOutputStatus status() const;
+};
+
+using RuntimeDiagnosticOutputCapture = DiagnosticOutputCapture<32768>;
+```
+
+- [ ] **Step 1: Write the complete failing host test file**
+
+Create `diagnostic-output-capture-test.cpp` with these exact helpers and cases:
 
 ```cpp
 #include "diagnostic-output-capture.h"
@@ -122,69 +124,159 @@ void require(bool condition, const char* message) {
     }
 }
 
+void requireNear(float actual, float expected, const char* message) {
+    require(std::abs(actual - expected) < 0.0001f, message);
+}
+
+void testInitialState() {
+    DiagnosticOutputCapture<4> capture;
+    const auto status = capture.status();
+    require(status.state == DiagnosticOutputProducerState::Idle, "initial state");
+    require(status.stopReason == DiagnosticOutputStopReason::None, "initial reason");
+    require(!status.bufferedFramesRemain, "initial buffer empty");
+}
+
+void testInvalidStart() {
+    DiagnosticOutputCapture<4> capture;
+    require(!capture.start(0, 2, 10), "zero rate rejected");
+    require(capture.status().stopReason == DiagnosticOutputStopReason::StartFailed, "start failure reason");
+
+    DiagnosticOutputCapture<4> wrongChannels;
+    require(!wrongChannels.start(48000, 1, 10), "mono rejected");
+    require(wrongChannels.status().stopReason == DiagnosticOutputStopReason::StartFailed, "mono failure reason");
+}
+
 void testStartAndContiguousDrain() {
     DiagnosticOutputCapture<4> capture;
-    require(capture.start(48000, 2, 1'000'000), "capture should start");
+    require(capture.start(48000, 2, 1'000'000), "start succeeds");
     capture.writeFrame(0.25f, -0.25f, 48000, 2, 1'000'100);
     capture.writeFrame(0.50f, -0.50f, 48000, 2, 1'000'200);
 
     float samples[8]{};
     const auto result = capture.drain(samples, 4);
-    require(result.frameCount == 2, "two frames should drain");
-    require(result.firstLogicalFrame == 0, "first logical frame should be zero");
-    require(std::abs(samples[0] - 0.25f) < 0.0001f, "left sample should match");
-    require(std::abs(samples[3] + 0.50f) < 0.0001f, "right sample should match");
+    require(result.frameCount == 2, "two frames drain");
+    require(result.firstLogicalFrame == 0, "first logical frame zero");
+    requireNear(samples[0], 0.25f, "first left");
+    requireNear(samples[1], -0.25f, "first right");
+    requireNear(samples[2], 0.50f, "second left");
+    requireNear(samples[3], -0.50f, "second right");
+    require(result.firstCapturedFrameNanos == 1'000'100, "first frame timestamp");
 }
 
-void testOverflowCreatesNextRunGap() {
+void testRepeatedStartPreservesActiveCapture() {
+    DiagnosticOutputCapture<4> capture;
+    require(capture.start(48000, 2, 100), "first start");
+    require(!capture.start(96000, 2, 200), "second start rejected");
+    const auto status = capture.status();
+    require(status.state == DiagnosticOutputProducerState::Capturing, "capture remains active");
+    require(status.sampleRate == 48000, "format unchanged");
+}
+
+void testOverflowAndContiguousRuns() {
     DiagnosticOutputCapture<2> capture;
-    require(capture.start(48000, 2, 10), "capture should start");
+    require(capture.start(48000, 2, 10), "start succeeds");
     capture.writeFrame(0.1f, 0.2f, 48000, 2, 11);
     capture.writeFrame(0.3f, 0.4f, 48000, 2, 12);
     capture.writeFrame(0.5f, 0.6f, 48000, 2, 13);
 
     float first[4]{};
     const auto firstRun = capture.drain(first, 2);
-    require(firstRun.frameCount == 2, "ring should retain two frames");
-    require(firstRun.droppedFrames == 1, "overflow should count one dropped frame");
+    require(firstRun.frameCount == 2, "ring retains capacity");
+    require(firstRun.firstLogicalFrame == 0, "first run starts zero");
+    require(firstRun.droppedFrames == 1, "one dropped frame");
 
     capture.writeFrame(0.7f, 0.8f, 48000, 2, 14);
     float second[4]{};
     const auto secondRun = capture.drain(second, 2);
-    require(secondRun.frameCount == 1, "one post-gap frame should drain");
-    require(secondRun.firstLogicalFrame == 3, "next run should expose exact gap");
+    require(secondRun.frameCount == 1, "post-gap run has one frame");
+    require(secondRun.firstLogicalFrame == 3, "post-gap index exposed");
+    require(secondRun.logicalFrames == 4, "logical timeline includes drop");
+    require(secondRun.capturedFrames == 3, "captured count excludes drop");
+}
+
+void testWrapAroundOrdering() {
+    DiagnosticOutputCapture<3> capture;
+    require(capture.start(48000, 2, 10), "start succeeds");
+    for (int index = 0; index < 3; ++index) {
+        capture.writeFrame(index + 0.1f, index + 0.2f, 48000, 2, 20 + index);
+    }
+    float first[4]{};
+    require(capture.drain(first, 2).frameCount == 2, "first partial drain");
+    capture.writeFrame(3.1f, 3.2f, 48000, 2, 30);
+    capture.writeFrame(4.1f, 4.2f, 48000, 2, 31);
+
+    float second[8]{};
+    const auto result = capture.drain(second, 4);
+    require(result.frameCount == 3, "wrapped frames drain");
+    require(result.firstLogicalFrame == 2, "wrapped run starts at two");
+    requireNear(second[0], 2.1f, "oldest wrapped left");
+    requireNear(second[4], 4.1f, "newest wrapped left");
+}
+
+void testDurationLimit() {
+    DiagnosticOutputCapture<8> capture;
+    require(capture.startForMaximumFramesForTest(48000, 2, 100, 3), "test start");
+    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
+    capture.writeFrame(0.3f, 0.4f, 48000, 2, 102);
+    capture.writeFrame(0.5f, 0.6f, 48000, 2, 103);
+    capture.writeFrame(0.7f, 0.8f, 48000, 2, 104);
+    const auto status = capture.status();
+    require(status.state == DiagnosticOutputProducerState::Stopped, "duration stops producer");
+    require(status.stopReason == DiagnosticOutputStopReason::DurationLimit, "duration reason");
+    require(status.logicalFrames == 3, "exact duration frames");
+}
+
+void testFormatChangeStopsBeforeNewFrame() {
+    DiagnosticOutputCapture<8> capture;
+    require(capture.start(48000, 2, 100), "start succeeds");
+    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
+    capture.writeFrame(0.3f, 0.4f, 96000, 2, 102);
+    float samples[16]{};
+    const auto result = capture.drain(samples, 8);
+    require(result.frameCount == 1, "new format not stored");
+    require(result.stopReason == DiagnosticOutputStopReason::FormatChanged, "format reason");
+}
+
+void testAudioStopAndIdempotentStop() {
+    DiagnosticOutputCapture<8> capture;
+    require(capture.start(48000, 2, 100), "start succeeds");
+    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
+    capture.markAudioStopped();
+    capture.stop(DiagnosticOutputStopReason::StoppedByUser);
+    const auto status = capture.status();
+    require(status.stopReason == DiagnosticOutputStopReason::AudioStopped, "first reason wins");
+    require(status.bufferedFramesRemain, "buffer preserved");
+}
+
+void testStoppedWritesDoNothing() {
+    DiagnosticOutputCapture<4> capture;
+    require(capture.start(48000, 2, 100), "start succeeds");
+    capture.stop(DiagnosticOutputStopReason::StoppedByUser);
+    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
+    const auto status = capture.status();
+    require(status.logicalFrames == 0, "stopped logical count unchanged");
+    require(status.capturedFrames == 0, "stopped captured count unchanged");
 }
 
 }  // namespace
 
 int main() {
+    testInitialState();
+    testInvalidStart();
     testStartAndContiguousDrain();
-    testOverflowCreatesNextRunGap();
-    // Call the additional tests added below.
+    testRepeatedStartPreservesActiveCapture();
+    testOverflowAndContiguousRuns();
+    testWrapAroundOrdering();
+    testDurationLimit();
+    testFormatChangeStopsBeforeNewFrame();
+    testAudioStopAndIdempotentStop();
+    testStoppedWritesDoNothing();
     std::cout << "diagnostic-output-capture tests passed\n";
     return 0;
 }
 ```
 
-Add separate test functions for:
-
-- initial `Idle` status;
-- invalid start with sample rate `0` or channel count other than `2` returning `false` and `StartFailed`;
-- repeated start while capturing leaving the active capture unchanged;
-- wrap-around ordering;
-- no overwrite of unread frames;
-- first-captured timestamp set only by the first successfully stored frame;
-- contiguous-run drain stopping before a logical discontinuity;
-- logical frame count advancing across drops;
-- duration limit using `startForMaximumFramesForTest(48000, 2, activationNanos, 3)` or an equivalent constructor-visible test hook that does not affect the runtime default;
-- format change stopping before the new-format frame is stored;
-- `markAudioStopped()` retaining buffered frames;
-- idempotent stop preserving the first terminal reason;
-- disabled/stopped writes changing no counters.
-
-- [ ] **Step 2: Run the host test to verify it fails**
-
-Run:
+- [ ] **Step 2: Run the test to prove the red state**
 
 ```bash
 cd drum-kit-android
@@ -197,9 +289,9 @@ c++ -std=c++20 -Wall -Wextra -Werror -pthread \
 
 Expected: compilation fails because `diagnostic-output-capture.h` does not exist.
 
-- [ ] **Step 3: Implement the minimal bounded ring and state machine**
+- [ ] **Step 3: Implement the header-only ring**
 
-Create a header-only template. Use monotonically increasing producer/consumer sequences rather than reserving one sentinel slot, so all `CapacityFrames` slots are usable:
+Create these exact data types:
 
 ```cpp
 #pragma once
@@ -212,21 +304,6 @@ Create a header-only template. Use monotonically increasing producer/consumer se
 
 constexpr uint64_t kNoDiagnosticOutputFrame = std::numeric_limits<uint64_t>::max();
 constexpr int64_t kNoDiagnosticOutputTimestamp = -1;
-
-enum class DiagnosticOutputProducerState : int32_t {
-    Idle = 0,
-    Capturing = 1,
-    Stopped = 2,
-};
-
-enum class DiagnosticOutputStopReason : int32_t {
-    None = 0,
-    StoppedByUser = 1,
-    DurationLimit = 2,
-    FormatChanged = 3,
-    AudioStopped = 4,
-    StartFailed = 5,
-};
 
 struct DiagnosticOutputStatus {
     DiagnosticOutputProducerState state = DiagnosticOutputProducerState::Idle;
@@ -246,92 +323,97 @@ struct DiagnosticOutputDrainResult : DiagnosticOutputStatus {
     uint64_t firstLogicalFrame = kNoDiagnosticOutputFrame;
     size_t frameCount = 0;
 };
-
-template <size_t CapacityFrames>
-class DiagnosticOutputCapture {
-    static_assert(CapacityFrames > 0, "capture capacity must be positive");
-
-    struct Slot {
-        uint64_t logicalFrame = 0;
-        float left = 0.0f;
-        float right = 0.0f;
-    };
-
-public:
-    bool start(int32_t sampleRate, int32_t channelCount, int64_t activationNanos) {
-        return startInternal(
-            sampleRate,
-            channelCount,
-            activationNanos,
-            static_cast<uint64_t>(sampleRate) * 600U
-        );
-    }
-
-    bool startForMaximumFramesForTest(
-        int32_t sampleRate,
-        int32_t channelCount,
-        int64_t activationNanos,
-        uint64_t maximumLogicalFrames
-    ) {
-        return startInternal(sampleRate, channelCount, activationNanos, maximumLogicalFrames);
-    }
-
-    // Implement writeFrame, drain, stop, markAudioStopped, status, and private reset/start helpers.
-
-private:
-    std::array<Slot, CapacityFrames> slots_{};
-    std::atomic<uint64_t> readSequence_{0};
-    std::atomic<uint64_t> writeSequence_{0};
-    std::atomic<uint64_t> logicalFrames_{0};
-    std::atomic<uint64_t> capturedFrames_{0};
-    std::atomic<uint64_t> droppedFrames_{0};
-    std::atomic<int64_t> firstCapturedFrameNanos_{kNoDiagnosticOutputTimestamp};
-    std::atomic<DiagnosticOutputProducerState> state_{DiagnosticOutputProducerState::Idle};
-    std::atomic<DiagnosticOutputStopReason> stopReason_{DiagnosticOutputStopReason::None};
-    int32_t sampleRate_ = 0;
-    int32_t channelCount_ = 0;
-    uint64_t maximumLogicalFrames_ = 0;
-    int64_t activationNanos_ = kNoDiagnosticOutputTimestamp;
-};
-
-using RuntimeDiagnosticOutputCapture = DiagnosticOutputCapture<32768>;
 ```
 
-Implementation rules inside the header:
+Implement `DiagnosticOutputCapture<CapacityFrames>` with:
 
-- `startInternal` rejects invalid formats and `maximumLogicalFrames == 0`, sets `StartFailed`, and returns `false`.
-- A successful start resets sequences/counters, writes format fields, then publishes `Capturing` with release semantics.
-- `writeFrame` loads state with acquire semantics and returns immediately unless capturing.
-- A format mismatch calls `stop(FormatChanged)` before storing the frame.
-- Each callback frame consumes one logical index. When the ring is full, increment only `droppedFrames`; never advance `writeSequence`.
-- For a successful slot write, write logical index and samples first, then publish `writeSequence + 1` with release semantics.
-- Set `firstCapturedFrameNanos` with compare-exchange only after a frame is successfully stored.
-- After the final allowed logical frame is represented, stop with `DurationLimit`.
-- `drain` loads published `writeSequence` with acquire semantics, copies one contiguous logical run, and stops before the first discontinuity.
-- `drain` advances `readSequence` only after destination samples are written.
-- `stop` uses compare-exchange so the first terminal reason wins.
+```cpp
+struct Slot {
+    uint64_t logicalFrame = 0;
+    float left = 0.0f;
+    float right = 0.0f;
+};
 
-- [ ] **Step 4: Add the reusable host-test script and workflow step**
+std::array<Slot, CapacityFrames> slots_{};
+std::atomic<uint64_t> readSequence_{0};
+std::atomic<uint64_t> writeSequence_{0};
+std::atomic<uint64_t> logicalFrames_{0};
+std::atomic<uint64_t> capturedFrames_{0};
+std::atomic<uint64_t> droppedFrames_{0};
+std::atomic<int64_t> firstCapturedFrameNanos_{kNoDiagnosticOutputTimestamp};
+std::atomic<DiagnosticOutputProducerState> state_{DiagnosticOutputProducerState::Idle};
+std::atomic<DiagnosticOutputStopReason> stopReason_{DiagnosticOutputStopReason::None};
+int32_t sampleRate_ = 0;
+int32_t channelCount_ = 0;
+uint64_t maximumLogicalFrames_ = 0;
+int64_t activationNanos_ = kNoDiagnosticOutputTimestamp;
+```
+
+Use these algorithms:
+
+```cpp
+bool startInternal(int32_t rate, int32_t channels, int64_t activation, uint64_t maximum) {
+    if (state_.load(std::memory_order_acquire) == DiagnosticOutputProducerState::Capturing) {
+        return false;
+    }
+    if (readSequence_.load(std::memory_order_acquire) != writeSequence_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (rate <= 0 || channels != 2 || maximum == 0) {
+        stopReason_.store(DiagnosticOutputStopReason::StartFailed, std::memory_order_relaxed);
+        state_.store(DiagnosticOutputProducerState::Stopped, std::memory_order_release);
+        return false;
+    }
+    readSequence_.store(0, std::memory_order_relaxed);
+    writeSequence_.store(0, std::memory_order_relaxed);
+    logicalFrames_.store(0, std::memory_order_relaxed);
+    capturedFrames_.store(0, std::memory_order_relaxed);
+    droppedFrames_.store(0, std::memory_order_relaxed);
+    firstCapturedFrameNanos_.store(kNoDiagnosticOutputTimestamp, std::memory_order_relaxed);
+    sampleRate_ = rate;
+    channelCount_ = channels;
+    maximumLogicalFrames_ = maximum;
+    activationNanos_ = activation;
+    stopReason_.store(DiagnosticOutputStopReason::None, std::memory_order_relaxed);
+    state_.store(DiagnosticOutputProducerState::Capturing, std::memory_order_release);
+    return true;
+}
+```
+
+`writeFrame` must:
+
+1. return unless state is `Capturing`;
+2. stop with `FormatChanged` before advancing the timeline when rate/channels differ;
+3. stop with `DurationLimit` when `logicalFrames == maximumLogicalFrames`;
+4. reserve the current logical index and increment `logicalFrames` once;
+5. compare `writeSequence - readSequence` with `CapacityFrames`;
+6. increment `droppedFrames` and store no slot when full;
+7. otherwise write slot index `writeSequence % CapacityFrames`, then publish `writeSequence + 1` with release semantics;
+8. set first-captured timestamp by compare-exchange after the first successful slot write;
+9. stop with `DurationLimit` after representing the final allowed logical frame.
+
+`drain` must copy only one contiguous logical run. Load `writeSequence` with acquire semantics, inspect each slot from `readSequence`, stop before any slot whose logical index is not `firstLogicalFrame + copied`, then publish the new `readSequence` with release semantics.
+
+`stop` must compare-exchange `stopReason` from `None` to the requested reason, then publish `Stopped`. `markAudioStopped` calls `stop(AudioStopped)`. `status` snapshots counters and sets `bufferedFramesRemain = writeSequence > readSequence`.
+
+- [ ] **Step 4: Add the reusable script and CI step**
 
 Create `tools/test_diagnostic_output_capture.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="$ROOT_DIR/build/native-tests"
 mkdir -p "$OUTPUT_DIR"
-
 c++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT_DIR/engine-audio/src/main/cpp" \
   "$ROOT_DIR/engine-audio/src/test/cpp/diagnostic-output-capture-test.cpp" \
   -o "$OUTPUT_DIR/diagnostic-output-capture-test"
-
 "$OUTPUT_DIR/diagnostic-output-capture-test"
 ```
 
-Add this step before Gradle setup in `.github/workflows/drum-kit-android-validation.yml`:
+Add before Gradle setup in `.github/workflows/drum-kit-android-validation.yml`:
 
 ```yaml
       - name: Run diagnostic output native tests
@@ -339,20 +421,14 @@ Add this step before Gradle setup in `.github/workflows/drum-kit-android-validat
         run: bash tools/test_diagnostic_output_capture.sh
 ```
 
-- [ ] **Step 5: Run the focused native tests**
-
-Run:
+- [ ] **Step 5: Run the green test**
 
 ```bash
 cd drum-kit-android
 bash tools/test_diagnostic_output_capture.sh
 ```
 
-Expected output:
-
-```text
-diagnostic-output-capture tests passed
-```
+Expected output: `diagnostic-output-capture tests passed`.
 
 - [ ] **Step 6: Commit Task 1**
 
@@ -367,114 +443,108 @@ git commit -m "test(audio): add bounded diagnostic output ring"
 
 ---
 
-### Task 2: Kotlin Capture Protocol and Decoder
+### Task 2: Define the Kotlin Protocol and Wire It to Oboe/JNI
 
 **Files:**
 - Create: `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/DiagnosticOutputCapture.kt`
 - Create: `drum-kit-android/engine-audio/src/test/java/com/vitautas/drumkit/audio/DiagnosticOutputCaptureDecoderTest.kt`
 - Modify: `drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/AudioEngine.kt:11-158`
+- Modify: `drum-kit-android/engine-audio/src/main/cpp/sampled-audio-engine.cpp:1-1100`
 
-**Interfaces:**
-- Consumes: native integer wire values and one reusable interleaved `FloatArray` supplied by the app drainer.
-- Produces:
+**Wire contract:** one `LongArray` with 12 fields in this exact order:
 
-```kotlin
-enum class DiagnosticOutputProducerState(val wireValue: Int) {
-    IDLE(0), CAPTURING(1), STOPPED(2);
-}
-
-enum class DiagnosticOutputStopReason(val wireValue: Int) {
-    NONE(0), STOPPED_BY_USER(1), DURATION_LIMIT(2), FORMAT_CHANGED(3),
-    AUDIO_STOPPED(4), START_FAILED(5);
-}
-
-data class DiagnosticOutputStartResult(
-    val started: Boolean,
-    val sampleRate: Int,
-    val channelCount: Int,
-    val maximumLogicalFrames: Long,
-    val activationMonotonicNanos: Long?,
-    val stopReason: DiagnosticOutputStopReason,
-)
-
-data class DiagnosticOutputDrainInfo(
-    val returnedFrames: Int,
-    val firstLogicalFrame: Long?,
-    val logicalFrames: Long,
-    val capturedFrames: Long,
-    val droppedFrames: Long,
-    val sampleRate: Int,
-    val channelCount: Int,
-    val producerState: DiagnosticOutputProducerState,
-    val stopReason: DiagnosticOutputStopReason,
-    val activationMonotonicNanos: Long?,
-    val firstCapturedFrameMonotonicNanos: Long?,
-    val bufferedFramesRemain: Boolean,
-)
+```text
+0 firstLogicalFrame (-1 when absent)
+1 returnedFrames
+2 logicalFrames
+3 capturedFrames
+4 droppedFrames
+5 sampleRate
+6 channelCount
+7 producerState
+8 stopReason
+9 activationMonotonicNanos (-1 when absent)
+10 firstCapturedFrameMonotonicNanos (-1 when absent)
+11 bufferedFramesRemain (0 or 1)
 ```
 
-`AudioEngine` produces:
+- [ ] **Step 1: Write decoder tests**
 
-```kotlin
-fun startDiagnosticOutputCapture(): DiagnosticOutputStartResult
-@Synchronized fun drainDiagnosticOutput(samples: FloatArray): DiagnosticOutputDrainInfo
-fun stopDiagnosticOutputCapture()
-fun diagnosticOutputStatus(): DiagnosticOutputDrainInfo
-```
-
-- [ ] **Step 1: Write decoder tests that fail before the protocol exists**
-
-Use fixed metadata indices and explicit sentinels:
+Create exact tests:
 
 ```kotlin
 @Test
-fun decodesContiguousDrainMetadata() {
-    val metadata = longArrayOf(
-        12L,       // first logical frame
-        4L,        // returned frames
-        20L,       // logical frames
-        19L,       // captured frames
-        1L,        // dropped frames
-        48_000L,
-        2L,
-        1L,        // CAPTURING
-        0L,        // NONE
-        1_000L,    // activation nanos
-        1_100L,    // first captured nanos
-        1L,        // buffered frames remain
-    )
-
+fun decodesDrainMetadata() {
+    val metadata = longArrayOf(12, 4, 20, 19, 1, 48_000, 2, 1, 0, 1_000, 1_100, 1)
     val result = DiagnosticOutputCaptureDecoder.decodeDrain(metadata, samplesSize = 16)
-
     assertEquals(4, result.returnedFrames)
     assertEquals(12L, result.firstLogicalFrame)
+    assertEquals(20L, result.logicalFrames)
+    assertEquals(19L, result.capturedFrames)
     assertEquals(1L, result.droppedFrames)
     assertEquals(DiagnosticOutputProducerState.CAPTURING, result.producerState)
+    assertEquals(DiagnosticOutputStopReason.NONE, result.stopReason)
+    assertEquals(1_000L, result.activationMonotonicNanos)
+    assertEquals(1_100L, result.firstCapturedFrameMonotonicNanos)
     assertTrue(result.bufferedFramesRemain)
 }
 
 @Test
-fun convertsNegativeSentinelsToNull() {
-    val metadata = longArrayOf(-1L, 0L, 0L, 0L, 0L, 48_000L, 2L, 2L, 1L, -1L, -1L, 0L)
-    val result = DiagnosticOutputCaptureDecoder.decodeDrain(metadata, samplesSize = 128)
+fun decodesAbsentSentinels() {
+    val metadata = longArrayOf(-1, 0, 0, 0, 0, 48_000, 2, 2, 1, -1, -1, 0)
+    val result = DiagnosticOutputCaptureDecoder.decodeDrain(metadata, samplesSize = 0)
     assertNull(result.firstLogicalFrame)
     assertNull(result.activationMonotonicNanos)
     assertNull(result.firstCapturedFrameMonotonicNanos)
+    assertFalse(result.bufferedFramesRemain)
+}
+
+@Test
+fun rejectsUnknownStateAndReason() {
+    assertThrows(IllegalStateException::class.java) {
+        DiagnosticOutputCaptureDecoder.decodeDrain(
+            longArrayOf(-1, 0, 0, 0, 0, 48_000, 2, 99, 0, -1, -1, 0),
+            0,
+        )
+    }
+    assertThrows(IllegalStateException::class.java) {
+        DiagnosticOutputCaptureDecoder.decodeDrain(
+            longArrayOf(-1, 0, 0, 0, 0, 48_000, 2, 2, 99, -1, -1, 0),
+            0,
+        )
+    }
+}
+
+@Test
+fun rejectsInvalidCounts() {
+    assertThrows(IllegalArgumentException::class.java) {
+        DiagnosticOutputCaptureDecoder.decodeDrain(
+            longArrayOf(0, 5, 5, 5, 0, 48_000, 2, 1, 0, 0, 0, 1),
+            samplesSize = 8,
+        )
+    }
+    assertThrows(IllegalArgumentException::class.java) {
+        DiagnosticOutputCaptureDecoder.decodeDrain(
+            longArrayOf(0, 1, -1, 0, 0, 48_000, 2, 1, 0, 0, 0, 1),
+            samplesSize = 2,
+        )
+    }
+}
+
+@Test
+fun mapsEveryWireEnumValue() {
+    assertEquals(
+        listOf(IDLE, CAPTURING, STOPPED),
+        listOf(0, 1, 2).map(DiagnosticOutputProducerState::fromWire),
+    )
+    assertEquals(
+        listOf(NONE, STOPPED_BY_USER, DURATION_LIMIT, FORMAT_CHANGED, AUDIO_STOPPED, START_FAILED),
+        listOf(0, 1, 2, 3, 4, 5).map(DiagnosticOutputStopReason::fromWire),
+    )
 }
 ```
 
-Also test:
-
-- unknown producer-state wire value throws `IllegalStateException`;
-- unknown stop-reason wire value throws `IllegalStateException`;
-- negative counters are rejected;
-- returned frames exceeding `samplesSize / 2` are rejected;
-- non-stereo channel counts are rejected after a successful start;
-- a stopped empty result decodes with `bufferedFramesRemain == false`.
-
-- [ ] **Step 2: Run the decoder test to verify it fails**
-
-Run:
+- [ ] **Step 2: Run the decoder tests and confirm failure**
 
 ```bash
 cd drum-kit-android
@@ -483,60 +553,44 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   --tests com.vitautas.drumkit.audio.DiagnosticOutputCaptureDecoderTest
 ```
 
-Expected: Kotlin compilation fails because the capture protocol types do not exist.
+Expected: Kotlin compilation fails because protocol types do not exist.
 
-- [ ] **Step 3: Implement strict wire decoding**
+- [ ] **Step 3: Implement Kotlin models and strict decoding**
 
-Create `DiagnosticOutputCapture.kt` with named metadata constants:
+Create:
 
 ```kotlin
 internal const val DIAGNOSTIC_OUTPUT_METADATA_FIELD_COUNT = 12
-internal const val DIAGNOSTIC_OUTPUT_FIRST_FRAME_INDEX = 0
-internal const val DIAGNOSTIC_OUTPUT_RETURNED_FRAME_COUNT_INDEX = 1
-internal const val DIAGNOSTIC_OUTPUT_LOGICAL_FRAME_COUNT_INDEX = 2
-internal const val DIAGNOSTIC_OUTPUT_CAPTURED_FRAME_COUNT_INDEX = 3
-internal const val DIAGNOSTIC_OUTPUT_DROPPED_FRAME_COUNT_INDEX = 4
-internal const val DIAGNOSTIC_OUTPUT_SAMPLE_RATE_INDEX = 5
-internal const val DIAGNOSTIC_OUTPUT_CHANNEL_COUNT_INDEX = 6
-internal const val DIAGNOSTIC_OUTPUT_STATE_INDEX = 7
-internal const val DIAGNOSTIC_OUTPUT_STOP_REASON_INDEX = 8
-internal const val DIAGNOSTIC_OUTPUT_ACTIVATION_NANOS_INDEX = 9
-internal const val DIAGNOSTIC_OUTPUT_FIRST_CAPTURED_NANOS_INDEX = 10
-internal const val DIAGNOSTIC_OUTPUT_BUFFERED_REMAIN_INDEX = 11
 
-internal object DiagnosticOutputCaptureDecoder {
-    fun decodeDrain(metadata: LongArray, samplesSize: Int): DiagnosticOutputDrainInfo {
-        require(metadata.size >= DIAGNOSTIC_OUTPUT_METADATA_FIELD_COUNT)
-        val returnedFrames = metadata[DIAGNOSTIC_OUTPUT_RETURNED_FRAME_COUNT_INDEX].toInt()
-        require(returnedFrames >= 0 && returnedFrames <= samplesSize / 2)
-        val channelCount = metadata[DIAGNOSTIC_OUTPUT_CHANNEL_COUNT_INDEX].toInt()
-        if (returnedFrames > 0) require(channelCount == 2)
-        return DiagnosticOutputDrainInfo(
-            returnedFrames = returnedFrames,
-            firstLogicalFrame = metadata[DIAGNOSTIC_OUTPUT_FIRST_FRAME_INDEX].takeIf { it >= 0L },
-            logicalFrames = metadata[DIAGNOSTIC_OUTPUT_LOGICAL_FRAME_COUNT_INDEX].requireNonNegative("logicalFrames"),
-            capturedFrames = metadata[DIAGNOSTIC_OUTPUT_CAPTURED_FRAME_COUNT_INDEX].requireNonNegative("capturedFrames"),
-            droppedFrames = metadata[DIAGNOSTIC_OUTPUT_DROPPED_FRAME_COUNT_INDEX].requireNonNegative("droppedFrames"),
-            sampleRate = metadata[DIAGNOSTIC_OUTPUT_SAMPLE_RATE_INDEX].toInt().coerceAtLeast(0),
-            channelCount = channelCount.coerceAtLeast(0),
-            producerState = DiagnosticOutputProducerState.fromWire(metadata[DIAGNOSTIC_OUTPUT_STATE_INDEX].toInt()),
-            stopReason = DiagnosticOutputStopReason.fromWire(metadata[DIAGNOSTIC_OUTPUT_STOP_REASON_INDEX].toInt()),
-            activationMonotonicNanos = metadata[DIAGNOSTIC_OUTPUT_ACTIVATION_NANOS_INDEX].takeIf { it >= 0L },
-            firstCapturedFrameMonotonicNanos = metadata[DIAGNOSTIC_OUTPUT_FIRST_CAPTURED_NANOS_INDEX].takeIf { it >= 0L },
-            bufferedFramesRemain = metadata[DIAGNOSTIC_OUTPUT_BUFFERED_REMAIN_INDEX] != 0L,
-        )
+enum class DiagnosticOutputProducerState(val wireValue: Int) {
+    IDLE(0), CAPTURING(1), STOPPED(2);
+
+    companion object {
+        internal fun fromWire(value: Int): DiagnosticOutputProducerState =
+            entries.firstOrNull { it.wireValue == value }
+                ?: error("unknown diagnostic output producer state: $value")
+    }
+}
+
+enum class DiagnosticOutputStopReason(val wireValue: Int) {
+    NONE(0), STOPPED_BY_USER(1), DURATION_LIMIT(2), FORMAT_CHANGED(3),
+    AUDIO_STOPPED(4), START_FAILED(5);
+
+    companion object {
+        internal fun fromWire(value: Int): DiagnosticOutputStopReason =
+            entries.firstOrNull { it.wireValue == value }
+                ?: error("unknown diagnostic output stop reason: $value")
     }
 }
 ```
 
-Implement `fromWire` with `entries.firstOrNull` and a clear exception message. Keep the models immutable.
+Define immutable `DiagnosticOutputStartResult` and `DiagnosticOutputDrainInfo` with all fields named in the design. `decodeDrain` validates metadata length, non-negative counters, `returnedFrames <= samplesSize / 2`, stereo when frames are returned, and nullable `-1` sentinels. `decodeStart` uses the same metadata array and returns `started`, format, maximum logical frames, activation timestamp, and stop reason.
 
-- [ ] **Step 4: Add reusable buffers and public operations to `AudioEngine`**
+- [ ] **Step 4: Add synchronised `AudioEngine` operations**
 
-Add:
+Add one reusable metadata array and these methods:
 
 ```kotlin
-private const val NativeDiagnosticOutputDrainFrames = 4_096
 private val diagnosticOutputMetadataBuffer = LongArray(DIAGNOSTIC_OUTPUT_METADATA_FIELD_COUNT)
 
 @Synchronized
@@ -554,95 +608,26 @@ fun drainDiagnosticOutput(samples: FloatArray): DiagnosticOutputDrainInfo {
     diagnosticOutputMetadataBuffer.fill(0L)
     val count = nativeDrainDiagnosticOutput(samples, diagnosticOutputMetadataBuffer)
     check(count >= 0) { "native diagnostic output drain failed: $count" }
-    diagnosticOutputMetadataBuffer[DIAGNOSTIC_OUTPUT_RETURNED_FRAME_COUNT_INDEX] = count.toLong()
+    diagnosticOutputMetadataBuffer[1] = count.toLong()
     return DiagnosticOutputCaptureDecoder.decodeDrain(diagnosticOutputMetadataBuffer, samples.size)
 }
 
 @Synchronized
-fun stopDiagnosticOutputCapture() = nativeStopDiagnosticOutputCapture()
+fun stopDiagnosticOutputCapture() {
+    nativeStopDiagnosticOutputCapture()
+}
 
 @Synchronized
 fun diagnosticOutputStatus(): DiagnosticOutputDrainInfo {
     diagnosticOutputMetadataBuffer.fill(0L)
     nativeGetDiagnosticOutputStatus(diagnosticOutputMetadataBuffer)
-    return DiagnosticOutputCaptureDecoder.decodeDrain(diagnosticOutputMetadataBuffer, samplesSize = 0)
+    return DiagnosticOutputCaptureDecoder.decodeDrain(diagnosticOutputMetadataBuffer, 0)
 }
 ```
 
-Declare native methods with `LongArray` metadata. Do not expose the metadata wire format to the app module.
+Declare the four native methods with `LongArray` metadata and `FloatArray` samples.
 
-- [ ] **Step 5: Run engine-audio unit tests**
-
-Run:
-
-```bash
-cd drum-kit-android
-gradle --no-daemon --console=plain --warning-mode=fail \
-  :engine-audio:testDebugUnitTest
-```
-
-Expected: all engine-audio JVM tests pass. Native method bodies are added in Task 3, so do not call the new `AudioEngine` methods in local JVM tests.
-
-- [ ] **Step 6: Commit Task 2**
-
-```bash
-git add \
-  drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/AudioEngine.kt \
-  drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/DiagnosticOutputCapture.kt \
-  drum-kit-android/engine-audio/src/test/java/com/vitautas/drumkit/audio/DiagnosticOutputCaptureDecoderTest.kt
-git commit -m "feat(audio): define diagnostic output capture protocol"
-```
-
----
-
-### Task 3: Oboe Capture Point and JNI Bridge
-
-**Files:**
-- Modify: `drum-kit-android/engine-audio/src/main/cpp/sampled-audio-engine.cpp:1-1100`
-- Test: `drum-kit-android/engine-audio/src/test/cpp/diagnostic-output-capture-test.cpp`
-
-**Interfaces:**
-- Consumes: `RuntimeDiagnosticOutputCapture` and Kotlin metadata field order from Task 2.
-- Produces JNI methods:
-
-```cpp
-nativeStartDiagnosticOutputCapture(long[] metadata): boolean
-nativeDrainDiagnosticOutput(float[] samples, long[] metadata): int
-nativeStopDiagnosticOutputCapture(): void
-nativeGetDiagnosticOutputStatus(long[] metadata): void
-```
-
-- [ ] **Step 1: Extend the native tests for runtime-format and stop transitions**
-
-Add tests proving the component behaviour required by engine integration:
-
-```cpp
-void testFormatChangeStopsBeforeNewFrame() {
-    DiagnosticOutputCapture<8> capture;
-    require(capture.start(48000, 2, 100), "capture should start");
-    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
-    capture.writeFrame(0.3f, 0.4f, 96000, 2, 102);
-
-    float samples[16]{};
-    const auto drained = capture.drain(samples, 8);
-    require(drained.frameCount == 1, "new-format frame must not be stored");
-    require(drained.stopReason == DiagnosticOutputStopReason::FormatChanged, "format change should be terminal");
-}
-
-void testAudioStopKeepsBufferedFrames() {
-    DiagnosticOutputCapture<8> capture;
-    require(capture.start(48000, 2, 100), "capture should start");
-    capture.writeFrame(0.1f, 0.2f, 48000, 2, 101);
-    capture.markAudioStopped();
-    const auto status = capture.status();
-    require(status.state == DiagnosticOutputProducerState::Stopped, "audio stop should stop producer");
-    require(status.bufferedFramesRemain, "buffered frame should remain drainable");
-}
-```
-
-Run `bash tools/test_diagnostic_output_capture.sh`; expect these tests to pass before touching Oboe integration.
-
-- [ ] **Step 2: Add the runtime capture member and monotonic helper**
+- [ ] **Step 5: Add the native capture instance and callback write**
 
 At the top of `sampled-audio-engine.cpp`:
 
@@ -659,17 +644,9 @@ int64_t monotonicNanos() {
 }
 ```
 
-Add to `NativeAudioEngine`:
+Add `RuntimeDiagnosticOutputCapture diagnosticOutputCapture_{};` to `NativeAudioEngine`. Do not reset it in `clearRealtimeState()`.
 
-```cpp
-RuntimeDiagnosticOutputCapture diagnosticOutputCapture_{};
-```
-
-Do not place capture reset inside `clearRealtimeState()`, because an unexpected stream close must leave buffered capture frames available for Kotlin to drain.
-
-- [ ] **Step 3: Copy the final output frame without changing audio**
-
-In `onAudioReady`, stop discarding `audioStream`. Resolve callback format once:
+In `onAudioReady`, resolve callback format and timestamp once:
 
 ```cpp
 const int callbackSampleRate = audioStream != nullptr
@@ -683,7 +660,7 @@ const bool captureActive = diagnosticOutputCapture_.status().state ==
 const int64_t callbackNanos = captureActive ? monotonicNanos() : kNoDiagnosticOutputTimestamp;
 ```
 
-After limiter application and alongside the existing Oboe writes:
+After limiter application and alongside existing Oboe writes:
 
 ```cpp
 output[frame * kChannelCount] = left;
@@ -699,21 +676,11 @@ if (captureActive) {
 }
 ```
 
-`captureActive` is only a callback-local optimisation. `writeFrame` must still recheck atomic state so a concurrent stop takes effect safely.
+Before closing a running stream in `stop()` and inside `onErrorAfterClose()`, call `diagnosticOutputCapture_.markAudioStopped()`.
 
-- [ ] **Step 4: Preserve capture on stream failures and normal engine stop**
+- [ ] **Step 6: Implement JNI metadata operations**
 
-Before closing a running stream in `NativeAudioEngine::stop()` and inside `onErrorAfterClose()`, call:
-
-```cpp
-diagnosticOutputCapture_.markAudioStopped();
-```
-
-The method is a no-op unless capture is currently active. It must not replace an earlier `DurationLimit`, `FormatChanged`, or `StoppedByUser` reason.
-
-- [ ] **Step 5: Implement JNI metadata filling**
-
-Add one helper outside the callback:
+Use this helper outside the callback:
 
 ```cpp
 constexpr int kDiagnosticOutputMetadataFieldCount = 12;
@@ -742,25 +709,18 @@ void writeDiagnosticOutputMetadata(
         static_cast<jlong>(value.firstCapturedFrameNanos),
         value.bufferedFramesRemain ? 1 : 0,
     };
-    env->SetLongArrayRegion(target, 0, fields.size(), fields.data());
+    env->SetLongArrayRegion(
+        target,
+        0,
+        static_cast<jsize>(fields.size()),
+        fields.data()
+    );
 }
 ```
 
-Use a corresponding status-to-drain conversion for start/status responses. JNI methods may copy arrays or allocate local objects because they never run on the audio callback.
+Implement JNI start by calling `diagnosticOutputCapture_.start(currentSampleRate, 2, monotonicNanos())`; drain by capping to `samplesLength / 2`, obtaining float elements, draining, releasing with mode `0`, and writing metadata; stop with `StoppedByUser`; status with a zero-frame `DiagnosticOutputDrainResult` populated from `status()`.
 
-For drain:
-
-- validate non-null arrays;
-- cap frames to `floatArrayLength / 2`;
-- obtain float elements;
-- call `diagnosticOutputCapture_.drain`;
-- release float elements with mode `0`;
-- fill metadata;
-- return the drained frame count.
-
-- [ ] **Step 6: Run native host tests and Android compilation**
-
-Run:
+- [ ] **Step 7: Run focused native/Kotlin checks**
 
 ```bash
 cd drum-kit-android
@@ -770,99 +730,118 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   :app:compileDebugKotlin
 ```
 
-Expected: host tests pass and the app compiles with all JNI declarations resolved at native build time in the later APK workflow.
+Expected: host tests, decoder tests, and Kotlin compilation pass.
 
-- [ ] **Step 7: Commit Task 3**
+- [ ] **Step 8: Commit Task 2**
 
 ```bash
 git add \
   drum-kit-android/engine-audio/src/main/cpp/sampled-audio-engine.cpp \
-  drum-kit-android/engine-audio/src/test/cpp/diagnostic-output-capture-test.cpp
-git commit -m "feat(audio): capture final native output frames"
+  drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/AudioEngine.kt \
+  drum-kit-android/engine-audio/src/main/java/com/vitautas/drumkit/audio/DiagnosticOutputCapture.kt \
+  drum-kit-android/engine-audio/src/test/java/com/vitautas/drumkit/audio/DiagnosticOutputCaptureDecoderTest.kt
+git commit -m "feat(audio): expose generated output capture"
 ```
 
 ---
 
-### Task 4: Deterministic PCM16 and WAV Writer
+### Task 3: Write PCM16 and Finalise a Valid WAV
 
 **Files:**
 - Create: `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticPcm16WavWriter.kt`
 - Create: `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticPcm16WavWriterTest.kt`
 
 **Interfaces:**
-- Consumes: interleaved stereo float runs and logical silence-frame counts.
-- Produces:
 
 ```kotlin
-internal class DiagnosticPcm16WavWriter(
-    private val file: File,
-    val sampleRate: Int,
-    val channelCount: Int = 2,
-) : AutoCloseable {
-    val dataBytesWritten: Long
+internal interface DiagnosticGeneratedOutputSink {
     val framesWritten: Long
     fun writeInterleavedFrames(samples: FloatArray, frameCount: Int, scratch: ByteArray)
     fun writeSilenceFrames(frameCount: Long, scratch: ByteArray)
     fun finish(): File
     fun abort()
 }
+
+internal class DiagnosticPcm16WavWriter(
+    private val file: File,
+    val sampleRate: Int,
+    val channelCount: Int = 2,
+) : DiagnosticGeneratedOutputSink
 ```
 
 - [ ] **Step 1: Write byte-exact failing tests**
 
-Create tests for conversion endpoints and header arithmetic:
-
 ```kotlin
 @Test
-fun convertsFiniteAndNonFiniteSamplesToPcm16() {
-    val file = temporaryFile("samples.wav")
-    val writer = DiagnosticPcm16WavWriter(file, sampleRate = 48_000)
-    val samples = floatArrayOf(-1f, 1f, 0f, Float.NaN, -0.5f, 0.5f)
-    writer.writeInterleavedFrames(samples, frameCount = 3, scratch = ByteArray(32))
+fun convertsSamplesToPcm16LittleEndian() {
+    val file = File(tempDir, "samples.wav")
+    val writer = DiagnosticPcm16WavWriter(file, 48_000)
+    writer.writeInterleavedFrames(
+        floatArrayOf(-1f, 1f, 0f, Float.NaN, -0.5f, 0.5f),
+        frameCount = 3,
+        scratch = ByteArray(32),
+    )
     writer.finish()
 
-    val bytes = file.readBytes()
     assertArrayEquals(
         byteArrayOf(
             0x00, 0x80.toByte(), 0xff.toByte(), 0x7f,
             0x00, 0x00, 0x00, 0x00,
             0x00, 0xc0.toByte(), 0x00, 0x40,
         ),
-        bytes.copyOfRange(44, 56),
+        file.readBytes().copyOfRange(44, 56),
     )
 }
 
 @Test
-fun writesCorrectStereoHeader() {
-    val file = temporaryFile("header.wav")
-    val writer = DiagnosticPcm16WavWriter(file, sampleRate = 48_000)
-    writer.writeSilenceFrames(2, ByteArray(16))
+fun saturatesAndZeroesNonFiniteValues() {
+    val file = File(tempDir, "saturation.wav")
+    val writer = DiagnosticPcm16WavWriter(file, 48_000)
+    writer.writeInterleavedFrames(
+        floatArrayOf(-2f, 2f, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY),
+        frameCount = 2,
+        scratch = ByteArray(16),
+    )
     writer.finish()
+    assertArrayEquals(
+        byteArrayOf(0x00, 0x80.toByte(), 0xff.toByte(), 0x7f, 0, 0, 0, 0),
+        file.readBytes().copyOfRange(44, 52),
+    )
+}
 
+@Test
+fun writesCorrectStereoHeaderAndSilence() {
+    val file = File(tempDir, "header.wav")
+    val writer = DiagnosticPcm16WavWriter(file, 48_000)
+    writer.writeSilenceFrames(3, ByteArray(8))
+    writer.finish()
     val bytes = file.readBytes()
     assertEquals("RIFF", bytes.copyOfRange(0, 4).decodeToString())
-    assertEquals(44 + 8, bytes.size)
+    assertEquals("WAVE", bytes.copyOfRange(8, 12).decodeToString())
     assertEquals(48_000, bytes.littleEndianInt(24))
     assertEquals(192_000, bytes.littleEndianInt(28))
     assertEquals(4, bytes.littleEndianShort(32))
     assertEquals(16, bytes.littleEndianShort(34))
-    assertEquals(8, bytes.littleEndianInt(40))
+    assertEquals(12, bytes.littleEndianInt(40))
+    assertEquals(56, bytes.size)
+    assertTrue(bytes.copyOfRange(44, 56).all { it == 0.toByte() })
+}
+
+@Test
+fun rejectsIncompleteFramesAndDeletesOnAbort() {
+    val file = File(tempDir, "abort.wav")
+    val writer = DiagnosticPcm16WavWriter(file, 48_000)
+    assertThrows(IllegalArgumentException::class.java) {
+        writer.writeInterleavedFrames(floatArrayOf(0f, 0f), 2, ByteArray(16))
+    }
+    writer.abort()
+    assertFalse(file.exists())
 }
 ```
 
-Also test:
+Add test-local `littleEndianInt` and `littleEndianShort` helpers using unsigned byte masks.
 
-- values below `-1` and above `1` saturate;
-- `Float.POSITIVE_INFINITY` and `Float.NEGATIVE_INFINITY` become zero;
-- odd sample counts and frame counts exceeding the source buffer fail;
-- silence writing works across a scratch-buffer boundary;
-- `finish()` is idempotent only by returning the already-finalised file without rewriting;
-- `abort()` deletes the temporary file;
-- payload sizes above `0xffffffffL` are rejected before a corrupt header can be reported successful.
-
-- [ ] **Step 2: Run the tests to verify they fail**
-
-Run:
+- [ ] **Step 2: Run the tests and confirm failure**
 
 ```bash
 cd drum-kit-android
@@ -875,50 +854,35 @@ Expected: Kotlin compilation fails because the writer does not exist.
 
 - [ ] **Step 3: Implement the seekable writer**
 
-Use `RandomAccessFile` and reserve the header before payload writes:
+Use `RandomAccessFile`, reserve 44 bytes, and convert with:
 
 ```kotlin
-private const val WavHeaderBytes = 44
-private const val BytesPerSample = 2
-
-internal class DiagnosticPcm16WavWriter(
-    private val file: File,
-    val sampleRate: Int,
-    val channelCount: Int = 2,
-) : AutoCloseable {
-    private val output = RandomAccessFile(file, "rw")
-    private var finalised = false
-    var dataBytesWritten: Long = 0L
-        private set
-
-    val framesWritten: Long
-        get() = dataBytesWritten / (channelCount * BytesPerSample)
-
-    init {
-        require(sampleRate > 0)
-        require(channelCount == 2)
-        output.setLength(0L)
-        output.write(ByteArray(WavHeaderBytes))
-    }
-
-    private fun pcm16(value: Float): Short = when {
-        !value.isFinite() -> 0
-        value <= -1f -> Short.MIN_VALUE
-        value >= 1f -> Short.MAX_VALUE
-        else -> (value * Short.MAX_VALUE.toFloat()).roundToInt().toShort()
-    }
+private fun pcm16(value: Float): Short = when {
+    !value.isFinite() -> 0
+    value <= -1f -> Short.MIN_VALUE
+    value >= 1f -> Short.MAX_VALUE
+    else -> (value * Short.MAX_VALUE.toFloat()).roundToInt().toShort()
 }
 ```
 
-Write little-endian shorts into the caller-provided scratch buffer, flush scratch chunks to `RandomAccessFile`, and update `dataBytesWritten` only after successful writes. `finish()` validates the classic RIFF size, patches all header fields, syncs/close the file, and returns it.
+Write only complete stereo frames. Flush scratch chunks whenever fewer than four bytes remain. `writeSilenceFrames` repeatedly writes a zero-filled scratch buffer in whole-frame multiples. Track `dataBytesWritten` only after successful writes.
+
+`finish()` must:
+
+1. reject `dataBytesWritten > 0xffffffffL`;
+2. seek to zero;
+3. write `RIFF`, `36 + dataBytesWritten`, `WAVE`, `fmt `, PCM format `1`, channels `2`, sample rate, byte rate `sampleRate * 4`, block align `4`, bits `16`, `data`, and data length in little-endian order;
+4. sync and close;
+5. return the file;
+6. return the same file without rewriting on a repeated call.
+
+`abort()` closes and deletes the file. `close()` delegates to abort unless finalised.
 
 - [ ] **Step 4: Run the writer tests**
 
-Run the focused command from Step 2.
+Run the focused command from Step 2. Expected: all writer tests pass.
 
-Expected: all `DiagnosticPcm16WavWriterTest` tests pass.
-
-- [ ] **Step 5: Commit Task 4**
+- [ ] **Step 5: Commit Task 3**
 
 ```bash
 git add \
@@ -929,7 +893,7 @@ git commit -m "feat(diagnostics): add PCM16 WAV writer"
 
 ---
 
-### Task 5: Generated-Output Recorder and Timeline Alignment
+### Task 4: Drain, Align, and Classify a Generated-Output Session
 
 **Files:**
 - Create: `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorder.kt`
@@ -938,12 +902,13 @@ git commit -m "feat(diagnostics): add PCM16 WAV writer"
 - Modify: `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionRecorderTest.kt`
 
 **Interfaces:**
-- Consumes: `AudioEngine` capture operations, prepared cache file, and `DiagnosticSessionCapture.startedAtMonotonicNanos`.
-- Produces:
 
 ```kotlin
 internal enum class DiagnosticGeneratedOutputResultState(val wireName: String) {
-    COMPLETED("completed"), PARTIAL("partial"), UNAVAILABLE("unavailable"), FAILED("failed")
+    COMPLETED("completed"),
+    PARTIAL("partial"),
+    UNAVAILABLE("unavailable"),
+    FAILED("failed"),
 }
 
 internal data class DiagnosticGeneratedOutputCapture(
@@ -969,24 +934,11 @@ internal interface DiagnosticOutputCaptureSource {
     fun stop()
     fun status(): DiagnosticOutputDrainInfo
 }
-
-internal class DiagnosticGeneratedOutputRecorder(
-    private val source: DiagnosticOutputCaptureSource = AudioEngineDiagnosticOutputCaptureSource,
-) {
-    fun prepare(outputDirectory: File): DiagnosticGeneratedOutputPreparation
-    fun start(preparation: DiagnosticGeneratedOutputPreparation): DiagnosticOutputStartResult
-    fun drainAvailable(): DiagnosticOutputDrainInfo
-    fun requestStop()
-    fun finish(sessionStartedAtMonotonicNanos: Long): DiagnosticGeneratedOutputCapture
-    fun cancel()
-}
 ```
 
-All methods that create/write/finalise/delete files are called from `Dispatchers.IO` by the screen. `start`, `requestStop`, and native source operations do no file work.
+- [ ] **Step 1: Preserve monotonic session start with a red-green test**
 
-- [ ] **Step 1: Add the monotonic start timestamp test**
-
-Update the session recorder test:
+Add:
 
 ```kotlin
 @Test
@@ -999,123 +951,208 @@ fun captureRetainsMonotonicSessionStart() {
     )
     recorder.start(metadata())
     nanos = 8_000L
-
     val capture = recorder.stop()
-
     assertEquals(5_000L, capture.startedAtMonotonicNanos)
     assertEquals(3_000L, capture.durationNanos)
 }
 ```
 
-Run the focused session recorder test and verify it fails because `startedAtMonotonicNanos` is absent.
+Run `DiagnosticSessionRecorderTest`; expect failure because the field is absent. Add `startedAtMonotonicNanos: Long` to `DiagnosticSessionCapture` and populate it from `startedAtNanos`. Do not export the absolute monotonic value to JSON. Re-run and expect pass.
 
-- [ ] **Step 2: Preserve monotonic start in the capture model**
+- [ ] **Step 2: Create exact fake source and sink fixtures**
 
-Add:
+In `DiagnosticGeneratedOutputRecorderTest.kt` define:
 
 ```kotlin
-internal data class DiagnosticSessionCapture(
-    val sessionId: String,
-    val startedAtMonotonicNanos: Long,
-    // existing fields remain in their current order after this new field
+private data class FakeRun(
+    val samples: FloatArray,
+    val info: DiagnosticOutputDrainInfo,
 )
-```
 
-Populate it from `startedAtNanos` in `stopSnapshot()`. Keep the field internal; do not add the absolute monotonic value to `session.json`.
-
-Run `DiagnosticSessionRecorderTest`; expect pass.
-
-- [ ] **Step 3: Write failing recorder tests with a deterministic fake source**
-
-Create a fake that returns queued contiguous runs:
-
-```kotlin
-private class FakeDiagnosticOutputSource(
+private class FakeSource(
     private val startResult: DiagnosticOutputStartResult,
-    private val drains: ArrayDeque<Pair<FloatArray, DiagnosticOutputDrainInfo>>,
+    runs: List<FakeRun>,
 ) : DiagnosticOutputCaptureSource {
-    var stopCalls = 0
+    private val queue = ArrayDeque(runs)
+    val calls = mutableListOf<String>()
 
-    override fun start(): DiagnosticOutputStartResult = startResult
+    override fun start(): DiagnosticOutputStartResult {
+        calls += "start"
+        return startResult
+    }
 
     override fun drain(samples: FloatArray): DiagnosticOutputDrainInfo {
-        val next = drains.removeFirstOrNull()
-            ?: return stoppedEmptyInfo(startResult)
-        next.first.copyInto(samples)
-        return next.second
+        calls += "drain"
+        val run = queue.removeFirstOrNull() ?: return stoppedEmptyInfo(startResult)
+        run.samples.copyInto(samples)
+        return run.info
     }
 
     override fun stop() {
-        stopCalls += 1
+        calls += "stop"
     }
 
     override fun status(): DiagnosticOutputDrainInfo = stoppedEmptyInfo(startResult)
 }
-```
 
-Test normal capture:
+private class FakeSink(private val file: File) : DiagnosticGeneratedOutputSink {
+    val operations = mutableListOf<String>()
+    var representedFrames = 0L
+    override val framesWritten: Long get() = representedFrames
 
-```kotlin
-@Test
-fun writesContiguousRunsAndFinalisesNormalCapture() {
-    val source = fakeSource(
-        run(firstFrame = 0, samples = floatArrayOf(0.25f, -0.25f, 0.5f, -0.5f)),
-    )
-    val recorder = DiagnosticGeneratedOutputRecorder(source)
-    val prepared = recorder.prepare(tempDirectory())
-    recorder.start(prepared)
-    recorder.drainAvailable()
-    recorder.requestStop()
+    override fun writeInterleavedFrames(samples: FloatArray, frameCount: Int, scratch: ByteArray) {
+        operations += "audio:$frameCount"
+        representedFrames += frameCount
+    }
 
-    val result = recorder.finish(sessionStartedAtMonotonicNanos = 1_000L)
+    override fun writeSilenceFrames(frameCount: Long, scratch: ByteArray) {
+        operations += "silence:$frameCount"
+        representedFrames += frameCount
+    }
 
-    assertEquals(DiagnosticGeneratedOutputResultState.COMPLETED, result.resultState)
-    assertEquals(2L, result.logicalFrames)
-    assertEquals(0L, result.silenceSubstitutionFrames)
-    assertTrue(result.wavFile?.isFile == true)
+    override fun finish(): File {
+        operations += "finish"
+        file.writeBytes(byteArrayOf(1))
+        return file
+    }
+
+    override fun abort() {
+        operations += "abort"
+        file.delete()
+    }
 }
 ```
 
-Test overflow timing:
+Define `started(rate = 48_000)` and `drainInfo(...)` test helpers that fill every constructor field explicitly. `stoppedEmptyInfo` returns `STOPPED`, `STOPPED_BY_USER`, zero returned frames, and `bufferedFramesRemain = false`.
+
+- [ ] **Step 3: Write recorder behaviour tests**
 
 ```kotlin
 @Test
-fun insertsSilenceForLogicalGap() {
-    val source = fakeSource(
-        run(firstFrame = 0, samples = floatArrayOf(0.1f, 0.2f)),
-        run(firstFrame = 3, samples = floatArrayOf(0.3f, 0.4f), droppedFrames = 2),
+fun writesAudioAndSilenceInLogicalOrder() {
+    val source = FakeSource(
+        started(),
+        listOf(
+            FakeRun(floatArrayOf(0.1f, 0.2f), drainInfo(first = 0, returned = 1, logical = 1)),
+            FakeRun(
+                floatArrayOf(0.3f, 0.4f),
+                drainInfo(first = 3, returned = 1, logical = 4, captured = 2, dropped = 2),
+            ),
+        ),
     )
-    val recorder = DiagnosticGeneratedOutputRecorder(source)
-    val prepared = recorder.prepare(tempDirectory())
-    recorder.start(prepared)
+    val sink = FakeSink(File(tempDir, "capture.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
     recorder.drainAvailable()
     recorder.drainAvailable()
     recorder.requestStop()
-
     val result = recorder.finish(1_000L)
 
+    assertEquals(listOf("audio:1", "silence:2", "audio:1", "finish"), sink.operations)
     assertEquals(4L, result.logicalFrames)
     assertEquals(2L, result.silenceSubstitutionFrames)
-    assertEquals(DiagnosticGeneratedOutputResultState.PARTIAL, result.resultState)
+    assertEquals(PARTIAL, result.resultState)
+}
+
+@Test
+fun disablesProducerBeforeFinalDrain() {
+    val source = FakeSource(started(), emptyList())
+    val sink = FakeSink(File(tempDir, "order.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
+    recorder.requestStop()
+    recorder.finish(1_000L)
+    assertEquals(listOf("start", "stop", "drain"), source.calls.take(3))
+}
+
+@Test
+fun classifiesNormalAndPartialStops() {
+    val cases = listOf(
+        STOPPED_BY_USER to COMPLETED,
+        DURATION_LIMIT to PARTIAL,
+        FORMAT_CHANGED to PARTIAL,
+        AUDIO_STOPPED to PARTIAL,
+    )
+    cases.forEach { (reason, expected) ->
+        val source = sourceWithOneFrame(reason)
+        val sink = FakeSink(File(tempDir, "$reason.wav"))
+        val recorder = recorder(source, sink)
+        recorder.prepare(tempDir)
+        recorder.start()
+        recorder.drainAvailable()
+        recorder.requestStop()
+        assertEquals(expected, recorder.finish(1_000L).resultState)
+    }
+}
+
+@Test
+fun returnsUnavailableWhenStartFails() {
+    val source = FakeSource(
+        DiagnosticOutputStartResult(false, 0, 0, 0, null, START_FAILED),
+        emptyList(),
+    )
+    val sink = FakeSink(File(tempDir, "unavailable.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
+    val result = recorder.finish(1_000L)
+    assertEquals(UNAVAILABLE, result.resultState)
+    assertNull(result.wavFile)
+    assertTrue("abort" in sink.operations)
+}
+
+@Test
+fun computesSessionOffset() {
+    val source = sourceWithFirstFrameTimestamp(1_500L)
+    val sink = FakeSink(File(tempDir, "offset.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
+    recorder.drainAvailable()
+    recorder.requestStop()
+    assertEquals(500L, recorder.finish(1_000L).sessionStartOffsetNanos)
 }
 ```
 
-Also test:
+Add two more exact tests:
 
-- preparation failure returns `UNAVAILABLE` and creates no WAV;
-- native start failure deletes the prepared file;
-- duration limit, format change, and audio stop return `PARTIAL` with a valid WAV;
-- a stopped empty capture with zero represented frames is `UNAVAILABLE` and omits WAV;
-- writer failure requests native stop and returns `FAILED`;
-- `finish` drains until producer is stopped and `bufferedFramesRemain == false`;
-- repeated `requestStop` is safe;
-- `cancel` stops native capture, closes writer, and deletes temporary files;
-- `sessionStartOffsetNanos` is `firstCapturedFrameMonotonicNanos - sessionStartedAtMonotonicNanos`;
-- negative calculated offsets are retained because native activation may precede Kotlin session start only in a test/failure condition and must not be silently rewritten.
+```kotlin
+@Test
+fun returnsFailedWhenSinkWriteThrows() {
+    val sink = object : DiagnosticGeneratedOutputSink {
+        override val framesWritten = 0L
+        override fun writeInterleavedFrames(samples: FloatArray, frameCount: Int, scratch: ByteArray) {
+            error("write failed")
+        }
+        override fun writeSilenceFrames(frameCount: Long, scratch: ByteArray) = Unit
+        override fun finish(): File = error("finish must not run")
+        override fun abort() = Unit
+    }
+    val recorder = recorder(sourceWithOneFrame(STOPPED_BY_USER), sink)
+    recorder.prepare(tempDir)
+    recorder.start()
+    recorder.drainAvailable()
+    val result = recorder.finish(1_000L)
+    assertEquals(FAILED, result.resultState)
+    assertEquals("write failed", result.failureReason)
+}
 
-- [ ] **Step 4: Run recorder tests to verify they fail**
+@Test
+fun cancelStopsAndAborts() {
+    val source = FakeSource(started(), emptyList())
+    val sink = FakeSink(File(tempDir, "cancel.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
+    recorder.cancel()
+    assertTrue("stop" in source.calls)
+    assertTrue("abort" in sink.operations)
+}
+```
 
-Run:
+- [ ] **Step 4: Run the recorder tests and confirm failure**
 
 ```bash
 cd drum-kit-android
@@ -1124,53 +1161,65 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   --tests com.vitautas.drumkit.DiagnosticGeneratedOutputRecorderTest
 ```
 
-Expected: compilation fails because the recorder and source interface do not exist.
+Expected: Kotlin compilation fails because recorder types do not exist.
 
-- [ ] **Step 5: Implement preparation, drain, gap filling, and terminal result**
+- [ ] **Step 5: Implement recorder state and fixed buffers**
 
-Use fixed reusable buffers:
+Use:
 
 ```kotlin
-private const val DiagnosticOutputDrainFrames = 4_096
-private val floatBuffer = FloatArray(DiagnosticOutputDrainFrames * 2)
-private val byteBuffer = ByteArray(DiagnosticOutputDrainFrames * 4)
+private const val OutputDrainFrames = 4_096
+private const val FinalDrainNoProgressLimit = 1_000
+private val floatBuffer = FloatArray(OutputDrainFrames * 2)
+private val byteBuffer = ByteArray(OutputDrainFrames * 4)
 private var nextExpectedLogicalFrame = 0L
+private var silenceSubstitutionFrames = 0L
 ```
 
-`prepare` creates `diagnostic-generated-output-<UUID>.wav.tmp` and a writer with the current native sample rate only after `start` succeeds. To preserve the approved order, preparation creates the empty path; `start` obtains the authoritative native sample rate, constructs the writer, and deletes the file on failure.
+Constructor dependencies:
 
-`drainAvailable`:
+```kotlin
+internal class DiagnosticGeneratedOutputRecorder(
+    private val source: DiagnosticOutputCaptureSource = AudioEngineDiagnosticOutputCaptureSource,
+    private val sinkFactory: (File, Int) -> DiagnosticGeneratedOutputSink =
+        { file, rate -> DiagnosticPcm16WavWriter(file, rate) },
+    private val sessionIdFactory: () -> String = { UUID.randomUUID().toString() },
+)
+```
+
+`prepare(outputDirectory)` creates directories and records a sibling path named `generated-output-<id>.wav.tmp`; it catches file errors and records an unavailable reason. `start()` calls the native source, constructs the sink using the authoritative native sample rate, and stops/deletes on sink creation failure.
+
+`drainAvailable()` must execute:
 
 ```kotlin
 val info = source.drain(floatBuffer)
-val first = info.firstLogicalFrame
 if (info.returnedFrames > 0) {
-    checkNotNull(first)
-    check(first >= nextExpectedLogicalFrame) { "diagnostic output logical frame order regressed" }
+    val first = checkNotNull(info.firstLogicalFrame)
+    check(first >= nextExpectedLogicalFrame) {
+        "diagnostic output logical frame order regressed"
+    }
     val gap = first - nextExpectedLogicalFrame
-    if (gap > 0L) {
-        writer.writeSilenceFrames(gap, byteBuffer)
+    if (gap > 0) {
+        sink.writeSilenceFrames(gap, byteBuffer)
         silenceSubstitutionFrames += gap
     }
-    writer.writeInterleavedFrames(floatBuffer, info.returnedFrames, byteBuffer)
+    sink.writeInterleavedFrames(floatBuffer, info.returnedFrames, byteBuffer)
     nextExpectedLogicalFrame = first + info.returnedFrames
 }
 latestInfo = info
 return info
 ```
 
-`finish` calls `drainAvailable()` until the source is stopped and empty. Add a bounded no-progress guard of 1,000 empty iterations; exceeding it returns `FAILED` rather than spinning forever. No sleep occurs inside the recorder; the screen’s live polling supplies cadence, while final draining is expected to make immediate progress after producer stop.
+`finish(sessionStart)` calls `requestStop()` idempotently, then drains until `producerState == STOPPED`, `returnedFrames == 0`, and `bufferedFramesRemain == false`. Fail after 1,000 consecutive empty results that still claim buffered data. Classify:
 
-Result classification:
+- `COMPLETED` only for valid WAV + `STOPPED_BY_USER` + zero dropped frames;
+- `PARTIAL` for valid WAV + duration limit, format change, audio stop, or any dropped frames;
+- `UNAVAILABLE` for preparation/start failure or zero represented frames;
+- `FAILED` for order, write, no-progress, or finalisation failure.
 
-- `COMPLETED` only when stop reason is `STOPPED_BY_USER`, no dropped frames occurred, and a valid WAV finalised.
-- `PARTIAL` for duration limit, format change, audio stop, or any dropped frames when a valid WAV exists.
-- `UNAVAILABLE` for preparation/start failure or zero represented frames.
-- `FAILED` for write/finalisation/order/no-progress failures.
+Always calculate `sessionStartOffsetNanos = firstCapturedFrameMonotonicNanos - sessionStart` when a first timestamp exists. Preserve negative values rather than clamping.
 
 - [ ] **Step 6: Run recorder and session tests**
-
-Run:
 
 ```bash
 cd drum-kit-android
@@ -1182,7 +1231,7 @@ gradle --no-daemon --console=plain --warning-mode=fail \
 
 Expected: both test classes pass.
 
-- [ ] **Step 7: Commit Task 5**
+- [ ] **Step 7: Commit Task 4**
 
 ```bash
 git add \
@@ -1195,16 +1244,13 @@ git commit -m "feat(diagnostics): record generated output timeline"
 
 ---
 
-### Task 6: Streaming Diagnostic ZIP Augmentation
+### Task 5: Stream the WAV into the Final Diagnostic ZIP
 
 **Files:**
 - Create: `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenter.kt`
 - Create: `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenterTest.kt`
-- Modify: `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionBundleRecorderTest.kt:18-68`
 
-**Interfaces:**
-- Consumes: the fully augmented performance ZIP and `DiagnosticGeneratedOutputCapture`.
-- Produces:
+**Interface:**
 
 ```kotlin
 internal object DiagnosticGeneratedOutputBundleAugmenter {
@@ -1212,48 +1258,112 @@ internal object DiagnosticGeneratedOutputBundleAugmenter {
 }
 ```
 
-- [ ] **Step 1: Write failing ZIP augmentation tests**
+- [ ] **Step 1: Write complete ZIP test fixtures**
 
-Build a source ZIP containing the current performance manifest shape and small diagnostic entries. Test a successful capture:
+Define a source bundle helper that writes these entries in order:
+
+```kotlin
+private fun createSourceBundle(directory: File): File {
+    val file = File(directory, "source.zip")
+    val manifest = """
+        {
+          "schemaVersion": 2,
+          "sessionId": "test",
+          "bundleState": "step_1_2_performance_trace_partial",
+          "includedFiles": ["session.json", "touch-events.jsonl", "strikes.jsonl", "audio-diagnostics.csv", "performance.csv", "markers.json", "summary.txt", "checksums.sha256"],
+          "plannedFilesNotYetImplemented": ["generated-output.wav"],
+          "droppedData": {"performanceSamples": 0}
+        }
+    """.trimIndent()
+    val entries = linkedMapOf(
+        "manifest.json" to manifest.toByteArray(),
+        "session.json" to "{}".toByteArray(),
+        "performance.csv" to "schema_version\n1\n".toByteArray(),
+        "unknown-future.txt" to "retain-me".toByteArray(),
+        "summary.txt" to "Generated-output WAV capture is not yet implemented.\n".toByteArray(),
+        "checksums.sha256" to "old".toByteArray(),
+    )
+    ZipOutputStream(file.outputStream()).use { zip ->
+        entries.forEach { (name, bytes) ->
+            zip.putNextEntry(ZipEntry(name))
+            zip.write(bytes)
+            zip.closeEntry()
+        }
+    }
+    return file
+}
+```
+
+Define `assertChecksumsMatch` by parsing every non-blank checksum line into hash/name, reading that ZIP entry, calculating SHA-256, and asserting equality.
+
+- [ ] **Step 2: Write successful, partial, and unavailable tests**
 
 ```kotlin
 @Test
-fun addsWavMetadataAndRecomputedChecksum() {
-    val bundle = createPerformanceBundle(
-        manifest = performanceManifest(plannedFiles = listOf("generated-output.wav")),
-        summary = "Generated-output WAV capture is not yet implemented.\n",
+fun addsWavMetadataSummaryAndChecksums() {
+    val bundle = createSourceBundle(tempDir)
+    val wav = File(tempDir, "generated.wav").apply { writeBytes(ByteArray(2 * 1024 * 1024) { 7 }) }
+    val capture = capture(
+        wavFile = wav,
+        resultState = COMPLETED,
+        stopReason = STOPPED_BY_USER,
+        logicalFrames = 48000,
+        capturedFrames = 48000,
     )
-    val wav = createValidWav(frameCount = 4)
-    val capture = generatedCapture(wavFile = wav, resultState = COMPLETED, logicalFrames = 4)
 
     DiagnosticGeneratedOutputBundleAugmenter.augmentBundle(bundle, capture)
 
     ZipFile(bundle).use { zip ->
-        assertNotNull(zip.getEntry("generated-output.wav"))
+        assertEquals(wav.length(), zip.getEntry("generated-output.wav").size)
+        assertEquals("retain-me", zip.readUtf8("unknown-future.txt"))
         val manifest = zip.readUtf8("manifest.json")
         assertTrue(manifest.contains("step_1_2_generated_output_partial"))
         assertTrue(manifest.contains("\"plannedFilesNotYetImplemented\": []"))
         assertTrue(manifest.contains("\"resultState\": \"completed\""))
-        val checksums = zip.readUtf8("checksums.sha256")
-        assertTrue(checksums.contains("generated-output.wav"))
+        assertTrue(manifest.contains("\"generated-output.wav\""))
+        val summary = zip.readUtf8("summary.txt")
+        assertTrue(summary.contains("Generated output result: completed"))
+        assertTrue(summary.contains("Generated output logical frames: 48000"))
+        assertChecksumsMatch(zip)
+    }
+}
+
+@Test
+fun includesPartialWavAndExactStopReason() {
+    val bundle = createSourceBundle(tempDir)
+    val wav = File(tempDir, "partial.wav").apply { writeBytes(ByteArray(44)) }
+    DiagnosticGeneratedOutputBundleAugmenter.augmentBundle(
+        bundle,
+        capture(wav, PARTIAL, FORMAT_CHANGED, logicalFrames = 100, capturedFrames = 100),
+    )
+    ZipFile(bundle).use { zip ->
+        assertNotNull(zip.getEntry("generated-output.wav"))
+        assertTrue(zip.readUtf8("manifest.json").contains("\"stopReason\": \"format_changed\""))
+        assertChecksumsMatch(zip)
+    }
+}
+
+@Test
+fun recordsUnavailableWithoutWav() {
+    val bundle = createSourceBundle(tempDir)
+    DiagnosticGeneratedOutputBundleAugmenter.augmentBundle(
+        bundle,
+        capture(null, UNAVAILABLE, START_FAILED, failureReason = "temporary storage unavailable"),
+    )
+    ZipFile(bundle).use { zip ->
+        assertNull(zip.getEntry("generated-output.wav"))
+        val manifest = zip.readUtf8("manifest.json")
+        assertTrue(manifest.contains("\"plannedFilesNotYetImplemented\": []"))
+        assertTrue(manifest.contains("\"resultState\": \"unavailable\""))
+        assertTrue(manifest.contains("temporary storage unavailable"))
         assertChecksumsMatch(zip)
     }
 }
 ```
 
-Also test:
+Add a failure test that passes a directory instead of a valid WAV file, expects an exception, then verifies the original source bundle still contains `unknown-future.txt` and no temporary sibling remains.
 
-- partial WAV is included with `resultState: partial` and exact stop reason;
-- unavailable/failed capture omits the WAV but still removes it from planned files and records the error;
-- existing `performance.csv`, dispatch files, touch files, and unknown future entries are retained byte-for-byte;
-- old `checksums.sha256` is never retained;
-- summary contains duration, format, counters, result, stop reason, and failure text;
-- a multi-megabyte WAV is copied through streams and its ZIP size matches the file size;
-- a failed rewrite leaves the original bundle intact and removes the temporary ZIP.
-
-- [ ] **Step 2: Run the focused tests to verify failure**
-
-Run:
+- [ ] **Step 3: Run the tests and confirm failure**
 
 ```bash
 cd drum-kit-android
@@ -1262,11 +1372,11 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   --tests com.vitautas.drumkit.DiagnosticGeneratedOutputBundleAugmenterTest
 ```
 
-Expected: compilation fails because the augmenter does not exist.
+Expected: Kotlin compilation fails because the augmenter does not exist.
 
-- [ ] **Step 3: Implement a streaming rewrite**
+- [ ] **Step 4: Implement a streaming final rewrite**
 
-Do not load `generated-output.wav` into a `ByteArray`. Use a digesting copy helper:
+Use this exact digesting copy primitive:
 
 ```kotlin
 private fun copyWithSha256(input: InputStream, output: OutputStream): Pair<Long, String> {
@@ -1280,37 +1390,28 @@ private fun copyWithSha256(input: InputStream, output: OutputStream): Pair<Long,
         digest.update(buffer, 0, count)
         total += count
     }
-    return total to digest.digest().joinToString("") { "%02x".format(it) }
+    return total to digest.digest().joinToString("") { byte -> "%02x".format(byte) }
 }
 ```
 
-Rewrite order:
+Algorithm:
 
-1. transformed `manifest.json`;
-2. known existing diagnostic entries in their current order;
-3. any unknown retained entries except `summary.txt` and `checksums.sha256`;
-4. `generated-output.wav` when a valid file exists;
-5. transformed `summary.txt`;
-6. newly generated `checksums.sha256`.
+1. Open the current ZIP and read only `manifest.json` and `summary.txt` as UTF-8 strings.
+2. Transform bundle state to `step_1_2_generated_output_partial`.
+3. Add `generated-output.wav` to `includedFiles` only when `capture.wavFile?.isFile == true`.
+4. Replace the planned list containing only generated output with `[]`.
+5. Insert a JSON-escaped `generatedOutput` object before `droppedData`, containing every field from `DiagnosticGeneratedOutputCapture` plus `durationNanos = logicalFrames * 1_000_000_000 / sampleRate` when sample rate is positive.
+6. Create `.<bundle-name>.generated-output.tmp`.
+7. Write transformed manifest, then copy every existing entry except manifest, summary, old checksums, and old generated WAV through `copyWithSha256`.
+8. Stream `capture.wavFile` through `copyWithSha256`; never call `readBytes()` on it.
+9. Write transformed summary through the digest helper.
+10. Write the new checksum text last.
+11. Atomically replace the original, with non-atomic replace fallback matching existing augmenters.
+12. On failure delete the temporary ZIP and leave the original unchanged.
 
-For each entry, calculate the digest while writing the exact bytes to the new ZIP and append one checksum line. Use a temporary sibling file named `.<bundle>.generated-output.tmp`, then the same atomic-move/fallback pattern used by existing augmenters.
+Summary lines must include result state, stop reason, duration, format, logical/captured/dropped/silence frames, first-frame session offset, and failure reason when present.
 
-Manifest transformation must:
-
-- replace `step_1_2_performance_trace_partial` with `step_1_2_generated_output_partial`;
-- add `generated-output.wav` to `includedFiles` only when present;
-- replace `"plannedFilesNotYetImplemented": ["generated-output.wav"]` with `[]`;
-- insert a `generatedOutput` object before `droppedData`;
-- add `generatedOutputFrames` to `droppedData` using the exact native dropped count;
-- JSON-escape failure text and never include raw newlines.
-
-- [ ] **Step 4: Update the older bundle expectation**
-
-`DiagnosticSessionBundleRecorderTest` exercises the intermediate touch-only bundle, so retain its current assertion that generated output is not yet present at that intermediate stage. Change only wording that became stale due performance telemetry already being implemented; do not assert final generated-output contents in the base recorder test.
-
-- [ ] **Step 5: Run bundle tests**
-
-Run:
+- [ ] **Step 5: Run bundle regression tests**
 
 ```bash
 cd drum-kit-android
@@ -1321,63 +1422,54 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   --tests com.vitautas.drumkit.DiagnosticPerformanceRecorderTest
 ```
 
-Expected: all selected tests pass and prior performance checksum tests remain intact.
+Expected: all selected tests pass.
 
-- [ ] **Step 6: Commit Task 6**
+- [ ] **Step 6: Commit Task 5**
 
 ```bash
 git add \
   drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenter.kt \
-  drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenterTest.kt \
-  drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticSessionBundleRecorderTest.kt
+  drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputBundleAugmenterTest.kt
 git commit -m "feat(diagnostics): add generated output to bundles"
 ```
 
 ---
 
-### Task 7: Diagnostic Screen Lifecycle Integration
+### Task 6: Integrate Capture into the Diagnostic Screen
 
 **Files:**
 - Modify: `drum-kit-android/app/src/main/java/com/vitautas/drumkit/DiagnosticDrumKitScreen.kt:56-330`
 - Test: `drum-kit-android/app/src/test/java/com/vitautas/drumkit/DiagnosticGeneratedOutputRecorderTest.kt`
 
-**Interfaces:**
-- Consumes: recorder and augmenter interfaces from Tasks 5 and 6.
-- Produces: a session workflow where generated-output preparation/start/drain/stop/finalisation is ordered around the existing base, dispatch, and performance recorders.
+- [ ] **Step 1: Add ordering tests before editing Compose**
 
-- [ ] **Step 1: Add orchestration-state tests to the recorder**
-
-Add tests that prove the exact public ordering contract needed by Compose:
+Use the Task 4 fake source to add:
 
 ```kotlin
 @Test
-fun stopDisablesProducerBeforeFinalDrain() {
-    val source = RecordingFakeSource()
-    val recorder = preparedAndStartedRecorder(source)
-
-    recorder.requestStop()
-    recorder.finish(sessionStartedAtMonotonicNanos = 1_000L)
-
-    assertEquals(listOf("start", "stop", "drain"), source.calls.take(3))
-}
-
-@Test
-fun liveDrainCanRunRepeatedlyBeforeStop() {
-    val source = sourceWithRuns(run(0, frame(0.1f, 0.2f)), emptyCapturingRun())
-    val recorder = preparedAndStartedRecorder(source)
-
+fun liveDrainsCanRepeatBeforeStop() {
+    val source = FakeSource(
+        started(),
+        listOf(
+            FakeRun(floatArrayOf(0.1f, 0.2f), drainInfo(first = 0, returned = 1, logical = 1)),
+            FakeRun(floatArrayOf(), drainInfo(first = null, returned = 0, logical = 1)),
+        ),
+    )
+    val sink = FakeSink(File(tempDir, "live.wav"))
+    val recorder = recorder(source, sink)
+    recorder.prepare(tempDir)
+    recorder.start()
     recorder.drainAvailable()
     recorder.drainAvailable()
-
-    assertEquals(2, source.drainCalls)
+    assertEquals(2, source.calls.count { it == "drain" })
 }
 ```
 
-Run the recorder test. Adjust only recorder code if these tests expose an ordering defect.
+Run `DiagnosticGeneratedOutputRecorderTest`; expect pass. This locks the API used by Compose.
 
-- [ ] **Step 2: Add generated-output state to the composable**
+- [ ] **Step 2: Add screen state without adding controls**
 
-At recorder construction:
+Add:
 
 ```kotlin
 val generatedOutputRecorder = remember { DiagnosticGeneratedOutputRecorder() }
@@ -1385,51 +1477,64 @@ var isStarting by remember { mutableStateOf(false) }
 var generatedOutputStatus by remember { mutableStateOf<String?>(null) }
 ```
 
-Disable `START DIAG` while `isStarting` is true. Do not add another button.
+Include `!isStarting` in the existing button enabled expression. Use the existing status label; do not add a new button or panel.
 
-- [ ] **Step 3: Prepare the file before starting the diagnostic clocks**
+- [ ] **Step 3: Prepare before starting diagnostic clocks, then start native capture**
 
-Change the non-recording button branch to launch a coroutine:
+Replace the non-recording branch with a coroutine that performs:
 
 ```kotlin
 isStarting = true
 status = "Preparing generated-output capture"
 scope.launch {
-    val preparation = withContext(Dispatchers.IO) {
-        generatedOutputRecorder.prepare(File(context.cacheDir, "diagnostics/output"))
+    runCatching {
+        val preparation = withContext(Dispatchers.IO) {
+            generatedOutputRecorder.prepare(File(context.cacheDir, "diagnostics/output"))
+        }
+        val diagnostics = AudioEngine.diagnostics()
+        val resolvedRoute = DiagnosticAudioRouteResolver.resolve(context)
+        val metadata = DiagnosticMetadataFactory.create(
+            context = context,
+            diagnostics = diagnostics,
+            masterVolume = masterVolume,
+            roomLevel = roomLevel,
+            audioRoute = resolvedRoute,
+        )
+        val staleOutcomes = AudioEngine.drainDiagnosticDispatchOutcomes()
+        val sessionId = recorder.start(metadata)
+        dispatchTraceRecorder.start(staleOutcomes.droppedOutcomeCount)
+        performanceRecorder.start(
+            metadata = metadata,
+            viewportWidthPx = viewportSize.width.toInt().takeIf { it > 0 } ?: metadata.screenWidthPx,
+            viewportHeightPx = viewportSize.height.toInt().takeIf { it > 0 } ?: metadata.screenHeightPx,
+            density = density,
+        )
+        val outputStart = withContext(Dispatchers.IO) {
+            generatedOutputRecorder.start(preparation)
+        }
+        recorder.recordAudioDiagnostics(diagnostics)
+        isRecording = true
+        generatedOutputStatus = if (outputStart.started) {
+            "Output capture active"
+        } else {
+            "Output capture unavailable"
+        }
+        status = "Recording ${sessionId.take(8)}"
+    }.onFailure { failure ->
+        generatedOutputRecorder.cancel()
+        if (performanceRecorder.isRecording) performanceRecorder.cancel()
+        if (recorder.isRecording) recorder.cancel()
+        status = "Diagnostic start failed: ${failure.message ?: failure::class.java.simpleName}"
     }
-    val diagnostics = AudioEngine.diagnostics()
-    val resolvedRoute = DiagnosticAudioRouteResolver.resolve(context)
-    val metadata = DiagnosticMetadataFactory.create(
-        context = context,
-        diagnostics = diagnostics,
-        masterVolume = masterVolume,
-        roomLevel = roomLevel,
-        audioRoute = resolvedRoute,
-    )
-    val staleOutcomes = AudioEngine.drainDiagnosticDispatchOutcomes()
-    val sessionId = recorder.start(metadata)
-    dispatchTraceRecorder.start(staleOutcomes.droppedOutcomeCount)
-    performanceRecorder.start(
-        metadata = metadata,
-        viewportWidthPx = viewportSize.width.toInt().takeIf { it > 0 } ?: metadata.screenWidthPx,
-        viewportHeightPx = viewportSize.height.toInt().takeIf { it > 0 } ?: metadata.screenHeightPx,
-        density = density,
-    )
-    val outputStart = generatedOutputRecorder.start(preparation)
-    recorder.recordAudioDiagnostics(diagnostics)
-    isRecording = true
     isStarting = false
-    generatedOutputStatus = if (outputStart.started) "Output capture active" else "Output capture unavailable"
-    status = "Recording ${sessionId.take(8)}"
 }
 ```
 
-Wrap the coroutine body in `runCatching`; on failure cancel every recorder that started, reset `isStarting`, and report a concise status. Preparation failure itself is not fatal and returns an unavailable preparation object.
+`DiagnosticGeneratedOutputPreparation` is the exact type returned by `prepare` in Task 4; `start(preparation)` must not infer a different pending file.
 
-- [ ] **Step 4: Drain generated output during the existing 50 ms poll loop**
+- [ ] **Step 4: Drain during the existing 50 ms poll loop**
 
-Inside each repeat iteration, before `delay(NativeOutcomePollIntervalMillis)`:
+Before each existing `delay(NativeOutcomePollIntervalMillis)`:
 
 ```kotlin
 val outputInfo = withContext(Dispatchers.IO) {
@@ -1443,9 +1548,9 @@ generatedOutputStatus = when (outputInfo.stopReason) {
 }
 ```
 
-The 32,768-frame ring holds about 341 ms at 96 kHz, so a 50 ms consumer cadence provides substantial headroom without adding a new timer.
+The ring contains about 341 ms at 96 kHz, so 50 ms live draining leaves more than six polling intervals of transport capacity.
 
-- [ ] **Step 5: Stop the producer before snapshotting and finalise on I/O**
+- [ ] **Step 5: Stop producer first and augment last**
 
 At the start of the recording stop branch:
 
@@ -1455,7 +1560,7 @@ val capture = recorder.stop()
 val performanceCapture = performanceRecorder.stop()
 ```
 
-In the export coroutine, before base ZIP export:
+Inside the export coroutine, before base export:
 
 ```kotlin
 val generatedOutputCapture = withContext(Dispatchers.IO) {
@@ -1463,7 +1568,7 @@ val generatedOutputCapture = withContext(Dispatchers.IO) {
 }
 ```
 
-After dispatch and performance augmentation, run generated-output augmentation last:
+After dispatch and performance augmentation:
 
 ```kotlin
 DiagnosticGeneratedOutputBundleAugmenter.augmentBundle(
@@ -1472,22 +1577,20 @@ DiagnosticGeneratedOutputBundleAugmenter.augmentBundle(
 )
 ```
 
-Running last ensures its checksum list covers every earlier augmentation and the binary WAV.
+This augmenter runs last so its checksum file covers all earlier entries and the WAV.
 
-- [ ] **Step 6: Show compact capture status without adding controls**
+- [ ] **Step 6: Keep status compact and reset it**
 
-Append `generatedOutputStatus` to the existing status label only when non-null. Keep text short enough for landscape:
+Render:
 
 ```kotlin
 val visibleStatus = listOfNotNull(status, generatedOutputStatus).joinToString(" · ")
-Text(text = visibleStatus, /* existing styling */)
+Text(text = visibleStatus, style = MaterialTheme.typography.labelSmall, /* existing modifier and colour */)
 ```
 
-Reset the status after successful export or cancellation.
+Clear `generatedOutputStatus` after successful export, cancellation, or terminal start failure.
 
-- [ ] **Step 7: Run application tests and compilation**
-
-Run:
+- [ ] **Step 7: Run app tests and compilation**
 
 ```bash
 cd drum-kit-android
@@ -1496,9 +1599,9 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   :app:compileDebugKotlin
 ```
 
-Expected: all app unit tests pass and Compose compilation succeeds with warnings treated as errors.
+Expected: all app tests pass and Compose compilation succeeds.
 
-- [ ] **Step 8: Commit Task 7**
+- [ ] **Step 8: Commit Task 6**
 
 ```bash
 git add \
@@ -1509,29 +1612,25 @@ git commit -m "feat(diagnostics): integrate generated output capture"
 
 ---
 
-### Task 8: Documentation, Full Validation, APK, and Physical Handoff
+### Task 7: Documentation, Full Validation, APK, and Physical Handoff
 
 **Files:**
 - Modify: `drum-kit-android/README.md:9-90`
 - Modify: `drum-kit-android/docs/Drum_Kit_Recovery_and_Development_Roadmap.md:4-8,63 onward`
-- Modify: PR #10 body after all automated checks pass
+- Modify: PR #10 body after automated validation
 
-**Interfaces:**
-- Consumes: completed implementation and validation evidence.
-- Produces: accurate status documentation, exact-head APK, and a bounded physical validation checklist.
+- [ ] **Step 1: Document implemented behaviour without overstating acceptance**
 
-- [ ] **Step 1: Update documentation with implemented versus physically verified status**
+README must state:
 
-README changes must state:
-
-- `generated-output.wav` contains post-room/post-master/post-limiter stereo PCM16;
+- normal diagnostic sessions include post-room/post-master/post-limiter PCM16 WAV output;
 - native capture uses a bounded 32,768-frame ring;
 - Kotlin writes through cache storage outside the callback;
 - dropped capture frames become silence and are counted;
 - ten-minute, format-change, and audio-stop cases produce partial WAVs;
 - capture failure does not stop playing or the remaining ZIP export.
 
-Roadmap status must use exact wording equivalent to:
+Roadmap status must include:
 
 ```markdown
 - **Generated-output capture — implemented and automated-validated, physical review pending:** the diagnostic ZIP now includes a checksum-covered PCM16 WAV for normal sessions. Native capture is bounded and real-time safe; overflow, duration-limit, format-change, audio-stop, and file-failure states are explicit. Physical playback/timing and underrun validation remain required before this Step 1.2 slice is fully accepted.
@@ -1539,9 +1638,7 @@ Roadmap status must use exact wording equivalent to:
 
 Do not mark Step 1.2 complete.
 
-- [ ] **Step 2: Run the narrow checks first**
-
-Run:
+- [ ] **Step 2: Run narrow validation first**
 
 ```bash
 cd drum-kit-android
@@ -1551,11 +1648,9 @@ gradle --no-daemon --console=plain --warning-mode=fail \
   :app:testDebugUnitTest
 ```
 
-Expected: host native tests and all focused JVM tests pass.
+Expected: host native tests and focused JVM tests pass.
 
-- [ ] **Step 3: Run the project’s normal automated checks**
-
-Run:
+- [ ] **Step 3: Run the complete project checks**
 
 ```bash
 cd drum-kit-android
@@ -1571,16 +1666,20 @@ gradle --no-daemon --console=plain --warning-mode=fail \
 
 Expected: exit code `0`, no warnings promoted to errors, and no test failures.
 
-- [ ] **Step 4: Inspect the implementation against the real-time checklist**
+- [ ] **Step 4: Perform the real-time source inspection**
 
-Perform and record a source review confirming:
+Record evidence for each item:
 
-- `onAudioReady()` performs only atomic state/counter operations and writes to preallocated slots for capture;
-- no capture path in `onAudioReady()` opens files, allocates containers, locks mutexes, logs, calls JNI, waits, or converts floats to PCM integers;
-- `clearRealtimeState()` does not erase buffered generated-output capture;
-- all file and ZIP work is called from `Dispatchers.IO`;
-- generated-output augmentation runs after dispatch and performance augmentation;
-- `generated-output.wav` is not loaded wholly into memory.
+```text
+onAudioReady uses only atomic capture operations and preallocated slots
+onAudioReady opens no file and creates no container
+onAudioReady takes no mutex and performs no JNI call
+onAudioReady performs no PCM integer conversion
+clearRealtimeState does not erase buffered output capture
+all WAV and ZIP methods are invoked from Dispatchers.IO
+generated-output augmentation runs after dispatch and performance augmentation
+generated-output.wav is streamed and never loaded through readBytes()
+```
 
 - [ ] **Step 5: Commit documentation**
 
@@ -1591,78 +1690,47 @@ git add \
 git commit -m "docs: record generated output capture status"
 ```
 
-- [ ] **Step 6: Verify GitHub Actions on the exact final head**
+- [ ] **Step 6: Verify exact-head GitHub Actions**
 
-Wait for and inspect:
+Inspect Drum Kit Quick Check, Android Validation including the new host C++ step, and Android Lint. For a failure, invoke `superpowers:systematic-debugging`, inspect the failing job log, and change only generated-output files.
 
-- Drum Kit Quick Check;
-- Drum Kit Android Validation, including the new host C++ test;
-- Drum Kit Android Lint.
+- [ ] **Step 7: Request and verify the exact-head APK**
 
-If any check fails, use `superpowers:systematic-debugging`, inspect the failing logs, and change only the generated-output slice.
+Apply the repository’s APK-request label to PR #10. Verify exact-head checkout, snare-bank structure, arm64 native compilation, debug APK assembly, embedded source SHA, and APK/build-log/manifest artifact uploads. Record run number, artifact ID, digest, source SHA, and expiry date.
 
-- [ ] **Step 7: Request and verify an exact-head debug APK**
+- [ ] **Step 8: Update PR #10 and keep it draft**
 
-Apply the repository’s existing APK request label to PR #10. Verify the APK workflow:
+Add generated-output architecture, file/metadata changes, real-time invariants, partial/failure semantics, validation run numbers, artifact details, and an explicit physical-review-pending statement. Do not mark ready, merge, or release.
 
-- checks out the exact PR head;
-- verifies the snare bank;
-- compiles arm64 native C++ with project warning settings;
-- assembles the debug APK;
-- verifies the embedded source SHA;
-- uploads APK, build log, and snare manifest artifacts.
+- [ ] **Step 9: Perform the physical handoff**
 
-Record artifact ID, digest, exact source SHA, and expiry date in the PR body.
-
-- [ ] **Step 8: Update PR #10 without changing draft status**
-
-Add:
-
-- generated-output architecture;
-- exact files and metadata added;
-- real-time invariants;
-- overflow/silence, duration, format-change, audio-stop, and failure semantics;
-- automated validation run numbers;
-- APK artifact details;
-- explicit statement that physical WAV validation remains.
-
-Do not mark the PR ready, merge it, or claim Step 1.2 complete.
-
-- [ ] **Step 9: Perform the physical validation handoff**
-
-Install the exact-head APK and record a 20–30 second phone-speaker session containing kick, snare, cymbals, rapid pedal retriggers, and a marker. Export the ZIP and verify:
+Install the exact-head APK and record a 20–30 second phone-speaker session containing kick, snare, cymbals, rapid pedal retriggers, and one marker. Verify:
 
 ```text
 generated-output.wav exists and opens
 format is stereo PCM16
-sample rate matches session.json/audio diagnostics
-WAV duration = logicalFrames / sampleRate within one frame
+sample rate matches session.json and audio diagnostics
+WAV duration equals logicalFrames / sampleRate within one frame
 checksums.sha256 matches generated-output.wav
-audible strikes align with strike/marker timing under the documented offset
-underrun count did not increase
+audible strikes align with logged strike/marker timing under sessionStartOffsetNanos
+underrun count does not increase
 ```
 
-Repeat a short Galaxy Buds session to verify honest Bluetooth route/burst metadata. A deliberate route change during a session must yield a playable partial WAV with `format_changed` or `audio_stopped`, not a corrupt file.
+Repeat a short Galaxy Buds session to verify honest route/burst metadata. Change route once during a short session and verify a playable partial WAV with `format_changed` or `audio_stopped`, never corruption.
 
 - [ ] **Step 10: Record acceptance accurately**
 
-After reviewing the uploaded physical ZIP:
-
-- mark each generated-output acceptance criterion `Met`, `Partially met`, or `Not testable`;
-- keep Step 1.2 partial because guided tests and recovery/share/deletion work remain;
-- recommend guided diagnostic sequence and automatic markers as the next Step 1.2 batch.
+After reviewing the uploaded bundle, mark generated-output criteria `Met`, `Partially met`, or `Not testable`. Keep Step 1.2 partial because guided diagnostics and recovery/share/deletion work remain. Recommend guided sequence and automatic markers as the next Step 1.2 batch.
 
 ---
 
 ## Plan Self-Review Checklist
 
-Before execution begins, verify:
-
-- Every approved design requirement maps to Tasks 1–8.
+- Every approved design requirement maps to Tasks 1–7.
 - Native overflow exposes exact gaps through per-slot logical indices and contiguous-run drains.
 - Native producer state, native stop reason, and Kotlin final result remain distinct.
-- The WAV path never stores ten minutes in RAM and never loads the final WAV into a `ByteArray` for ZIP insertion.
+- The WAV path stores neither ten minutes of audio nor the final WAV in RAM.
 - The 96 kHz ten-minute PCM16 payload is approximately 230 MB and below classic RIFF limits.
 - The first captured frame offset uses the shared Android monotonic timebase and remains nullable for zero-frame captures.
 - The final ZIP augmenter runs last and recomputes checksums for all retained and new entries.
-- No task introduces a second roadmap step or implements deferred Step 1.2 slices.
+- No task starts a second roadmap step or implements another deferred Step 1.2 slice.
