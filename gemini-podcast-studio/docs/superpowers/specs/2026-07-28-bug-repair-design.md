@@ -4,6 +4,14 @@
 
 Repair the confirmed defects found during the PR #13 audit without changing the visual design or adding unrelated product features.
 
+## Implementation structure
+
+The application already uses an application-scoped service registry and late decorators for compatibility-sensitive features. The repairs follow that established pattern in `src/js/bug-repairs.js` rather than duplicating fixes across event handlers and transport modules.
+
+`installBugRepairs()` runs after the original status, TTS and editor services are installed, but before UI event listeners are registered. Event handlers therefore bind the repaired service functions. Later preview and final-review decorators continue to wrap the repaired services normally. The connection wording is also corrected directly in `ui-connection.js` so initial rendering and form synchronisation never display the obsolete wording.
+
+The repaired browser smoke command remains a thin wrapper around the original smoke implementation. It patches only the stale deterministic fixture, Chrome executable selection and startup timeout at execution time, leaving the established browser-test flow intact.
+
 ## Behavioural design
 
 ### Atomic audio generation
@@ -40,7 +48,7 @@ Update the deterministic runtime fixture to match the strict script schema, sele
 
 ## Testing strategy
 
-Add focused regression tests for each behaviour. The implementation workflow must first run the new tests against the unmodified branch and record the expected failures, then apply production changes and rerun the focused suite, the complete Node suite, the standalone build, standalone verification and browser runtime smoke test.
+Add focused regression tests for each behaviour. Verify the repair module with Node syntax checking and focused behavioural tests. The complete Node suite, standalone build, standalone verifier and browser smoke test remain mandatory before the pull request can leave draft status.
 
 ## Non-goals
 
