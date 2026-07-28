@@ -51,7 +51,7 @@ const services = createServices({
   showServiceError: value => { serviceError = value; }, hideServiceError() { serviceError = null; },
   announce: message => { announcements.push(message); }
 });
-installServices(services, ['constants', 'textUtilities', 'appHelpers', 'pcmAudio', 'wavEncoder']);
+installServices(services, ['constants', 'textUtilities', 'appHelpers', 'geminiTransport', 'pcmAudio', 'wavEncoder']);
 services.announce = message => { announcements.push(message); };
 services.voicePreviewCacheBackend = {};
 services.setVoicePreviewCacheBackendForTests = backend => { services.voicePreviewCacheBackend = backend; };
@@ -87,7 +87,7 @@ function responseWithAudio(bytes = [1, 2, 3, 4]) {
     ok: true,
     status: 200,
     async text() {
-      return JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: 'audio/pcm;rate=24000' } }] } }] });
+      return JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: 'audio/pcm;rate=24000;channels=1' } }] } }] });
     }
   };
 }
@@ -254,7 +254,7 @@ test('API and empty-audio failures show a useful error without automatic retry',
     fetchImpl: async () => ({ ok: true, status: 200, async text() { return JSON.stringify({ candidates: [] }); } })
   });
   assert.equal(empty, false);
-  assert.match(serviceError.details, /empty voice-preview audio response/);
+  assert.match(serviceError.details, /no response candidate/);
 });
 
 test('one speaker preview does not overwrite the other speaker cache entry', async () => {

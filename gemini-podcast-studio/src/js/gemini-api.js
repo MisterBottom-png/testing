@@ -29,6 +29,53 @@ export function installGeminiTransport(services) {
     if (finishReason && !['STOP', 'FINISH_REASON_UNSPECIFIED'].includes(finishReason)) throw createGeminiResponseError('GEMINI_FINISH_REASON', `Gemini stopped with finish reason ${finishReason}.`, JSON.stringify(data, null, 2));
     return finishReason;
   }
+  function parseAudioMimeType(mimeType, data) {
+    const value = String(mimeType || '').trim();
+    if (!value) throw createGeminiResponseError('GEMINI_AUDIO_MISSING_MIME_TYPE', 'Gemini returned audio without a MIME type.', JSON.stringify(data, null, 2));
+    const [mediaType, ...rawParameters] = value.split(';').map(item => item.trim());
+    if (!['audio/pcm', 'audio/l16'].includes(mediaType.toLowerCase())) {
+      throw createGeminiResponseError('GEMINI_AUDIO_UNSUPPORTED_MEDIA_TYPE', `Gemini returned unsupported audio media type ${mediaType}.`, JSON.stringify(data, null, 2));
+    }
+    const parameters = new Map();
+    for (const rawParameter of rawParameters) {
+      const match = rawParameter.match(/^([^=\s]+)\s*=\s*([^=\s]+)$/);
+      if (!match) throw createGeminiResponseError('GEMINI_AUDIO_INVALID_METADATA', `Gemini returned malformed audio MIME metadata (${rawParameter || 'empty parameter'}).`, JSON.stringify(data, null, 2));
+      const name = match[1].toLowerCase();
+      const parameterValue = match[2].replace(/^"|"$/g, '');
+      if (parameters.has(name) && parameters.get(name).toLowerCase() !== parameterValue.toLowerCase()) {
+        throw createGeminiResponseError('GEMINI_AUDIO_INVALID_METADATA', `Gemini returned contradictory ${name} audio metadata.`, JSON.stringify(data, null, 2));
+      }
+      parameters.set(name, parameterValue);
+    }
+    if (!/^\d+$/.test(parameters.get('rate') || '') || Number(parameters.get('rate')) <= 0) {
+      throw createGeminiResponseError('GEMINI_AUDIO_INVALID_METADATA', 'Gemini audio must declare a valid positive integer sample rate.', JSON.stringify(data, null, 2));
+    }
+    if (!/^\d+$/.test(parameters.get('channels') || '') || Number(parameters.get('channels')) !== 1) {
+      throw createGeminiResponseError('GEMINI_AUDIO_INVALID_METADATA', 'Gemini PCM audio must declare exactly one channel.', JSON.stringify(data, null, 2));
+    }
+    if (parameters.has('codec') && parameters.get('codec').toLowerCase() !== 'pcm') {
+      throw createGeminiResponseError('GEMINI_AUDIO_INVALID_METADATA', 'Gemini audio MIME metadata declares a non-PCM codec.', JSON.stringify(data, null, 2));
+    }
+    return { sampleRate: Number(parameters.get('rate')), channels: 1, mimeType: value };
+  }
+  function parseGeminiAudioResponse(data) {
+    const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+    if (!candidates.length) getFirstCandidate(data);
+    candidates.forEach(candidate => assertUsableFinishReason(candidate, data));
+    const part = candidates.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData);
+    if (!part) throw createGeminiResponseError('GEMINI_EMPTY_CANDIDATE', 'Gemini returned no inline audio.', JSON.stringify(data, null, 2));
+    const metadata = parseAudioMimeType(part.inlineData.mimeType, data);
+    let pcmBytes;
+    try {
+      pcmBytes = services.base64ToBytes(part.inlineData.data);
+    } catch (error) {
+      throw createGeminiResponseError('GEMINI_AUDIO_INVALID_DATA', error?.message || 'Gemini returned invalid base64 audio.', JSON.stringify(data, null, 2));
+    }
+    if (pcmBytes.byteLength < 2 || pcmBytes.byteLength % 2 !== 0) {
+      throw createGeminiResponseError('GEMINI_AUDIO_INVALID_DATA', 'Gemini returned empty or incomplete PCM audio.', JSON.stringify(data, null, 2));
+    }
+    return { pcmBytes, ...metadata };
+  }
   function buildScriptGenerationConfig({
     schema,
     maxOutputTokens = services.getScriptOutputTokenLimit(),
@@ -97,6 +144,7 @@ export function installGeminiTransport(services) {
     getFinishReason,
     getFirstCandidate,
     assertUsableFinishReason,
+    parseGeminiAudioResponse,
     buildScriptGenerationConfig,
     callGeminiText,
     generateStructuredScript,
