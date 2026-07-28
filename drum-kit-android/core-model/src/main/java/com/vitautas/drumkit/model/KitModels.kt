@@ -433,7 +433,7 @@ object StudioKitDefinition {
                 HitRegionInsets(left = 0.06f, top = 0.08f, right = 0.06f, bottom = 0.08f)
 
             InstrumentId.KICK ->
-                HitRegionInsets(left = 0.18f, top = 0.18f, right = 0.08f, bottom = 0.10f)
+                HitRegionInsets(left = 0.18f, top = 0.10f, right = 0.08f, bottom = 0.10f)
         }
         val hitBounds = inset(surfaceBounds, insets)
         return EllipseHitRegion(bounds = hitBounds)
@@ -487,7 +487,13 @@ object StudioKitDefinition {
             pan = pan,
         )
     }
+}
 
+enum class StrikeVelocitySource(val wireName: String) {
+    PRESSURE("pressure"),
+    CONTACT_SIZE("contact_size"),
+    HISTORY("history"),
+    DETERMINISTIC_FALLBACK("deterministic_fallback"),
 }
 
 data class DrumStrike(
@@ -499,6 +505,10 @@ data class DrumStrike(
     val pressure: Float,
     val contactSize: Float,
     val eventTimeNanos: Long,
+    val velocitySource: StrikeVelocitySource = StrikeVelocitySource.DETERMINISTIC_FALLBACK,
+    /** Resolved by the input layer when a deliberate multi-contact gesture is present. */
+    val requestedArticulation: SnareArticulation? = null,
+    val inputTarget: StrikeInputTarget = StrikeInputTarget.INSTRUMENT_SURFACE,
 )
 
 data class AudioDiagnostics(

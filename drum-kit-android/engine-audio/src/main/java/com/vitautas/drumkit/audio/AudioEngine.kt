@@ -4,16 +4,24 @@ import android.content.Context
 import android.content.res.AssetManager
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
-import com.vitautas.drumkit.model.InstrumentId
-import com.vitautas.drumkit.model.SnareArticulation
-import com.vitautas.drumkit.model.SnareArticulationResolver
 
 object AudioEngine {
+    private val mixState = AudioMixState()
+
     init {
         System.loadLibrary("drumkit")
     }
 
-    fun start(context: Context): Boolean = nativeStart(context.assets)
+    fun start(context: Context): Boolean {
+        val started = nativeStart(context.assets)
+        if (started) {
+            mixState.apply(
+                setMasterVolume = ::nativeSetMasterVolume,
+                setRoomMix = ::nativeSetRoomMix,
+            )
+        }
+        return started
+    }
 
     fun stop() {
         nativeStop()
@@ -23,15 +31,12 @@ object AudioEngine {
         val velocity = AudioInputSanitizer.velocity(strike.velocity)
         val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
         val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
-        val articulation = if (strike.instrument == InstrumentId.SNARE) {
-            SnareArticulationResolver.resolve(
-                normalizedX = normalizedX,
-                normalizedY = normalizedY,
-                velocity = velocity,
-            )
-        } else {
-            SnareArticulation.CENTER
-        }
+        val articulation = StrikeArticulationSelector.resolve(
+            strike = strike,
+            velocity = velocity,
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+        )
 
         nativeTrigger(
             instrument = strike.instrument.nativeCode,
@@ -43,11 +48,17 @@ object AudioEngine {
     }
 
     fun setMasterVolume(value: Float) {
-        AudioInputSanitizer.level(value)?.let(::nativeSetMasterVolume)
+        AudioInputSanitizer.level(value)?.let { sanitized ->
+            mixState.updateMasterVolume(sanitized)
+            nativeSetMasterVolume(sanitized)
+        }
     }
 
     fun setRoomMix(value: Float) {
-        AudioInputSanitizer.level(value)?.let(::nativeSetRoomMix)
+        AudioInputSanitizer.level(value)?.let { sanitized ->
+            mixState.updateRoomMix(sanitized)
+            nativeSetRoomMix(sanitized)
+        }
     }
 
     fun diagnostics(): AudioDiagnostics = AudioDiagnostics(
