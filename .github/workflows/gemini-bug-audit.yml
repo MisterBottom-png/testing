@@ -30,7 +30,7 @@ jobs:
           git status --short > audit-output/git-status.txt
           find gemini-podcast-studio -path '*/node_modules' -prune -o -type f -printf '%p\n' | sort > audit-output/file-manifest.txt
           tar --exclude='gemini-podcast-studio/node_modules' --exclude='gemini-podcast-studio/.single-file-build' -czf /tmp/gemini-podcast-studio-source.tar.gz gemini-podcast-studio
-          base64 -w 0 /tmp/gemini-podcast-studio-source.tar.gz | split -b 400000 - audit-output/source.tar.gz.b64.part-
+          base64 -w 0 /tmp/gemini-podcast-studio-source.tar.gz | split -b 20000 - audit-output/source.tar.gz.b64.part-
 
           cd gemini-podcast-studio
           npm install --no-audit --no-fund > ../audit-output/npm-install.log 2>&1
