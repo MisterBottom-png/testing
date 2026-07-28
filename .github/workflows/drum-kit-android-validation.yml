@@ -78,23 +78,37 @@ jobs:
           exit 1
 
       - name: Run Android unit tests and compile app
+        id: run_tests
         if: steps.apply_repair.outcome == 'success'
+        continue-on-error: true
         run: >-
           gradle --no-daemon --console=plain --warning-mode=fail
           :engine-input:testDebugUnitTest
           :engine-audio:testDebugUnitTest
           :feature-kit:testDebugUnitTest
           :app:compileDebugKotlin
+          > ../task1-tests.log 2>&1
+
+      - name: Persist test failure
+        if: steps.apply_repair.outcome == 'success' && steps.run_tests.outcome == 'failure'
+        working-directory: .
+        run: |
+          git config user.name "chatgpt-bugfix-agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add task1-tests.log
+          git commit -m "chore: capture deterministic velocity test failure"
+          git push origin HEAD:agent/drum-kit-current-bug-fixes
+          exit 1
 
       - name: Commit verified repair
-        if: steps.apply_repair.outcome == 'success'
+        if: steps.apply_repair.outcome == 'success' && steps.run_tests.outcome == 'success'
         working-directory: .
         run: |
           git checkout origin/main -- .github/workflows/drum-kit-android-validation.yml
           rm -f .github/workflows/drum-kit-bugfix-task1.yml
           rm -f .github/scripts/apply-drum-kit-bugfix-task1.py
           rm -f .github/scripts/repair-drum-kit-bugfix-task1-runner.py
-          rm -f task1-runner.log
+          rm -f task1-runner.log task1-tests.log
           git config user.name "chatgpt-bugfix-agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
