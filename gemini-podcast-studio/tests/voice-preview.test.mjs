@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { createServices, installServices } from './service-harness.mjs';
 
 class FakeClassList {
@@ -51,7 +52,7 @@ const services = createServices({
   showServiceError: value => { serviceError = value; }, hideServiceError() { serviceError = null; },
   announce: message => { announcements.push(message); }
 });
-installServices(services, ['constants', 'textUtilities', 'appHelpers', 'pcmAudio', 'wavEncoder']);
+installServices(services, ['constants', 'textUtilities', 'appHelpers', 'geminiTransport', 'pcmAudio', 'wavEncoder']);
 services.announce = message => { announcements.push(message); };
 services.voicePreviewCacheBackend = {};
 services.setVoicePreviewCacheBackendForTests = backend => { services.voicePreviewCacheBackend = backend; };
@@ -87,7 +88,7 @@ function responseWithAudio(bytes = [1, 2, 3, 4]) {
     ok: true,
     status: 200,
     async text() {
-      return JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: 'audio/pcm;rate=24000' } }] } }] });
+      return JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: 'audio/pcm;rate=24000;channels=1' } }] } }] });
     }
   };
 }
@@ -103,17 +104,42 @@ function resetState() {
   api.setVoicePreviewCacheBackendForTests(createCache());
 }
 
-test('preview descriptor includes language, voice, delivery instructions, model and generation version', () => {
+test('preview descriptor key includes model, voice, language, accent, delivery, text and generation version', () => {
   resetState();
   appState.podcast.language = 'Estonian';
+  appState.speakers[0].accent = 'Tallinn accent';
   const descriptor = api.buildVoicePreviewDescriptor(appState.speakers[0]);
   assert.equal(descriptor.geminiVoiceName, 'Iapetus');
   assert.equal(descriptor.ttsModel, 'gemini-3.1-flash-tts-preview');
+  assert.equal(descriptor.accent, 'Tallinn accent');
+  assert.equal(descriptor.previewText, api.VOICE_PREVIEW_SENTENCES.estonian);
   assert.match(descriptor.prompt, /Tere\./);
   assert.match(descriptor.prompt, /Natural pace/);
+  assert.match(descriptor.prompt, /Tallinn accent/);
   assert.match(descriptor.cacheKey, /^voice-preview-voice-preview-v1-/);
   const same = api.buildVoicePreviewDescriptor({ ...appState.speakers[0], deliveryInstructions: '  NATURAL   PACE ' });
   assert.equal(same.cacheKey, descriptor.cacheKey);
+  for (const change of [
+    { ttsModel: 'another-model' },
+    { geminiVoiceName: 'Erinome' },
+    { language: 'English' },
+    { accent: 'Tartu accent' },
+    { deliveryInstructions: 'Fast' },
+    { previewText: 'Different deterministic text.' },
+    { version: 'voice-preview-v2' }
+  ]) {
+    const changed = { ...descriptor, ...change };
+    const keyInput = {
+      version: changed.version,
+      language: api.normaliseVoicePreviewValue(changed.language, { lowerCase: true }),
+      geminiVoiceName: api.normaliseVoicePreviewValue(changed.geminiVoiceName, { lowerCase: true }),
+      accent: api.normaliseVoicePreviewValue(changed.accent, { lowerCase: true }),
+      deliveryInstructions: api.normaliseVoicePreviewValue(changed.deliveryInstructions, { lowerCase: true }),
+      ttsModel: api.normaliseVoicePreviewValue(changed.ttsModel, { lowerCase: true }),
+      previewText: api.normaliseVoicePreviewValue(changed.previewText, { lowerCase: true })
+    };
+    assert.notEqual(`voice-preview-${changed.version}-${api.hashVoicePreviewValue(JSON.stringify(keyInput))}`, descriptor.cacheKey);
+  }
 });
 
 test('preview request sends the selected Gemini voice, language instructions and current TTS model', async () => {
@@ -154,6 +180,24 @@ test('loading state disables the button and duplicate simultaneous requests shar
   resolveFetch(responseWithAudio());
   assert.equal(await first, true);
   assert.equal(await second, true);
+});
+
+test('descriptor-level concurrent callers receive the same in-flight promise and request', async () => {
+  resetState();
+  const descriptor = api.buildVoicePreviewDescriptor(appState.speakers[0]);
+  let resolveFetch;
+  let fetchCalls = 0;
+  const fetchResult = new Promise(resolve => { resolveFetch = resolve; });
+  const options = {
+    cacheBackend: createCache(),
+    fetchImpl: async () => { fetchCalls += 1; return fetchResult; }
+  };
+  const first = api.getOrGenerateVoicePreviewRecord(descriptor, options);
+  const second = api.getOrGenerateVoicePreviewRecord(descriptor, options);
+  assert.strictEqual(second, first);
+  assert.equal(fetchCalls, 1);
+  resolveFetch(responseWithAudio());
+  await first;
 });
 
 test('successful previews are cached and replay without another API request', async () => {
@@ -254,7 +298,7 @@ test('API and empty-audio failures show a useful error without automatic retry',
     fetchImpl: async () => ({ ok: true, status: 200, async text() { return JSON.stringify({ candidates: [] }); } })
   });
   assert.equal(empty, false);
-  assert.match(serviceError.details, /empty voice-preview audio response/);
+  assert.match(serviceError.details, /no response candidate/);
 });
 
 test('one speaker preview does not overwrite the other speaker cache entry', async () => {
@@ -272,4 +316,11 @@ test('one speaker preview does not overwrite the other speaker cache entry', asy
   assert.equal(cache.map.size, 2);
   const keys = [...cache.map.keys()];
   assert.notEqual(keys[0], keys[1]);
+});
+
+test('generation jobs contains only the voice-preview delegation, not a direct Gemini request path', async () => {
+  const source = await readFile(`${import.meta.dirname}/../src/js/generation-jobs.js`, 'utf8');
+  const voiceTest = source.match(/function generateVoiceTest[\s\S]*?\n  \}/u)?.[0] || '';
+  assert.match(voiceTest, /services\.generateVoicePreview\(index, options\)/);
+  assert.doesNotMatch(voiceTest, /fetch\(|generateContent|pcm16ToWavBlob|new Audio/);
 });

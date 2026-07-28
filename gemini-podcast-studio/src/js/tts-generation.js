@@ -39,12 +39,7 @@ export function installTtsTransport(services) {
       throw services.createApiError(response.status, 'Gemini returned non-JSON audio response data.', raw);
     }
     if (!response.ok) throw services.createApiError(response.status, data?.error?.message || `Audio request failed with HTTP ${response.status}.`, JSON.stringify(data, null, 2));
-    const audioPart = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(part => part?.inlineData?.data);
-    if (!audioPart) throw services.createApiError(response.status, 'Gemini returned no audio.', JSON.stringify(data, null, 2));
-    return {
-      pcmBytes: services.base64ToBytes(audioPart.inlineData.data),
-      sampleRate: services.sampleRateFromMimeType(audioPart.inlineData.mimeType)
-    };
+    return services.parseGeminiAudioResponse(data);
   }
   async function generateTtsPcm({ transcript, speakerVoiceConfigs = buildSpeakerVoiceConfigs() } = {}) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;

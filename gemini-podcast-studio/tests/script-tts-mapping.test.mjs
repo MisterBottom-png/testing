@@ -40,7 +40,7 @@ function createHarness() {
     createApiError(status, message, details = '') { const error = new Error(message); error.status = status; error.details = details; return error; },
     handleGenerationError(error) { throw error; }, announce() {}, renderScriptStage() {}
   });
-  installServices(services, ['constants', 'textUtilities', 'appHelpers', 'scriptUi', 'scriptValidation', 'pcmAudio', 'wavEncoder', 'ttsChunking', 'ttsTransport']);
+  installServices(services, ['constants', 'textUtilities', 'appHelpers', 'scriptUi', 'scriptValidation', 'pcmAudio', 'wavEncoder', 'ttsChunking', 'ttsTransport', 'indexedDb', 'mediaCache']);
   services.setStage = value => { stage = value; };
   services.generateTtsPcm = async ({ transcript, speakerVoiceConfigs }) => {
   requests.push(services.buildTtsRequestBody(transcript, speakerVoiceConfigs));
@@ -48,6 +48,18 @@ function createHarness() {
 };
   installServices(services, ['generationJobs']);
   return { services, requests, serviceErrors, revokedUrls, get stage() { return stage; } };
+}
+
+function useMemoryChunkCache(services) {
+  const records = new Map();
+  services.setTtsChunkCacheBackendForTests({
+    get: async cacheKey => records.get(cacheKey) || null,
+    set: async record => records.set(record.cacheKey, structuredClone(record)),
+    delete: async cacheKey => records.delete(cacheKey),
+    clear: async () => records.clear(),
+    keys: async () => [...records.keys()]
+  });
+  return records;
 }
 
 async function withAudioGlobals(callback, revokedUrls = []) {
@@ -129,6 +141,50 @@ test('long scripts retain segment order and stable speaker-to-voice mapping acro
   }
   assert.deepEqual(plain(harness.services.appState.audioCacheReferences.chunks.map(chunk => chunk.speakerOrder)), plain(chunks.map(() => ['James', 'Anna'])));
   assert.equal(harness.stage, 'audio');
+});
+
+test('retry resumes at the first missing PCM chunk after a later request fails', async () => {
+  const harness = createHarness();
+  const records = useMemoryChunkCache(harness.services);
+  harness.services.appState.settings.maxTtsCharacters = 700;
+  harness.services.appState.script.segments = Array.from({ length: 4 }, (_, index) => ({
+    speaker: index % 2 ? 'Anna' : 'James', direction: '', text: `${index}-${'A'.repeat(120)}`
+  }));
+  const requested = [];
+  let failSecondChunk = true;
+  harness.services.generateTtsPcm = async ({ transcript }) => {
+    requested.push(transcript);
+    if (failSecondChunk && requested.length === 2) throw new Error('temporary failure');
+    return { pcmBytes: new Uint8Array([requested.length, 0]), sampleRate: 24000 };
+  };
+
+  await assert.rejects(withAudioGlobals(() => harness.services.generatePodcastAudio()), /chunk 2/i);
+  assert.equal(records.size, 1);
+  const firstTranscript = requested[0];
+  failSecondChunk = false;
+  await withAudioGlobals(() => harness.services.generatePodcastAudio());
+
+  assert.equal(requested.filter(transcript => transcript === firstTranscript).length, 1);
+  assert.equal(harness.stage, 'audio');
+});
+
+test('changed TTS generation inputs cannot replay stale cached PCM', async () => {
+  const harness = createHarness();
+  const records = useMemoryChunkCache(harness.services);
+  let requests = 0;
+  harness.services.generateTtsPcm = async () => ({ pcmBytes: new Uint8Array([++requests, 0]), sampleRate: 24000 });
+
+  await withAudioGlobals(() => harness.services.generatePodcastAudio());
+  const originalKeys = [...records.keys()];
+  assert.equal(requests, 1);
+  await withAudioGlobals(() => harness.services.generatePodcastAudio());
+  assert.equal(requests, 1, 'unchanged generation inputs should replay the valid PCM');
+
+  harness.services.appState.connection.ttsModel = 'custom';
+  harness.services.appState.connection.customTtsModel = 'different-tts-model';
+  await withAudioGlobals(() => harness.services.generatePodcastAudio());
+  assert.equal(requests, 2, 'a model change must request fresh PCM');
+  assert.ok(originalKeys.every(cacheKey => !records.has(cacheKey)), 'obsolete generation records should be removed');
 });
 
 test('changing one voice invalidates completed audio and all dependent chunk references without altering the other speaker', async () => {
