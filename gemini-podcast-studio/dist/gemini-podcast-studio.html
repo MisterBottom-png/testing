@@ -281,7 +281,11 @@
       <section class="mt-24" aria-labelledby="generationSettingsTitle">
         <h3 id="generationSettingsTitle">Generation</h3>
         <div class="field-grid mt-14">
-          <div class="field"><label for="maxTtsCharacters">TTS character warning threshold</label><input id="maxTtsCharacters" type="number" min="2000" max="30000" step="500" value="12000" /></div>
+          <div class="field">
+            <label for="maxTtsCharacters">Generation chunk target (request characters)</label>
+            <input id="maxTtsCharacters" type="number" min="4000" max="30000" step="500" value="24000" aria-describedby="ttsChunkTargetHelp" />
+            <small id="ttsChunkTargetHelp">Advanced troubleshooting override. The 24,000-character default is a conservative tested target for Gemini 3.1 Flash TTS Preview, below its 8,192-token maximum input context to allow for tokenisation variation. Smaller chunks use more requests and can reduce voice and conversational continuity.</small>
+          </div>
           <div class="field"><label for="speakingRate">Words per minute</label><input id="speakingRate" type="number" min="100" max="200" step="5" value="140" /></div>
         </div>
       </section>
@@ -332,7 +336,7 @@
       <div class="speaker-card-head">
         <span class="speaker-id" aria-hidden="true">${D===0?"A":"B"}</span>
         <div class="speaker-copy">
-          <h3 id="speakerCardTitle${D}">${x}</h3>
+          <h3 id="speakerCardTitle${D}">${G}</h3>
           <p class="speaker-description">Configure the podcast character and Gemini TTS voice independently.</p>
         </div>
       </div>
@@ -491,7 +495,7 @@ ${M?.details||M?.stack||String(M)}`,retry:null}),!1}async function K(m,N={}){con
 `);return`Create a short two-speaker conversation preview.
 
 LANGUAGE
-${W}
+${H}
 
 DELIVERY INSTRUCTIONS
 ${U}

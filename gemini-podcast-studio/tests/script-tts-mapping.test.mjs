@@ -125,8 +125,8 @@ test('unknown visible script speakers block TTS before any network request with 
 
 test('long scripts retain segment order and stable speaker-to-voice mapping across every chunk', async () => {
   const harness = createHarness();
-  const longText = 'A'.repeat(430);
-  harness.services.appState.settings.maxTtsCharacters = 1200;
+  const longText = 'A'.repeat(600);
+  harness.services.appState.settings.maxTtsCharacters = 4000;
   harness.services.appState.script.segments = Array.from({ length: 8 }, (_, index) => ({ speaker: index % 2 ? 'Anna' : 'James', direction: '', text: `${index}-${longText}` }));
   const chunks = harness.services.createTtsChunks();
   assert.ok(chunks.length > 1);
