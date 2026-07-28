@@ -42,6 +42,22 @@ class KickPedalTest {
     }
 
     @Test
+    fun visibleSnareRimResolvesToDedicatedRimTarget() {
+        val snare = StudioKitDefinition.instruments.first { it.id == InstrumentId.SNARE }
+        val point = StudioKitGeometry.screenPoint(
+            layout = snare.layout,
+            normalizedX = 0.96f,
+            normalizedY = 0.5f,
+            aspectRatio = landscapeAspectRatio,
+        )
+
+        val hit = StudioKitInputGeometry.hitTest(point.x, point.y, landscapeAspectRatio)
+
+        assertEquals(InstrumentId.SNARE, hit?.definition?.id)
+        assertEquals(StrikeInputTarget.SNARE_RIM, hit?.inputTarget)
+    }
+
+    @Test
     fun pedalTouchAreaExtendsBeyondRenderedFootboard() {
         val accessiblePointX = 0.41f
         val accessiblePointY = 0.90f

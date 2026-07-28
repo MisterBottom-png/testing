@@ -489,6 +489,13 @@ object StudioKitDefinition {
     }
 }
 
+enum class StrikeVelocitySource(val wireName: String) {
+    PRESSURE("pressure"),
+    CONTACT_SIZE("contact_size"),
+    HISTORY("history"),
+    DETERMINISTIC_FALLBACK("deterministic_fallback"),
+}
+
 data class DrumStrike(
     val pointerId: Int,
     val instrument: InstrumentId,
@@ -498,6 +505,10 @@ data class DrumStrike(
     val pressure: Float,
     val contactSize: Float,
     val eventTimeNanos: Long,
+    val velocitySource: StrikeVelocitySource = StrikeVelocitySource.DETERMINISTIC_FALLBACK,
+    /** Resolved by the input layer when a deliberate multi-contact gesture is present. */
+    val requestedArticulation: SnareArticulation? = null,
+    val inputTarget: StrikeInputTarget = StrikeInputTarget.INSTRUMENT_SURFACE,
 )
 
 data class AudioDiagnostics(

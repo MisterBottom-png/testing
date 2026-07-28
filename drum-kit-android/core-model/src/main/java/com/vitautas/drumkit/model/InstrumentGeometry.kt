@@ -65,6 +65,34 @@ object StudioKitGeometry {
         return null
     }
 
+    /** Returns a hit anywhere on an instrument's visible playable ellipse, including its rim. */
+    fun playableSurfaceHit(
+        definition: InstrumentDefinition,
+        screenX: Float,
+        screenY: Float,
+        aspectRatio: Float,
+    ): InstrumentHit? {
+        validateInput(screenX, screenY, aspectRatio)
+        val layout = definition.layout
+        val unrotated = rotateScreenPoint(
+            x = screenX,
+            y = screenY,
+            centerX = layout.drawBounds.centerX,
+            centerY = layout.drawBounds.centerY,
+            degrees = -layout.rotationDegrees,
+            aspectRatio = aspectRatio,
+        )
+        val bounds = layout.playableSurfaceBounds.toGeometryBounds()
+        val x = (unrotated.x - bounds.centerX) / (bounds.width * 0.5f)
+        val y = (unrotated.y - bounds.centerY) / (bounds.height * 0.5f)
+        if (x * x + y * y > 1f) return null
+        return InstrumentHit(
+            definition = definition,
+            normalizedX = ((unrotated.x - bounds.left) / bounds.width).coerceIn(0f, 1f),
+            normalizedY = ((unrotated.y - bounds.top) / bounds.height).coerceIn(0f, 1f),
+        )
+    }
+
     fun matchingInstrumentCount(
         screenX: Float,
         screenY: Float,

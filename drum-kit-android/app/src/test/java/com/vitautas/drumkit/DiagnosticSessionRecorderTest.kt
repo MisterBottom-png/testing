@@ -54,6 +54,7 @@ class DiagnosticSessionRecorderTest {
             assertTrue(manifest.contains("touch-events.jsonl"))
             val strikes = zip.readText("strikes.jsonl")
             assertTrue(strikes.contains("\"instrument\":\"snare\""))
+            assertTrue(strikes.contains("\"velocitySource\":\"deterministic_fallback\""))
             val markers = zip.readText("markers.json")
             assertTrue(markers.contains("metallic ring"))
         }
