@@ -1,0 +1,68 @@
+name: Package Antimatter Mobile Source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/package-antimatter-mobile-source.yml"
+      - ".github/workflows/build-antimatter-mobile.yml"
+      - "antimatter-mobile/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source branch
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned upstream game source
+        shell: bash
+        run: |
+          set -euo pipefail
+          UPSTREAM_DIR="$RUNNER_TEMP/upstream-game-source"
+          mkdir -p "$UPSTREAM_DIR"
+          git -C "$UPSTREAM_DIR" init
+          git -C "$UPSTREAM_DIR" remote add origin https://github.com/IvarK/AntimatterDimensionsSourceCode.git
+          git -C "$UPSTREAM_DIR" fetch --depth 1 origin 8ae221fcb07db667b3d04114c2b977175966611d
+          git -C "$UPSTREAM_DIR" checkout --detach FETCH_HEAD
+          rm -rf "$UPSTREAM_DIR/.git"
+          echo "UPSTREAM_DIR=$UPSTREAM_DIR" >> "$GITHUB_ENV"
+
+      - name: Create complete source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source-package/.github/workflows
+          cp -R antimatter-mobile source-package/
+          cp -R "$UPSTREAM_DIR" source-package/upstream-game-source
+          cp .github/workflows/build-antimatter-mobile.yml source-package/.github/workflows/
+          cp .github/workflows/package-antimatter-mobile-source.yml source-package/.github/workflows/
+          cat > source-package/SOURCE-MANIFEST.txt <<'EOF'
+          Antimatter Dimensions Mobile v0.3.0 complete source package
+
+          Android/mobile wrapper source: antimatter-mobile/
+          Secrets and Cheats source overlay: antimatter-mobile/game-source-overrides/
+          Upstream patch script: antimatter-mobile/patch-upstream-source.mjs
+          Full pinned upstream game source: upstream-game-source/
+          CI build workflows: .github/workflows/
+          Upstream repository: https://github.com/IvarK/AntimatterDimensionsSourceCode
+          Pinned upstream commit: 8ae221fcb07db667b3d04114c2b977175966611d
+
+          Generated build folders, dependency caches, APK binaries, and Git metadata are excluded.
+          The upstream game and assets remain under the upstream MIT license.
+          EOF
+          find source-package -type d \( -name build -o -name .gradle -o -name node_modules -o -name output -o -name dist -o -name .git \) -prune -exec rm -rf {} +
+          cd source-package
+          zip -r ../Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0.zip .
+
+      - name: Upload complete source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0
+          path: Antimatter-Dimensions-Mobile-Complete-Source-v0.3.0.zip
+          if-no-files-found: error
+          retention-days: 14

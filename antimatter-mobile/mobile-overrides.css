@@ -1,0 +1,375 @@
+/* Mobile adaptation layered on top of the upstream Antimatter Dimensions UI. */
+@media (max-width: 900px), (pointer: coarse) {
+  :root {
+    --sidebar-width: 0rem;
+    --mobile-nav-height: 6.8rem;
+    --mobile-subnav-height: 5.6rem;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #app,
+  #ui-container,
+  #ui,
+  #page {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+    min-height: 100%;
+    overflow-x: hidden !important;
+  }
+
+  html,
+  body {
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .c-news-ticker {
+    display: none !important;
+  }
+
+  .game-container {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 0 !important;
+    margin-left: 0 !important;
+    padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-subnav-height) + env(safe-area-inset-bottom) + 1.2rem);
+  }
+
+  .tab-container,
+  .c-game-tab,
+  .l-antimatter-dim-tab {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .c-modern-sidebar {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    position: fixed !important;
+    top: auto !important;
+    right: 0;
+    bottom: 0;
+    left: 0 !important;
+    z-index: 1000 !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: stretch;
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-base) 94%, transparent);
+    border-top: 0.1rem solid var(--color-accent);
+    padding: 0 0 env(safe-area-inset-bottom);
+    box-shadow: 0 -0.4rem 1.4rem rgba(0, 0, 0, 45%);
+    backdrop-filter: blur(1rem);
+    scrollbar-width: none;
+    pointer-events: auto;
+  }
+
+  .c-modern-sidebar::-webkit-scrollbar,
+  .subtabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .c-sidebar-resource {
+    display: none !important;
+  }
+
+  .c-modern-sidebar > .o-tab-btn {
+    flex: 0 0 8.6rem;
+    width: 8.6rem !important;
+    min-width: 8.6rem;
+    height: var(--mobile-nav-height) !important;
+    min-height: var(--mobile-nav-height);
+    position: relative;
+    font-size: 1.2rem !important;
+    line-height: 1.15;
+    border-width: 0;
+    border-right: 0.1rem solid color-mix(in srgb, var(--color-text) 16%, transparent);
+    margin: 0 !important;
+  }
+
+  .c-modern-sidebar > .o-tab-btn::after {
+    display: none !important;
+  }
+
+  .c-modern-sidebar > .o-tab-btn::before {
+    width: 100% !important;
+    height: 0 !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: 0;
+    left: 0 !important;
+    transition: height 0.15s;
+  }
+
+  .c-modern-sidebar > .o-tab-btn--active::before {
+    width: 100% !important;
+    height: 0.4rem !important;
+  }
+
+  .l-tab-btn-inner {
+    min-width: 0;
+    padding: 0.6rem 0.5rem 0.8rem;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .c-modern-sidebar .subtabs {
+    display: none !important;
+  }
+
+  .c-modern-sidebar > .o-tab-btn--active .subtabs {
+    display: flex !important;
+    width: 100% !important;
+    height: var(--mobile-subnav-height);
+    position: fixed !important;
+    top: auto !important;
+    right: 0;
+    bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    left: 0 !important;
+    z-index: 999 !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 1 !important;
+    background: color-mix(in srgb, var(--color-base) 96%, transparent);
+    border-top: 0.1rem solid color-mix(in srgb, var(--color-text) 15%, transparent);
+    padding: 0.4rem 0.7rem;
+    box-shadow: 0 -0.2rem 0.8rem rgba(0, 0, 0, 30%);
+    pointer-events: auto !important;
+    scrollbar-width: none;
+  }
+
+  .c-modern-sidebar .o-tab-btn--subtab {
+    flex: 0 0 4.8rem;
+    width: 4.8rem !important;
+    min-width: 4.8rem;
+    height: 4.8rem !important;
+    min-height: 4.8rem;
+    font-size: 2rem !important;
+    line-height: 4.6rem !important;
+    border: 0.1rem solid currentColor;
+    border-radius: 0.7rem !important;
+    margin: 0 !important;
+  }
+
+  .o-subtab__tooltip {
+    display: none !important;
+  }
+
+  .information-header {
+    width: 100%;
+    max-width: 100%;
+    font-size: 1.15rem;
+    line-height: 1.35;
+    padding: 0.4rem 1rem;
+  }
+
+  .l-antimatter-dim-tab {
+    justify-content: flex-start !important;
+    font-size: 1.3rem;
+    padding: 0.4rem 0.8rem 1.2rem;
+  }
+
+  .modes-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 0.8rem;
+    padding: 0.6rem 0;
+  }
+
+  .modes-container > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 4.8rem !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0.7rem !important;
+  }
+
+  .modes-container > .o-primary-btn--sacrifice {
+    grid-column: 1 / -1;
+  }
+
+  .l-dimensions-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.4rem 0 !important;
+  }
+
+  .l-dimension-single-row {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    gap: 0.8rem;
+    background: color-mix(in srgb, var(--color-base) 90%, transparent);
+    border: 0.1rem solid color-mix(in srgb, var(--color-text) 18%, transparent);
+    border-radius: 0.9rem;
+    margin: 0.7rem 0 !important;
+    padding: 1rem !important;
+  }
+
+  .l-dimension-text-container {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 4rem;
+    gap: 0.8rem;
+    grid-column: auto !important;
+  }
+
+  .l-dimension-text-container > div {
+    width: auto !important;
+    min-width: 0;
+  }
+
+  .l-dimension-text-container > div:last-child {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+
+  .l-dimension-text-container .c-dim-row__large {
+    font-size: 1.45rem;
+    line-height: 1.25;
+    margin-right: 0;
+  }
+
+  .l-dimension-text-container .c-dim-row__small {
+    font-size: 1.1rem;
+    line-height: 1.25;
+    margin-right: 0;
+  }
+
+  .l-dim-row-multi-button-container,
+  .c-modern-dim-tooltip-container {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .c-modern-dim-purchase-count-tooltip {
+    display: none !important;
+  }
+
+  .o-primary-btn--new {
+    width: 100% !important;
+    max-width: none !important;
+    height: 5.6rem !important;
+    min-height: 5.6rem;
+    font-size: 1.25rem !important;
+    margin: 0 !important;
+    padding: 0.7rem !important;
+  }
+
+  .resets-container {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 0.8rem;
+    padding: 0.6rem 0 !important;
+  }
+
+  .resets-container > *,
+  .o-primary-btn--dimension-reset,
+  .o-primary-btn--quick-reset {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 5.4rem !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+
+  .c-tickspeed-container,
+  .l-tickspeed-container,
+  .l-tickspeed-row {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .o-primary-btn,
+  .o-primary-btn--new,
+  .o-tab-btn,
+  .o-autobuyer-btn,
+  .o-achievement {
+    min-height: 4.8rem;
+  }
+
+  .c-modal,
+  .l-modal-overlay > div {
+    width: calc(100vw - 2rem) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100vh - 3rem) !important;
+    overflow: auto !important;
+  }
+
+  .c-modal button,
+  .c-modal .o-primary-btn {
+    min-height: 4.8rem;
+  }
+
+  table,
+  .l-challenge-grid,
+  .l-achievement-grid,
+  .l-options-grid,
+  .l-autobuyer-grid,
+  .l-infinity-upgrades-grid,
+  .l-eternity-upgrades-grid {
+    max-width: 100% !important;
+  }
+
+  .c-game-tab canvas,
+  .c-game-tab svg {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  :root {
+    --mobile-nav-height: 5.8rem;
+    --mobile-subnav-height: 5.2rem;
+  }
+
+  .c-modern-sidebar > .o-tab-btn {
+    flex-basis: 8rem;
+    width: 8rem !important;
+    min-width: 8rem;
+  }
+}
