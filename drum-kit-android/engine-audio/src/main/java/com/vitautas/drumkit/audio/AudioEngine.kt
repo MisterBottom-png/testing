@@ -4,9 +4,6 @@ import android.content.Context
 import android.content.res.AssetManager
 import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
-import com.vitautas.drumkit.model.InstrumentId
-import com.vitautas.drumkit.model.SnareArticulation
-import com.vitautas.drumkit.model.SnareArticulationResolver
 
 object AudioEngine {
     init {
@@ -23,15 +20,12 @@ object AudioEngine {
         val velocity = AudioInputSanitizer.velocity(strike.velocity)
         val normalizedX = AudioInputSanitizer.coordinate(strike.normalizedX)
         val normalizedY = AudioInputSanitizer.coordinate(strike.normalizedY)
-        val articulation = if (strike.instrument == InstrumentId.SNARE) {
-            SnareArticulationResolver.resolve(
-                normalizedX = normalizedX,
-                normalizedY = normalizedY,
-                velocity = velocity,
-            )
-        } else {
-            SnareArticulation.CENTER
-        }
+        val articulation = StrikeArticulationSelector.resolve(
+            strike = strike,
+            velocity = velocity,
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+        )
 
         nativeTrigger(
             instrument = strike.instrument.nativeCode,

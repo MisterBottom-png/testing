@@ -24,6 +24,7 @@ import com.vitautas.drumkit.model.InstrumentId
 import com.vitautas.drumkit.model.InstrumentRenderLayerKind
 import com.vitautas.drumkit.model.InstrumentRendererKey
 import com.vitautas.drumkit.model.StrikeInputTarget
+import com.vitautas.drumkit.model.SnareContactTracker
 import com.vitautas.drumkit.model.StudioKitCamera
 import com.vitautas.drumkit.model.StudioKitDefinition
 import com.vitautas.drumkit.model.StudioKitInputGeometry
@@ -52,6 +53,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     private val kickPedalAnimation = KickPedalAnimationState()
     private val kickPedalRenderer = KickPedalRenderer(density)
     private val velocityEstimator = StrikeVelocityEstimator()
+    private val snareContactTracker = SnareContactTracker()
     private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
     private var rackMountX = 0f
     private var rackMountY = 0f
@@ -292,6 +294,17 @@ class DrumSurfaceView @JvmOverloads constructor(
         )
         val velocity = velocityEstimate.velocity
         val eventTimeNanos = event.eventTime * NanosPerMillisecond
+        val requestedArticulation = if (definition.id == InstrumentId.SNARE) {
+            snareContactTracker.resolveAndRecord(
+                pointerId = pointerId,
+                normalizedX = hit.normalizedX,
+                normalizedY = hit.normalizedY,
+                velocity = velocity,
+                eventTimeNanos = eventTimeNanos,
+            )
+        } else {
+            null
+        }
         val nowNanos = System.nanoTime()
 
         onStrike?.invoke(
@@ -305,6 +318,7 @@ class DrumSurfaceView @JvmOverloads constructor(
                 contactSize = contactSize,
                 eventTimeNanos = eventTimeNanos,
                 velocitySource = velocityEstimate.source,
+                requestedArticulation = requestedArticulation,
             ),
         )
 
@@ -335,12 +349,14 @@ class DrumSurfaceView @JvmOverloads constructor(
             kickPedalAnimation.release(System.nanoTime())
         }
         activePointers.remove(pointerId)
+        snareContactTracker.remove(pointerId)
         postInvalidateOnAnimation()
     }
 
     private fun clearActivePointers() {
         activePointers.clear()
         activePedalPointers.clear()
+        snareContactTracker.clear()
         kickPedalAnimation.cancel()
         for (state in animationStates) {
             state.activePointerCount = 0
