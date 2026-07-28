@@ -306,6 +306,10 @@
       <div class="field">
         <label for="${o}TextModel">Text model</label>
         <select id="${o}TextModel" data-connection-field="textModel">
+          ${A(e.TEXT_MODEL_OPTIONS,l)}
+        </select>
+      </div>
+      <div class="field${l===e.CUSTOM_MODEL_VALUE?"":" hidden"}" data-custom-model="textModel">
           ${k(e.TEXT_MODEL_OPTIONS,r)}
         </select>
       </div>
@@ -356,10 +360,10 @@
           </div>
           <div class="field">
             <label for="speakerVoice${D}">Gemini voice</label>
-            <select id="speakerVoice${D}" data-speaker-field="geminiVoiceName" aria-describedby="speakerVoiceHelp${D}"${O?" disabled":""}>
-              <option value="">${z}</option>${b}
+            <select id="speakerVoice${D}" data-speaker-field="geminiVoiceName" aria-describedby="speakerVoiceHelp${D}"${V?" disabled":""}>
+              <option value="">${z}</option>${T}
             </select>
-            <p id="speakerVoiceHelp${D}" class="voice-description">${e.escapeHtml(j)}</p>
+            <p id="speakerVoiceHelp${D}" class="voice-description">${e.escapeHtml(B)}</p>
           </div>
           <div class="field full speaker-preview-row">
             <button id="speakerPreview${D}" class="secondary-button" type="button"${v?" disabled":""}>Preview voice</button>
