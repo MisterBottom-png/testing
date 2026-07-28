@@ -6,6 +6,8 @@ import com.vitautas.drumkit.model.AudioDiagnostics
 import com.vitautas.drumkit.model.DrumStrike
 
 object AudioEngine {
+    private val mixState = AudioMixState()
+
     init {
         System.loadLibrary("drumkit")
     }
@@ -13,7 +15,7 @@ object AudioEngine {
     fun start(context: Context): Boolean {
         val started = nativeStart(context.assets)
         if (started) {
-            applyAudioMixDefaults(
+            mixState.apply(
                 setMasterVolume = ::nativeSetMasterVolume,
                 setRoomMix = ::nativeSetRoomMix,
             )
@@ -46,11 +48,17 @@ object AudioEngine {
     }
 
     fun setMasterVolume(value: Float) {
-        AudioInputSanitizer.level(value)?.let(::nativeSetMasterVolume)
+        AudioInputSanitizer.level(value)?.let { sanitized ->
+            mixState.updateMasterVolume(sanitized)
+            nativeSetMasterVolume(sanitized)
+        }
     }
 
     fun setRoomMix(value: Float) {
-        AudioInputSanitizer.level(value)?.let(::nativeSetRoomMix)
+        AudioInputSanitizer.level(value)?.let { sanitized ->
+            mixState.updateRoomMix(sanitized)
+            nativeSetRoomMix(sanitized)
+        }
     }
 
     fun diagnostics(): AudioDiagnostics = AudioDiagnostics(

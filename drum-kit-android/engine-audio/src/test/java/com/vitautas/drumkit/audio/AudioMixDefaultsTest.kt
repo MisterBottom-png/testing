@@ -19,7 +19,7 @@ class AudioMixDefaultsTest {
     fun startupAppliesMasterBeforeRoom() {
         val applied = mutableListOf<Pair<String, Float>>()
 
-        applyAudioMixDefaults(
+        AudioMixState().apply(
             setMasterVolume = { applied += "master" to it },
             setRoomMix = { applied += "room" to it },
         )
@@ -31,5 +31,20 @@ class AudioMixDefaultsTest {
             ),
             applied,
         )
+    }
+
+    @Test
+    fun updatedValuesSurviveEngineRestartApplication() {
+        val state = AudioMixState()
+        state.updateMasterVolume(0.41f)
+        state.updateRoomMix(0.67f)
+        val applied = mutableListOf<Float>()
+
+        state.apply(
+            setMasterVolume = { applied += it },
+            setRoomMix = { applied += it },
+        )
+
+        assertEquals(listOf(0.41f, 0.67f), applied)
     }
 }
