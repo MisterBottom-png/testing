@@ -2,18 +2,19 @@ Gemini Podcast Studio bug repair verification
 Date: 2026-07-28
 Branch: agent/gemini-podcast-bug-repairs
 
-Focused command:
+Focused commands:
   node --check src/js/bug-repairs.js
   node --test tests/bug-repairs.test.mjs
+  node --check scripts/runtime-smoke-repaired.mjs
 
-Result:
+Latest result:
   tests: 8
   pass: 8
   fail: 0
   cancelled: 0
   skipped: 0
   todo: 0
-  duration_ms: 72.137864
+  duration_ms: 68.640445
 
 Covered regressions:
   1. Blank edited dialogue blocks TTS readiness.
@@ -27,8 +28,8 @@ Covered regressions:
 
 Additional source checks:
   - src/js/bug-repairs.js passed node --check.
-  - scripts/runtime-smoke-repaired.mjs passed node --check in the local repair workspace.
+  - scripts/runtime-smoke-repaired.mjs passed node --check.
   - temporary workflow and payload files were removed from the pull-request diff.
 
 Incomplete verification:
-  The private repository could not be cloned into the local execution container because outbound network access and GitHub CLI credentials were unavailable. GitHub Actions jobs for the baseline and repair workflows completed with failure before reporting any steps (steps: []). Therefore the full existing Node suite, Vite build, standalone-file verification and browser runtime smoke test have not been freshly completed on the repaired branch, and dist/gemini-podcast-studio.html has not been regenerated.
+  The private repository could not be cloned into the local execution container because outbound network access and GitHub CLI credentials were unavailable. The latest GitHub Actions baseline job completed with failure before reporting any steps (steps: []). Therefore the full existing Node suite, Vite build, standalone-file verification and browser runtime smoke test have not been freshly completed on the repaired branch, and dist/gemini-podcast-studio.html has not been regenerated.
