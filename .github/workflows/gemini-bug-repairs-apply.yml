@@ -1,9 +1,9 @@
 name: Apply Gemini Podcast Studio bug repairs
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/gemini-podcast-bug-repairs
+      - agent/gemini-podcast-modular-source
     paths:
       - .github/workflows/gemini-bug-repairs-apply.yml
   workflow_dispatch:
@@ -11,8 +11,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: gemini-podcast-bug-repairs
+  cancel-in-progress: true
+
 jobs:
   repair-and-verify:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Check out repair branch
@@ -79,12 +84,18 @@ jobs:
       - name: Check repository diff
         run: git diff --check
 
-      - name: Upload verification evidence
+      - name: Upload repaired source and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gemini-bug-repair-evidence
-          path: gemini-podcast-studio/docs/superpowers/evidence/
+          name: gemini-bug-repair-workspace
+          path: |
+            gemini-podcast-studio/src/
+            gemini-podcast-studio/tests/
+            gemini-podcast-studio/scripts/
+            gemini-podcast-studio/package.json
+            gemini-podcast-studio/dist/
+            gemini-podcast-studio/docs/superpowers/evidence/
           if-no-files-found: warn
 
       - name: Commit verified repairs
