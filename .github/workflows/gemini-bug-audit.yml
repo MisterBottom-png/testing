@@ -1,0 +1,82 @@
+name: Gemini Podcast Studio bug audit
+
+on:
+  pull_request:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-bug-audit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-bug-audit
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Run diagnostics and commit audit evidence
+        shell: bash
+        run: |
+          set +e
+          rm -rf audit-output
+          mkdir -p audit-output
+          git rev-parse HEAD > audit-output/head-sha.txt
+          git status --short > audit-output/git-status.txt
+          find gemini-podcast-studio -path '*/node_modules' -prune -o -type f -printf '%p\n' | sort > audit-output/file-manifest.txt
+          tar --exclude='gemini-podcast-studio/node_modules' --exclude='gemini-podcast-studio/.single-file-build' -czf /tmp/gemini-podcast-studio-source.tar.gz gemini-podcast-studio
+          base64 -w 0 /tmp/gemini-podcast-studio-source.tar.gz | split -b 400000 - audit-output/source.tar.gz.b64.part-
+
+          cd gemini-podcast-studio
+          npm install --no-audit --no-fund > ../audit-output/npm-install.log 2>&1
+          echo $? > ../audit-output/npm-install.status
+          npm test > ../audit-output/npm-test.log 2>&1
+          echo $? > ../audit-output/npm-test.status
+          npm run build > ../audit-output/npm-build.log 2>&1
+          echo $? > ../audit-output/npm-build.status
+          npm run verify:single > ../audit-output/single-file-verify.log 2>&1
+          echo $? > ../audit-output/single-file-verify.status
+          timeout 180 npm run test:runtime > ../audit-output/runtime-smoke.log 2>&1
+          echo $? > ../audit-output/runtime-smoke.status
+
+          find src scripts tests -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | while IFS= read -r -d '' file; do
+            node --check "$file" || echo "SYNTAX_FAILURE $file"
+          done > ../audit-output/node-check.log 2>&1
+          echo $? > ../audit-output/node-check.status
+
+          grep -RInE 'TODO|FIXME|HACK|XXX|console\.(log|warn|error)|catch[[:space:]]*\{[[:space:]]*\}' src scripts tests > ../audit-output/suspicious-patterns.txt 2>&1
+          echo $? > ../audit-output/suspicious-patterns.status
+
+          python - <<'PY' > ../audit-output/dom-id-audit.txt 2>&1
+          import re
+          from pathlib import Path
+          html = Path('src/index.html').read_text()
+          state = Path('src/js/state.js').read_text()
+          html_ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', html))
+          match = re.search(r"Object\.fromEntries\(\[(.*?)\]\.map\(id", state, re.S)
+          referenced = set(re.findall(r"'([^']+)'", match.group(1))) if match else set()
+          print('HTML IDs:', len(html_ids))
+          print('State references:', len(referenced))
+          print('Missing in HTML:', sorted(referenced - html_ids))
+          print('Unreferenced HTML IDs:', sorted(html_ids - referenced))
+          PY
+          echo $? > ../audit-output/dom-id-audit.status
+
+          npm audit --json > ../audit-output/npm-audit.json 2>&1
+          echo $? > ../audit-output/npm-audit.status
+          wc -c dist/gemini-podcast-studio.html > ../audit-output/dist-size.txt 2>&1
+          find dist -maxdepth 1 -type f -printf '%f %s bytes\n' | sort > ../audit-output/dist-files.txt 2>&1
+          cd ..
+
+          sha256sum audit-output/source.tar.gz.b64.part-* > audit-output/source-parts.sha256
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add audit-output
+          git commit -m 'Capture Gemini Podcast Studio audit evidence'
+          git push origin HEAD:agent/gemini-bug-audit
+          set -e
