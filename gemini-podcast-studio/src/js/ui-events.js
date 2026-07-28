@@ -184,14 +184,16 @@ export function installUiEvents(services) {
   }
   services.els.settingsButton.addEventListener('click', openSettings);
   services.els.connectionChip.addEventListener('click', openSettings);
-  services.els.closeSettingsButton.addEventListener('click', () => {
+  function commitSettings() {
     services.appState.settings.maxTtsCharacters = Math.min(services.MAX_TTS_CHUNK_CHARACTERS, Math.max(services.MIN_TTS_CHUNK_CHARACTERS, Number(services.els.maxTtsCharacters.value) || services.DEFAULT_MAX_TTS_CHARACTERS));
     services.appState.settings.speakingRate = Math.min(200, Math.max(100, Number(services.els.speakingRate.value) || services.DEFAULT_SPEAKING_RATE));
     services.queueSave();
-    services.els.settingsDialog.close();
     if (services.appState.currentStage === 'script') services.renderScriptMetrics();
     services.updateTargetSummary();
-  });
+  }
+  // The dialog's close event covers the Done button, X, Escape and programmatic close.
+  services.els.settingsDialog.addEventListener('close', commitSettings);
+  services.els.closeSettingsButton.addEventListener('click', () => services.els.settingsDialog.close());
   services.els.closeSettingsIcon.addEventListener('click', () => services.els.settingsDialog.close());
   services.els.clearStoredDataButton.addEventListener('click', services.clearStoredData);
   for (const formHost of [services.els.connectionSetupForm, services.els.connectionSettingsForm]) {

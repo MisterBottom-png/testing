@@ -186,6 +186,11 @@ export function installScriptValidation(services) {
     refreshScriptWarnings(result);
     return result;
   }
+  function validateEditableScript(script = services.appState.script) {
+    // Editor metadata is deliberately excluded, while the editable dialogue is
+    // held to the same structural and non-blank requirements as generated scripts.
+    return validateScript(toStructuredScriptPayload(script));
+  }
   function toStructuredScriptPayload(script = services.appState.script) {
     return {
       title: services.normaliseWhitespace(script?.title),
@@ -211,6 +216,7 @@ export function installScriptValidation(services) {
     getScriptWarnings,
     refreshScriptWarnings,
     validateScript,
+    validateEditableScript,
     toStructuredScriptPayload
   });
   return services;

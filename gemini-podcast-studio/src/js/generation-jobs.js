@@ -36,6 +36,17 @@ export function installGenerationJobs(services) {
       details: '',
       retry: null
     });
+    try {
+      services.validateEditableScript();
+    } catch (error) {
+      return services.showServiceError({
+        title: 'Script needs attention',
+        message: error.message,
+        suggestion: 'Add dialogue for every segment and correct the script structure before generating audio.',
+        details: '',
+        retry: null
+      });
+    }
     const invalidSpeaker = services.appState.speakers.find(speaker => {
       const voice = services.getGeminiTtsVoice(speaker.geminiVoiceName);
       return !voice || voice.gender !== speaker.gender || voice.type !== speaker.voiceType;
@@ -75,7 +86,7 @@ export function installGenerationJobs(services) {
     }));
     await services.retainTtsChunkCache?.(chunks.map(chunk => chunk.cacheKey));
     services.hideServiceError();
-    services.invalidatePodcastAudio('audio-regeneration');
+    // Keep currently playable audio available until every replacement chunk succeeds.
     services.appState.lastAction = 'generate-audio';
     services.setBusy(true, 'audio', services.AUDIO_PROGRESS_MESSAGES);
     const startedAt = performance.now();
@@ -114,6 +125,9 @@ export function installGenerationJobs(services) {
       }
       const pcmBytes = services.concatPcmBytes(pcmParts);
       const wavBlob = services.pcm16ToWavBlob(pcmBytes, sampleRate || 24000, 1);
+      services.revokeAudioUrl();
+      services.appState.audioCacheReferences = {};
+      services.appState.lastAudioInvalidationReason = 'audio-regeneration';
       services.appState.audio = {
         blob: wavBlob,
         url: URL.createObjectURL(wavBlob),
@@ -133,8 +147,7 @@ export function installGenerationJobs(services) {
       services.queueSave();
       services.setStage('audio');
     } catch (error) {
-      services.invalidatePodcastAudio('audio-generation-failed');
-      services.handleGenerationError(error, 'Audio generation failed', 'Try a shorter script or select a different TTS model.', generatePodcastAudio);
+      services.handleGenerationError(error, 'Audio generation failed', 'Your existing audio is still available. Try again or select a different TTS model.', generatePodcastAudio);
     } finally {
       services.setBusy(false);
     }

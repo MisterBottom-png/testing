@@ -45,10 +45,10 @@ export function installConnectionUi(services) {
     renderConnectionStatus();
   }
   function renderConnectionStatus() {
-    const connected = Boolean(services.appState.connection.apiKey && services.getTextModel() && services.getTtsModel());
-    services.els.connectionChip.classList.toggle('connected', connected);
-    services.els.connectionLabel.textContent = connected ? 'Gemini connected' : 'Gemini not connected';
-    services.els.connectionModels.textContent = connected ? `${services.getTextModel()} · ${services.getTtsModel()}` : 'Add API key';
+    const configured = Boolean(services.appState.connection.apiKey && services.getTextModel() && services.getTtsModel());
+    services.els.connectionChip.classList.toggle('connected', configured);
+    services.els.connectionLabel.textContent = configured ? 'Gemini configured' : 'Gemini not configured';
+    services.els.connectionModels.textContent = configured ? `${services.getTextModel()} · ${services.getTtsModel()}` : 'Add API key';
   }
   function syncConnectionForm(form) {
     for (const control of form.querySelectorAll('[data-connection-field]')) {

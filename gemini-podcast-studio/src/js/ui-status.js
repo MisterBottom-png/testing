@@ -162,7 +162,7 @@ export function installStatusUi(services) {
     services.appState.historyIndex = -1;
     services.appState.podcast = {
       topic: '',
-      durationMinutes: 5,
+      durationMinutes: services.DEFAULT_DURATION_MINUTES,
       language: 'English',
       customLanguage: '',
       format: 'Friendly conversation',
@@ -177,15 +177,15 @@ export function installStatusUi(services) {
     if (!preserveConnection) services.appState.connection = {
       apiKey: '',
       rememberKey: false,
-      textModel: 'gemini-3.6-flash',
+      textModel: services.DEFAULT_TEXT_MODEL,
       customTextModel: '',
-      ttsModel: 'gemini-3.1-flash-tts-preview',
+      ttsModel: services.DEFAULT_TTS_MODEL,
       customTtsModel: ''
     };
     if (!preservePreferences) services.appState.settings = {
       theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
       maxTtsCharacters: services.DEFAULT_MAX_TTS_CHARACTERS,
-      speakingRate: 140
+      speakingRate: services.DEFAULT_SPEAKING_RATE
     };
     services.populateInputsFromState();
     services.renderConnectionForms();

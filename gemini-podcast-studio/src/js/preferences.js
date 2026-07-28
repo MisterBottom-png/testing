@@ -181,6 +181,11 @@ export function installPreferences(services) {
       }
     };
   }
+  function isSafeSavedScript(script, speakers) {
+    if (!script || typeof script !== 'object' || Array.isArray(script) || !Array.isArray(script.segments) || script.segments.length < 2) return false;
+    const names = new Set((Array.isArray(speakers) ? speakers : []).map(speaker => services.normaliseWhitespace(speaker?.speakerName)).filter(Boolean));
+    return names.size === 2 && typeof script.title === 'string' && script.segments.every(segment => segment && typeof segment === 'object' && !Array.isArray(segment) && typeof segment.speaker === 'string' && names.has(services.normaliseWhitespace(segment.speaker)) && typeof segment.direction === 'string' && typeof segment.text === 'string' && Boolean(services.normaliseWhitespace(segment.text)));
+  }
   function createPodcastProjectSnapshot(state = services.appState) {
     const speakers = Array.isArray(state.speakers) ? state.speakers.slice(0, 2).map((speaker, index) => normaliseProjectSpeaker(speaker, index)) : services.createDefaultPodcastSpeakers();
     while (speakers.length < 2) speakers.push(services.createDefaultPodcastSpeakers()[speakers.length]);
@@ -273,11 +278,14 @@ export function installPreferences(services) {
     services.appState.lastModified = project.lastModified || '';
     services.appState.script = null;
     services.appState.legacyScript = null;
-    if (project.script?.segments?.length) {
+    if (project.script?.segments?.length && isSafeSavedScript(project.script, services.appState.speakers)) {
       services.appState.script = services.deepClone(project.script);
       services.appState.originalScript = services.deepClone(project.script);
     } else if (project.script != null) {
       services.appState.legacyScript = services.deepClone(project.script);
+      if (Number(project.schemaVersion) === services.PODCAST_PROJECT_SCHEMA_VERSION) {
+        services.appState.projectLoadWarning = 'The saved script was invalid and was not loaded.';
+      }
     }
     const storedApiKey = localStorage.getItem(services.API_KEY_STORAGE_KEY);
     services.appState.connection.apiKey = storedApiKey || sessionStorage.getItem(services.SESSION_KEY) || '';
@@ -292,6 +300,7 @@ export function installPreferences(services) {
     migrateStoredProjectSafely,
     normaliseProjectSpeaker,
     normaliseSelectedModels,
+    isSafeSavedScript,
     createDefaultPodcastProject,
     migratePodcastProject,
     createPodcastProjectSnapshot,

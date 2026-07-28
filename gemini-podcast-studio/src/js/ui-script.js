@@ -20,6 +20,7 @@ export function installScriptUi(services) {
     });
   }
   function undo() {
+    flushTypingHistory();
     if (services.appState.historyIndex <= 0) return;
     services.appState.historyIndex -= 1;
     services.appState.script = services.deepClone(services.appState.history[services.appState.historyIndex]);
@@ -29,6 +30,7 @@ export function installScriptUi(services) {
     services.announce('Undid the last script change.');
   }
   function redo() {
+    flushTypingHistory();
     if (services.appState.historyIndex >= services.appState.history.length - 1) return;
     services.appState.historyIndex += 1;
     services.appState.script = services.deepClone(services.appState.history[services.appState.historyIndex]);
@@ -154,6 +156,12 @@ export function installScriptUi(services) {
     }).join('')}</div>`;
     for (const textarea of services.els.scriptPanel.querySelectorAll('textarea')) services.autoSize(textarea);
   }
+  function flushTypingHistory() {
+    if (!services.typingHistoryTimer) return;
+    clearTimeout(services.typingHistoryTimer);
+    services.typingHistoryTimer = null;
+    snapshotScript();
+  }
   function updateSegmentFromControl(control) {
     const card = control.closest('[data-segment-index]');
     const segment = services.appState.script?.segments?.[Number(card?.dataset.segmentIndex)];
@@ -167,23 +175,25 @@ export function installScriptUi(services) {
     services.renderScriptMetrics();
     services.queueSave();
     clearTimeout(services.typingHistoryTimer);
-    services.typingHistoryTimer = setTimeout(() => snapshotScript(), 650);
+    services.typingHistoryTimer = setTimeout(() => {
+      services.typingHistoryTimer = null;
+      snapshotScript();
+    }, 650);
   }
   function performSegmentAction(index, action) {
     const segments = services.appState.script?.segments;
-    if (!segments) return;
+    const validAction = ['up', 'down', 'insert', 'duplicate', 'delete'].includes(action);
+    const canMutate = Array.isArray(segments) && Number.isInteger(index) && index >= 0 && index < segments.length && validAction && !(action === 'up' && index === 0) && !(action === 'down' && index === segments.length - 1) && !(action === 'delete' && segments.length <= 2);
+    if (!canMutate) return;
+    flushTypingHistory();
     snapshotScript();
-    if (action === 'up' && index > 0) [segments[index - 1], segments[index]] = [segments[index], segments[index - 1]];
-    if (action === 'down' && index < segments.length - 1) [segments[index + 1], segments[index]] = [segments[index], segments[index + 1]];
+    if (action === 'up') [segments[index - 1], segments[index]] = [segments[index], segments[index - 1]];
+    if (action === 'down') [segments[index + 1], segments[index]] = [segments[index], segments[index + 1]];
     if (action === 'duplicate') segments.splice(index + 1, 0, services.deepClone(segments[index]));
-    if (action === 'delete' && segments.length > 2) segments.splice(index, 1);
+    if (action === 'delete') segments.splice(index, 1);
     if (action === 'insert') {
       const nextSpeaker = services.appState.speakers.find(speaker => speaker.speakerName !== segments[index].speaker)?.speakerName || services.appState.speakers[0].speakerName;
-      segments.splice(index + 1, 0, {
-        speaker: nextSpeaker,
-        direction: '',
-        text: ''
-      });
+      segments.splice(index + 1, 0, { speaker: nextSpeaker, direction: '', text: '' });
     }
     services.appState.script.estimatedWords = services.getWordCount();
     services.invalidatePodcastAudio('script-structure-changed');
@@ -197,8 +207,10 @@ export function installScriptUi(services) {
     services.announce(`Segment ${index + 1} ${action === 'delete' ? 'deleted' : action === 'duplicate' ? 'duplicated' : action === 'insert' ? 'inserted' : `moved ${action}`}.`);
   }
   function reorderSegments(from, to) {
-    if (from === to || from == null || to == null) return;
-    const [segment] = services.appState.script.segments.splice(from, 1);
+    const segments = services.appState.script?.segments;
+    if (!Array.isArray(segments) || from === to || !Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= segments.length || to >= segments.length) return;
+    flushTypingHistory();
+    const [segment] = segments.splice(from, 1);
     services.appState.script.segments.splice(to, 0, segment);
     services.invalidatePodcastAudio('script-reordered');
     snapshotScript({
@@ -230,6 +242,7 @@ export function installScriptUi(services) {
   Object.assign(services, {
     snapshotScript,
     resetHistory,
+    flushTypingHistory,
     undo,
     redo,
     updateUndoRedo,

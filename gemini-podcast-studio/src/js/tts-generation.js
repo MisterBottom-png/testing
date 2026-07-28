@@ -43,7 +43,18 @@ export function installTtsTransport(services) {
   }
   async function generateTtsPcm({ transcript, speakerVoiceConfigs = buildSpeakerVoiceConfigs() } = {}) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;
-    return requestTtsChunk(endpoint, transcript, speakerVoiceConfigs);
+    const transientStatuses = new Set([500, 502, 503, 504]);
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await requestTtsChunk(endpoint, transcript, speakerVoiceConfigs);
+      } catch (error) {
+        lastError = error;
+        if (!transientStatuses.has(Number(error?.status)) || attempt === 3) throw error;
+        await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+      }
+    }
+    throw lastError;
   }
   Object.assign(services, {
     buildSpeakerVoiceConfigs,
