@@ -115,66 +115,8 @@ export function installGenerationJobs(services) {
       services.setBusy(false);
     }
   }
-  async function generateVoiceTest(index) {
-    const speaker = services.appState.speakers[index];
-    if (!services.appState.connection.apiKey.trim()) return services.showServiceError({
-      title: 'API key required',
-      message: 'Add a Gemini API key before generating a voice test.',
-      suggestion: 'Open connection settings.',
-      details: '',
-      retry: null
-    });
-    if (!services.getGeminiTtsVoice(speaker.geminiVoiceName)) return services.showServiceError({
-      title: 'Voice selection required',
-      message: 'This saved Gemini voice is unavailable.',
-      suggestion: 'Select an available Gemini voice.',
-      details: '',
-      retry: null
-    });
-    services.hideServiceError();
-    services.setBusy(true, 'voice', services.AUDIO_PROGRESS_MESSAGES);
-    const prompt = `${speaker.deliveryInstructions || 'Speak naturally and clearly.'}\n${speaker.accent || ''}\nRead exactly: Hello, I am ${speaker.speakerName}. This is a short voice preview for the podcast.`;
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(services.getTtsModel())}:generateContent`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': services.appState.connection.apiKey
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: speaker.geminiVoiceName
-                }
-              }
-            }
-          }
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw services.createApiError(response.status, data?.error?.message || 'Voice test failed.', JSON.stringify(data, null, 2));
-      const part = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData?.data);
-      if (!part) throw new Error('Gemini returned no voice-test audio.');
-      const url = URL.createObjectURL(services.pcm16ToWavBlob(services.base64ToBytes(part.inlineData.data), services.sampleRateFromMimeType(part.inlineData.mimeType), 1));
-      const audio = new Audio(url);
-      audio.addEventListener('ended', () => URL.revokeObjectURL(url), {
-        once: true
-      });
-      await audio.play();
-    } catch (error) {
-      services.handleGenerationError(error, 'Voice test failed', 'Try another voice or TTS model.', () => services.generateVoiceTest(index));
-    } finally {
-      services.setBusy(false);
-    }
+  function generateVoiceTest(index, options) {
+    return services.generateVoicePreview(index, options);
   }
   Object.assign(services, {
     invalidatePodcastAudio,

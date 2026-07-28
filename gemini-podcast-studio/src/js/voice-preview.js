@@ -27,16 +27,19 @@ export function installVoicePreview(services) {
   }
   function buildVoicePreviewPrompt({
     language,
-    deliveryInstructions
+    accent,
+    deliveryInstructions,
+    previewText
   }) {
     const languageName = normaliseVoicePreviewValue(language) || 'English';
     const languageKey = normaliseVoicePreviewValue(languageName, {
       lowerCase: true
     });
     const delivery = normaliseVoicePreviewValue(deliveryInstructions) || 'Speak naturally and clearly at a conversational pace.';
-    const sentence = getVoicePreviewSentence(languageName);
+    const accentInstruction = normaliseVoicePreviewValue(accent);
+    const sentence = normaliseVoicePreviewValue(previewText) || getVoicePreviewSentence(languageName);
     const translationInstruction = VOICE_PREVIEW_SENTENCES[languageKey] ? `Read the following text exactly in ${languageName}.` : `Translate the following neutral preview into ${languageName}, then speak only the translated preview.`;
-    return `${delivery}\n${translationInstruction}\nDo not add an introduction, speaker name or explanation.\n\n${sentence}`;
+    return `${delivery}${accentInstruction ? `\nUse this accent or language note: ${accentInstruction}.` : ''}\n${translationInstruction}\nDo not add an introduction, speaker name or explanation.\n\n${sentence}`;
   }
   function hashVoicePreviewValue(value) {
     if (typeof services.hashTtsCacheValue === 'function') return services.hashTtsCacheValue(value);
@@ -52,12 +55,15 @@ export function installVoicePreview(services) {
     language = services.getLanguage(),
     ttsModel = services.getTtsModel()
   } = {}) {
+    const languageName = normaliseVoicePreviewValue(language) || 'English';
     const descriptor = {
       version: VOICE_PREVIEW_GENERATION_VERSION,
-      language: normaliseVoicePreviewValue(language) || 'English',
+      language: languageName,
       geminiVoiceName: normaliseVoicePreviewValue(speaker?.geminiVoiceName),
+      accent: normaliseVoicePreviewValue(speaker?.accent),
       deliveryInstructions: normaliseVoicePreviewValue(speaker?.deliveryInstructions),
-      ttsModel: normaliseVoicePreviewValue(ttsModel)
+      ttsModel: normaliseVoicePreviewValue(ttsModel),
+      previewText: getVoicePreviewSentence(languageName)
     };
     const stableKeyData = JSON.stringify({
       version: descriptor.version,
@@ -67,10 +73,16 @@ export function installVoicePreview(services) {
       geminiVoiceName: normaliseVoicePreviewValue(descriptor.geminiVoiceName, {
         lowerCase: true
       }),
+      accent: normaliseVoicePreviewValue(descriptor.accent, {
+        lowerCase: true
+      }),
       deliveryInstructions: normaliseVoicePreviewValue(descriptor.deliveryInstructions, {
         lowerCase: true
       }),
       ttsModel: normaliseVoicePreviewValue(descriptor.ttsModel, {
+        lowerCase: true
+      }),
+      previewText: normaliseVoicePreviewValue(descriptor.previewText, {
         lowerCase: true
       })
     });
@@ -274,32 +286,35 @@ export function installVoicePreview(services) {
       version: VOICE_PREVIEW_GENERATION_VERSION,
       language: descriptor.language,
       geminiVoiceName: descriptor.geminiVoiceName,
+      accent: descriptor.accent,
       deliveryInstructions: descriptor.deliveryInstructions,
       ttsModel: descriptor.ttsModel,
+      previewText: descriptor.previewText,
       sampleRate,
       blob,
       createdAt: new Date().toISOString()
     };
   }
-  async function getOrGenerateVoicePreviewRecord(descriptor, {
+  function getOrGenerateVoicePreviewRecord(descriptor, {
     fetchImpl = fetch,
     cacheBackend = services.voicePreviewCacheBackend
   } = {}) {
     if (voicePreviewInFlightRequests.has(descriptor.cacheKey)) return voicePreviewInFlightRequests.get(descriptor.cacheKey);
-    const task = (async () => {
-      const record = await requestVoicePreviewRecord(descriptor, fetchImpl);
-      const storageError = await services.writeVoicePreviewCache(record, cacheBackend);
-      return {
-        record,
-        storageError
-      };
+    let task;
+    task = (async () => {
+      try {
+        const record = await requestVoicePreviewRecord(descriptor, fetchImpl);
+        const storageError = await services.writeVoicePreviewCache(record, cacheBackend);
+        return {
+          record,
+          storageError
+        };
+      } finally {
+        if (voicePreviewInFlightRequests.get(descriptor.cacheKey) === task) voicePreviewInFlightRequests.delete(descriptor.cacheKey);
+      }
     })();
     voicePreviewInFlightRequests.set(descriptor.cacheKey, task);
-    try {
-      return await task;
-    } finally {
-      voicePreviewInFlightRequests.delete(descriptor.cacheKey);
-    }
+    return task;
   }
   function showVoicePreviewFailure(index, descriptor, error) {
     const currentDescriptor = getCurrentVoicePreviewDescriptor(index);
