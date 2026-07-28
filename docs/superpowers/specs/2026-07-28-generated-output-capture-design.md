@@ -75,7 +75,7 @@ For each output frame:
 3. Apply master gain.
 4. Apply the peak limiter.
 5. Write the final left and right floats to Oboe.
-6. When diagnostic output capture is active, copy the same two floats into the preallocated capture ring.
+6. When diagnostic output capture is active, copy the same two floats and their logical frame index into the preallocated capture ring.
 
 The capture must not alter the samples written to Oboe.
 
@@ -83,22 +83,25 @@ The capture must not alter the samples written to Oboe.
 
 Add a focused `DiagnosticOutputCapture` component in `engine-audio`. It owns:
 
-- A fixed-capacity interleaved stereo float ring.
-- Atomic producer and consumer frame indices.
+- A fixed-capacity ring of complete capture slots.
+- One logical frame index and two stereo floats per slot.
+- Atomic producer and consumer slot indices.
 - A logical output-frame counter.
 - Captured-frame and dropped-frame counters.
 - Initial sample rate and channel count.
 - Maximum capture-frame count for ten minutes.
-- Capture-start monotonic timestamp or callback-relative offset.
-- Capture state and stop reason.
+- First-captured-frame monotonic timestamp.
+- Producer state and terminal stop reason.
 
-The ring stores complete stereo frames only. It never exposes or overwrites a half-written frame.
+A slot is published only after its logical frame index and both channel samples are written. The consumer never sees or overwrites a half-written frame.
 
 ### 5.3 Capture capacity
 
-The native ring is a short transport buffer, not ten minutes of storage. Its size must be fixed at compile time or preallocated before capture begins. The initial implementation should hold enough audio for at least 250 ms at the maximum supported diagnostic sample rate of 96 kHz stereo.
+The native ring is a short transport buffer, not ten minutes of storage. Use a fixed capacity of 32,768 stereo frames.
 
-A larger capacity may be chosen when justified by tests, but the ring must remain bounded and modest compared with whole-session audio.
+At 96 kHz this holds approximately 341 ms of output. A slot containing one 64-bit logical frame index and two 32-bit floats uses at most 16 bytes with ordinary alignment, so the ring consumes approximately 512 KiB.
+
+Changing this capacity requires test evidence and must preserve bounded memory.
 
 ### 5.4 Kotlin capture coordinator
 
@@ -118,20 +121,35 @@ Add `DiagnosticGeneratedOutputRecorder` in the app module. It is responsible for
 
 It does not start, stop, restart, or otherwise own the audio engine.
 
-## 6. Native state model
+## 6. State and result model
 
-Use explicit capture states:
+Keep native producer state separate from Kotlin export result.
 
-- `idle`: no capture has been started.
-- `capturing`: producer is accepting frames.
-- `stopped_by_user`: Kotlin requested capture stop and remaining buffered frames may still be drained.
+### 6.1 Native producer state
+
+- `idle`: capture is inactive and no buffered frames remain.
+- `capturing`: producer accepts frames.
+- `stopped`: producer no longer accepts frames; buffered frames may remain drainable.
+
+### 6.2 Native stop reason
+
+- `none`: capture has not terminated.
+- `stopped_by_user`: Kotlin requested capture stop.
 - `duration_limit`: the ten-minute maximum was reached.
-- `format_changed`: callback sample rate or channel count no longer matches the capture format.
+- `format_changed`: callback sample rate or channel count changed.
 - `audio_stopped`: the native audio stream stopped while capture was active.
-- `start_failed`: capture could not initialise.
-- `completed`: Kotlin drained and finalised all available frames.
+- `start_failed`: native capture could not initialise.
 
-Native code owns producer-side transitions through `capturing`, `duration_limit`, `format_changed`, and `audio_stopped`. Kotlin records `completed` only after the final drain and WAV finalisation succeed.
+The first terminal reason wins. Repeated stop calls do not replace it.
+
+### 6.3 Kotlin final result
+
+- `completed`: a normal WAV was finalised after user stop.
+- `partial`: a valid WAV was finalised after `duration_limit`, `format_changed`, `audio_stopped`, or capture overflow.
+- `unavailable`: capture could not start or no valid WAV could be created.
+- `failed`: capture began but file writing or WAV finalisation failed.
+
+Kotlin assigns the final result only after the final native drain and file finalisation attempt.
 
 ## 7. Ten-minute limit
 
@@ -148,7 +166,7 @@ The limit applies to the capture timeline, including dropped frames. When reache
 - The UI reports that generated-output capture has stopped.
 - Export includes the valid first ten minutes.
 
-At 96 kHz, stereo PCM16 for ten minutes is about 230 MB and remains far below the classic WAV 4 GiB limit.
+At 96 kHz, stereo PCM16 for ten minutes is approximately 230 MB and remains far below the classic WAV 4 GiB limit.
 
 ## 8. JNI contract
 
@@ -162,7 +180,7 @@ Expose bounded operations similar to the existing diagnostic dispatch-outcome dr
 - Sample rate.
 - Channel count, fixed to two for the current engine.
 - Maximum logical frames.
-- Capture-start timing metadata.
+- Capture activation monotonic timestamp.
 
 Starting while already active must fail deterministically without resetting the active capture.
 
@@ -185,18 +203,21 @@ The samples array contains interleaved stereo floats. The metadata must provide,
 - Total dropped frames.
 - Sample rate.
 - Channel count.
-- Native capture state.
-- Stop reason.
+- Native producer state.
+- Native stop reason.
+- First-captured-frame monotonic timestamp when available.
+
+Each ring slot stores its logical frame index. One drain call returns only a single contiguous logical-frame run. The consumer stops the batch before the first index discontinuity, even when more slots are available. A subsequent drain begins at the next stored logical frame, allowing Kotlin to detect and fill the exact gap using only the first index of each batch.
 
 The returned frame count must never exceed `samples.size / channelCount`.
 
 ### 8.3 Stop
 
-`stopDiagnosticOutputCapture()` disables producer writes first. Buffered frames remain drainable. Calling stop more than once is idempotent.
+`stopDiagnosticOutputCapture()` disables producer writes first. Buffered frames remain drainable. Calling stop more than once is idempotent and preserves the first terminal stop reason.
 
 ### 8.4 Status
 
-A lightweight status operation may be exposed when needed by the UI or final-drain loop. It must not allocate inside the callback or require callback participation.
+A lightweight status operation may be exposed for UI state or the final-drain loop. It must not allocate inside the callback or require callback participation.
 
 ## 9. Logical timeline and overflow
 
@@ -204,8 +225,8 @@ Each produced output frame advances a logical frame index while capture is activ
 
 When there is room:
 
-- Store the complete stereo frame.
-- Associate it with the current logical frame position.
+- Store the logical frame index and complete stereo frame.
+- Publish the slot with release semantics.
 - Advance captured-frame counters.
 
 When the ring is full:
@@ -215,7 +236,7 @@ When the ring is full:
 - Increment dropped-frame counters.
 - Continue advancing the logical frame position.
 
-The drain contract returns the first logical frame index for each batch. Kotlin compares this value with the next expected logical frame. A positive gap is written as zero-valued stereo PCM frames before the returned samples.
+Kotlin compares each drained run's first logical frame index with the next expected logical frame. A positive gap is written as zero-valued stereo PCM frames before the returned samples.
 
 This preserves WAV duration and timing alignment. Dropped audio is represented honestly as silence rather than removed time.
 
@@ -227,8 +248,10 @@ For each float sample:
 
 1. Replace non-finite values with zero.
 2. Clamp to `[-1.0, 1.0]`.
-3. Convert to signed 16-bit PCM with deterministic saturation.
-4. Write little-endian bytes.
+3. Map values at or below `-1.0` to `-32768`.
+4. Map values at or above `1.0` to `32767`.
+5. Otherwise round `value * 32767.0` to the nearest signed integer.
+6. Write the signed 16-bit value in little-endian order.
 
 The WAV format is:
 
@@ -252,7 +275,7 @@ The drainer must:
 - Continue until native capture is stopped and the ring is empty.
 - Flush and close deterministically.
 
-WAV finalisation may either prepend the header into a second temporary file or reserve and later patch a 44-byte header in a seekable file. The chosen implementation must be independently testable and leave no structurally invalid final WAV after a reported success.
+Reserve a 44-byte WAV header in a seekable temporary file, append PCM payload after it, then patch the header only after the payload is complete. The WAV writer must be independently testable and must not report success until header and payload lengths agree.
 
 Temporary files are removed after successful ZIP augmentation. On recoverable failure, stale temporary files are deleted before the recorder returns to idle.
 
@@ -260,15 +283,20 @@ Temporary files are removed after successful ZIP augmentation. On recoverable fa
 
 The WAV timeline begins at the first output callback frame accepted after native capture becomes active, not at the UI button timestamp.
 
-Export metadata records enough information to align the WAV with the session timeline:
+Native code records the first accepted frame using the Android monotonic clock. The diagnostic session uses the corresponding monotonic timebase through `System.nanoTime()`. Kotlin computes:
 
-- Diagnostic session start monotonic time.
-- Native capture activation time or session-relative offset.
-- First captured logical frame offset.
+`sessionStartOffsetNanos = firstCapturedFrameMonotonicNanos - diagnosticSessionStartMonotonicNanos`
+
+Export metadata records:
+
+- Diagnostic session start monotonic time for internal calculation.
+- Capture activation monotonic time.
+- First-captured-frame monotonic time.
+- Session-relative first-frame offset.
 - Sample rate.
 - Total logical frames represented by the WAV.
 
-The implementation must not claim precision finer than the available cross-layer clocks support.
+When no frame was captured, first-frame timestamps and offsets are `null`. Wall-clock timestamps remain session metadata only and are not used for sample alignment.
 
 ## 13. Format changes and route changes
 
@@ -319,7 +347,7 @@ If the raw file cannot be created or written:
 
 ### 15.3 Ring overflow
 
-Ring overflow affects diagnostic capture only. A structurally valid WAV is still produced with silence substitutions and exact counters.
+Ring overflow affects diagnostic capture only. A structurally valid WAV is still produced with silence substitutions and exact counters. The final result is `partial` when any capture frames were dropped.
 
 ### 15.4 Finalisation failure
 
@@ -341,7 +369,7 @@ The manifest removes `generated-output.wav` from `plannedFilesNotYetImplemented`
 ```json
 {
   "generatedOutput": {
-    "state": "completed",
+    "result": "completed",
     "stopReason": "stopped_by_user",
     "sampleRate": 48000,
     "channelCount": 2,
@@ -353,7 +381,7 @@ The manifest removes `generated-output.wav` from `plannedFilesNotYetImplemented`
     "durationLimited": false,
     "formatChanged": false,
     "audioStopped": false,
-    "sessionStartOffsetNanos": 0
+    "sessionStartOffsetNanos": 1234567
   }
 }
 ```
@@ -362,10 +390,11 @@ Field names may follow existing project naming conventions, but the represented 
 
 The human-readable summary includes:
 
-- Capture state and stop reason.
+- Final capture result and native stop reason.
 - WAV duration.
 - Sample rate, channels, and bit depth.
 - Captured frames.
+- Logical frames.
 - Dropped frames.
 - Silence-substitution frames.
 - Whether the duration limit, format change, audio stop, or file failure occurred.
@@ -396,29 +425,33 @@ Focused native tests must cover:
 - Ring initial state.
 - Start and idempotent stop.
 - Complete stereo-frame writes.
+- Per-slot logical frame indices.
 - Producer-consumer ordering.
 - Ring wrap-around.
+- Contiguous-run drain boundaries.
 - Overflow without unread-frame overwrite.
 - Logical frame continuity across drops.
 - Dropped-frame counting.
 - Ten-minute logical-frame limit.
+- First terminal stop reason winning.
 - Format-change detection.
 - Audio-stop state.
 - Disabled capture leaving output samples unchanged.
 
-Where native unit-test infrastructure is impractical, extract the ring and state machine into a platform-neutral C++ component compiled by the existing validation workflow.
+Extract the ring and state machine into a platform-neutral C++ component so these behaviours can be compiled and tested without an Android device. The Android build still validates JNI and engine integration.
 
 ### 18.2 Kotlin unit tests
 
 Tests must cover:
 
 - Float-to-PCM16 conversion.
-- Saturation and non-finite handling.
+- Exact saturation endpoints and non-finite handling.
 - Stereo interleaving.
-- Silence insertion for logical gaps.
+- Silence insertion between contiguous drain runs.
 - Reused batch-buffer boundaries.
 - WAV header fields.
 - RIFF and data sizes.
+- Header patching after payload completion.
 - Zero-length and partial WAV finalisation where permitted.
 - Ten-minute limit metadata.
 - Format-change metadata.
@@ -461,7 +494,7 @@ The implementation slice is complete when:
 - A normal diagnostic session includes `generated-output.wav`.
 - The WAV contains the post-room, post-master, post-limiter stereo output quantised to PCM16.
 - The callback performs no file I/O, allocation, locking, logging, JNI calls, or blocking waits.
-- Capture memory is bounded.
+- Capture memory is bounded to the fixed ring and reusable drain buffers.
 - Full-session capture supports up to ten minutes.
 - Overflow preserves timeline length through silence substitution.
 - A format change produces an honest valid partial WAV.
