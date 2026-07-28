@@ -1,0 +1,19 @@
+name: Cleanup Gemini Podcast Studio bug audit
+
+on:
+  pull_request:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-bug-audit-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete temporary audit branch
+        shell: bash
+        run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete agent/gemini-bug-audit || true
