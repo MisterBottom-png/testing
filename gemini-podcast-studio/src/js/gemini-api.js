@@ -36,7 +36,7 @@ export function installGeminiTransport(services) {
   } = {}) {
     return {
       responseMimeType: 'application/json',
-      responseSchema: schema,
+      responseJsonSchema: schema,
       maxOutputTokens: Math.min(services.MAX_SCRIPT_OUTPUT_TOKENS, Math.max(services.MIN_SCRIPT_OUTPUT_TOKENS, Math.round(Number(maxOutputTokens) || services.getScriptOutputTokenLimit()))),
       thinkingConfig: { thinkingLevel }
     };
