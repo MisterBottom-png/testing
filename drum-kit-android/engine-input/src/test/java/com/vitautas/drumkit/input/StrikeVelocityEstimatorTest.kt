@@ -32,12 +32,7 @@ class StrikeVelocityEstimatorTest {
     @Test
     fun invalidMeasurementsNeverProduceInvalidVelocity() {
         val estimate = StrikeVelocityEstimator().estimate(
-            input(
-                pressure = Float.NaN,
-                contactSize = Float.POSITIVE_INFINITY,
-                x = Float.NaN,
-                y = Float.NaN,
-            ),
+            input(pressure = Float.NaN, contactSize = Float.POSITIVE_INFINITY, x = Float.NaN, y = Float.NaN),
         )
 
         assertEquals(StrikeVelocitySource.DETERMINISTIC_FALLBACK, estimate.source)
@@ -81,9 +76,7 @@ class StrikeVelocityEstimatorTest {
             x = 40f,
             y = 20f,
             eventTimeMillis = 100L,
-            history = listOf(
-                sample(pressure = 0.5f, x = 2f, y = 1f, eventTimeMillis = 60L),
-            ),
+            history = listOf(sample(pressure = 0.5f, x = 2f, y = 1f, eventTimeMillis = 60L)),
         )
 
         val first = StrikeVelocityEstimator().estimate(input)

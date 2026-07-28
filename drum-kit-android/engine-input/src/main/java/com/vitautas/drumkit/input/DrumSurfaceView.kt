@@ -13,6 +13,7 @@ import android.graphics.Shader
 import android.os.Build
 import android.util.AttributeSet
 import android.util.SparseArray
+import android.util.SparseBooleanArray
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -22,9 +23,10 @@ import com.vitautas.drumkit.model.InstrumentDefinition
 import com.vitautas.drumkit.model.InstrumentId
 import com.vitautas.drumkit.model.InstrumentRenderLayerKind
 import com.vitautas.drumkit.model.InstrumentRendererKey
+import com.vitautas.drumkit.model.StrikeInputTarget
 import com.vitautas.drumkit.model.StudioKitCamera
 import com.vitautas.drumkit.model.StudioKitDefinition
-import com.vitautas.drumkit.model.StudioKitGeometry
+import com.vitautas.drumkit.model.StudioKitInputGeometry
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -42,11 +44,14 @@ class DrumSurfaceView @JvmOverloads constructor(
 
     private val density = resources.displayMetrics.density
     private val artworkFactory = LayeredInstrumentArtworkFactory(density)
-    private val velocityEstimator = StrikeVelocityEstimator()
     private val activePointers = SparseArray<InstrumentId>()
+    private val activePedalPointers = SparseBooleanArray()
     private val renderStates = ArrayList<InstrumentRenderState>(StudioKitDefinition.instruments.size)
     private val renderStatesByInstrument = arrayOfNulls<InstrumentRenderState>(InstrumentId.entries.size)
     private val animationStates = Array(InstrumentId.entries.size) { InstrumentAnimationState() }
+    private val kickPedalAnimation = KickPedalAnimationState()
+    private val kickPedalRenderer = KickPedalRenderer(density)
+    private val velocityEstimator = StrikeVelocityEstimator()
     private val kickDefinition = StudioKitDefinition.instruments.first { it.id == InstrumentId.KICK }
     private var rackMountX = 0f
     private var rackMountY = 0f
@@ -102,7 +107,7 @@ class DrumSurfaceView @JvmOverloads constructor(
     init {
         isFocusable = true
         isClickable = true
-        contentDescription = "Playable acoustic drum kit"
+        contentDescription = "Playable acoustic drum kit with kick pedal"
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -129,6 +134,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         )
         spotlightRect.set(-width * 0.10f, -height * 0.25f, width * 1.10f, height * 0.95f)
         floorClipRect.set(0f, StudioKitCamera.HORIZON_Y * height, width.toFloat(), height.toFloat())
+        kickPedalRenderer.configure(width.toFloat(), height.toFloat())
 
         val kickBounds = kickDefinition.layout.drawBounds
         rackMountX = kickBounds.centerX * width.toFloat()
@@ -178,6 +184,9 @@ class DrumSurfaceView @JvmOverloads constructor(
                     animationStates[renderState.definition.id.ordinal],
                 )
             }
+        }
+        if (kickPedalRenderer.draw(canvas, kickPedalAnimation, nowNanos)) {
+            animationActive = true
         }
 
         val labelAlpha = labelAlpha(nowNanos)
@@ -258,7 +267,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         val screenX = x / width.toFloat()
         val screenY = y / height.toFloat()
         val aspectRatio = width.toFloat() / height.toFloat()
-        val hit = StudioKitGeometry.hitTest(screenX, screenY, aspectRatio) ?: return
+        val hit = StudioKitInputGeometry.hitTest(screenX, screenY, aspectRatio) ?: return
         val definition = hit.definition
         val pointerId = event.getPointerId(pointerIndex)
         val pressure = event.getPressure(pointerIndex).coerceAtLeast(0f)
@@ -283,6 +292,7 @@ class DrumSurfaceView @JvmOverloads constructor(
         )
         val velocity = velocityEstimate.velocity
         val eventTimeNanos = event.eventTime * NanosPerMillisecond
+        val nowNanos = System.nanoTime()
 
         onStrike?.invoke(
             DrumStrike(
@@ -299,11 +309,15 @@ class DrumSurfaceView @JvmOverloads constructor(
         )
 
         activePointers.put(pointerId, definition.id)
+        if (hit.inputTarget == StrikeInputTarget.KICK_PEDAL) {
+            activePedalPointers.put(pointerId, true)
+            kickPedalAnimation.press(nowNanos, velocity)
+        }
         animationStates[definition.id.ordinal].apply {
             strikeX = hit.normalizedX
             strikeY = hit.normalizedY
             this.velocity = velocity
-            startTimeNanos = System.nanoTime()
+            startTimeNanos = nowNanos
             activePointerCount += 1
         }
         performInstrumentHaptic(definition.id, velocity)
@@ -316,12 +330,18 @@ class DrumSurfaceView @JvmOverloads constructor(
             val state = animationStates[instrument.ordinal]
             state.activePointerCount = (state.activePointerCount - 1).coerceAtLeast(0)
         }
+        if (activePedalPointers.get(pointerId)) {
+            activePedalPointers.delete(pointerId)
+            kickPedalAnimation.release(System.nanoTime())
+        }
         activePointers.remove(pointerId)
         postInvalidateOnAnimation()
     }
 
     private fun clearActivePointers() {
         activePointers.clear()
+        activePedalPointers.clear()
+        kickPedalAnimation.cancel()
         for (state in animationStates) {
             state.activePointerCount = 0
         }
