@@ -1,9 +1,9 @@
 name: Gemini Podcast Studio bug repairs RED
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/gemini-podcast-bug-repairs
+      - agent/gemini-podcast-modular-source
     paths:
       - gemini-podcast-studio/tests/bug-repairs.test.mjs
       - .github/workflows/gemini-bug-repairs-red.yml
@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/gemini-podcast-bug-repairs
       - uses: actions/setup-node@v4
         with:
           node-version: 22
