@@ -10,7 +10,16 @@ object AudioEngine {
         System.loadLibrary("drumkit")
     }
 
-    fun start(context: Context): Boolean = nativeStart(context.assets)
+    fun start(context: Context): Boolean {
+        val started = nativeStart(context.assets)
+        if (started) {
+            applyAudioMixDefaults(
+                setMasterVolume = ::nativeSetMasterVolume,
+                setRoomMix = ::nativeSetRoomMix,
+            )
+        }
+        return started
+    }
 
     fun stop() {
         nativeStop()
