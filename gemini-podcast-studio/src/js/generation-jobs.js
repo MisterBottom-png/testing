@@ -162,9 +162,8 @@ export function installGenerationJobs(services) {
       });
       const data = await response.json();
       if (!response.ok) throw services.createApiError(response.status, data?.error?.message || 'Voice test failed.', JSON.stringify(data, null, 2));
-      const part = data?.candidates?.flatMap(candidate => candidate?.content?.parts || []).find(item => item?.inlineData?.data);
-      if (!part) throw new Error('Gemini returned no voice-test audio.');
-      const url = URL.createObjectURL(services.pcm16ToWavBlob(services.base64ToBytes(part.inlineData.data), services.sampleRateFromMimeType(part.inlineData.mimeType), 1));
+      const { pcmBytes, sampleRate, channels } = services.parseGeminiAudioResponse(data);
+      const url = URL.createObjectURL(services.pcm16ToWavBlob(pcmBytes, sampleRate, channels));
       const audio = new Audio(url);
       audio.addEventListener('ended', () => URL.revokeObjectURL(url), {
         once: true
