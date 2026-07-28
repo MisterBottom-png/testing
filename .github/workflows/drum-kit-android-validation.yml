@@ -62,7 +62,7 @@ jobs:
           cache-cleanup: on-success
 
       - name: Apply deterministic velocity repair
-        run: python ../.github/scripts/apply-drum-kit-bugfix-task1.py
+        run: python ../.github/scripts/repair-drum-kit-bugfix-task1-runner.py
 
       - name: Run Android unit tests and compile app
         run: >-
@@ -78,6 +78,7 @@ jobs:
           git checkout origin/main -- .github/workflows/drum-kit-android-validation.yml
           rm -f .github/workflows/drum-kit-bugfix-task1.yml
           rm -f .github/scripts/apply-drum-kit-bugfix-task1.py
+          rm -f .github/scripts/repair-drum-kit-bugfix-task1-runner.py
           git config user.name "chatgpt-bugfix-agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
