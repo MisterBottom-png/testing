@@ -1,0 +1,44 @@
+name: Rebuild Gemini JSON Schema fix
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - .github/workflows/gemini-schema-fix-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/gemini-podcast-modular-source
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify and rebuild standalone application
+        working-directory: gemini-podcast-studio
+        run: |
+          npm install --no-audit --no-fund
+          node --test tests/gemini-response-json-schema.test.mjs
+          npm test
+          npm run build
+          npm run verify:single
+          grep -q 'responseJsonSchema' dist/gemini-podcast-studio.html
+          git diff --check
+
+      - name: Commit generated distribution and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/gemini-schema-fix-build.yml
+          git add gemini-podcast-studio/dist/gemini-podcast-studio.html
+          git commit -m 'Rebuild standalone app for JSON Schema fix'
+          git push origin HEAD:agent/gemini-podcast-modular-source
