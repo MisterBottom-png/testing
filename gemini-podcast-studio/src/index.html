@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="Create, edit, voice and download a two-speaker podcast with Gemini." />
+  <title>Gemini Podcast Studio</title>
+    <link rel="stylesheet" href="./styles/tokens.css" />
+  <link rel="stylesheet" href="./styles/base.css" />
+  <link rel="stylesheet" href="./styles/layout.css" />
+  <link rel="stylesheet" href="./styles/components.css" />
+  <link rel="stylesheet" href="./styles/responsive.css" />
+
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-bar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 12v3M8 8v11M12 5v14M16 8v11M20 12v3"/></svg>
+        </div>
+        <div class="brand-copy">
+          <h1>Podcast Studio</h1>
+          <p>A calm Gemini production workspace</p>
+        </div>
+      </div>
+      <div class="app-actions" aria-label="Application controls">
+        <span id="saveState" class="save-state" aria-live="polite">Ready</span>
+        <button id="connectionChip" class="connection-chip" type="button" aria-label="Open Gemini connection settings">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span><strong id="connectionLabel">Gemini not connected</strong><span id="connectionModels"></span></span>
+        </button>
+        <button id="themeButton" class="icon-button" type="button" aria-label="Switch to dark theme" title="Switch theme"></button>
+        <button id="settingsButton" class="icon-button" type="button" aria-label="Open settings" title="Settings"></button>
+      </div>
+    </header>
+
+    <nav class="stepper-shell" aria-label="Podcast creation progress">
+      <ol class="stepper">
+        <li class="step-item"><button class="step-button" type="button" data-stage="create" aria-current="step"><span class="step-number">1</span><span>Create</span></button></li>
+        <li class="step-item"><button class="step-button" type="button" data-stage="script" disabled><span class="step-number">2</span><span>Script</span></button></li>
+        <li class="step-item"><button class="step-button" type="button" data-stage="audio" disabled><span class="step-number">3</span><span>Audio</span></button></li>
+      </ol>
+    </nav>
+
+    <section class="workspace">
+      <section id="createStage" class="stage active" aria-labelledby="createStageTitle">
+        <form id="createForm" class="stage-inner" novalidate>
+          <div class="stage-heading">
+            <div>
+              <p class="eyebrow">Create</p>
+              <h2 id="createStageTitle" tabindex="-1">Create your episode</h2>
+              <p>Describe the conversation, confirm the speakers, then let Gemini draft it.</p>
+            </div>
+          </div>
+
+          <div id="createErrorSummary" class="error-summary hidden" tabindex="-1" role="alert" aria-labelledby="createErrorTitle">
+            <h3 id="createErrorTitle">There are problems with the episode setup</h3>
+            <ul id="createErrorList"></ul>
+          </div>
+
+          <div id="connectionSetup" class="section-card subtle hidden" aria-labelledby="connectionSetupTitle">
+            <div class="section-title-row">
+              <div>
+                <h3 id="connectionSetupTitle">Connect Gemini</h3>
+                <p>Add an API key once. Model choices stay tucked under advanced setup where they belong.</p>
+              </div>
+            </div>
+            <div id="connectionSetupForm"></div>
+          </div>
+
+          <div class="create-layout">
+            <div class="brief-column section-stack">
+              <section class="section-card" aria-labelledby="briefTitle">
+                <div class="section-title-row">
+                  <div>
+                    <h3 id="briefTitle">Episode brief</h3>
+                    <p>Start with the question or idea the episode should explore.</p>
+                  </div>
+                </div>
+
+                <div class="field-grid">
+                  <div class="field full">
+                    <label for="topic">What should this episode be about?</label>
+                    <textarea id="topic" class="topic-input" placeholder="Could humans establish a permanent settlement on Mars?" required aria-describedby="topicHelp"></textarea>
+                    <p id="topicHelp" class="field-help">A focused question usually produces a better conversation than a broad keyword.</p>
+                  </div>
+
+                  <fieldset class="field full">
+                    <legend>Duration</legend>
+                    <div id="durationChoices" class="choice-group">
+                      <input class="choice-input" id="duration2" type="radio" name="duration" value="2" />
+                      <label class="chip-label" for="duration2">2 minutes</label>
+                      <input class="choice-input" id="duration3" type="radio" name="duration" value="3" checked />
+                      <label class="chip-label" for="duration3">3 minutes</label>
+                      <input class="choice-input" id="duration5" type="radio" name="duration" value="5" />
+                      <label class="chip-label" for="duration5">5 minutes</label>
+                      <input class="choice-input" id="duration7" type="radio" name="duration" value="7" />
+                      <label class="chip-label" for="duration7">7 minutes</label>
+                      <input class="choice-input" id="durationCustom" type="radio" name="duration" value="custom" />
+                      <label class="chip-label" for="durationCustom">Custom</label>
+                    </div>
+                    <div id="customDurationField" class="field hidden mt-10 max-w-180">
+                      <label for="customDuration">Minutes</label>
+                      <input id="customDuration" type="number" min="1" max="10" step="0.5" value="3" />
+                    </div>
+                    <div class="target-summary">
+                      <span>Target: <strong id="targetWords">approximately 420 spoken words</strong></span>
+                      <span>Estimated: <strong id="estimatedDuration">3:00</strong></span>
+                    </div>
+                  </fieldset>
+
+                  <div class="field">
+                    <label for="language">Language</label>
+                    <select id="language">
+                      <option>English</option><option>Russian</option><option>Estonian</option><option>Lithuanian</option>
+                      <option>German</option><option>French</option><option>Spanish</option><option value="custom">Custom…</option>
+                    </select>
+                    <input id="customLanguage" class="hidden mt-10" type="text" placeholder="Language name" />
+                  </div>
+
+                  <div class="field">
+                    <label for="podcastFormat">Format</label>
+                    <select id="podcastFormat">
+                      <option>Friendly conversation</option><option>Interview</option><option>Debate</option>
+                      <option>Educational explainer</option><option>Documentary discussion</option>
+                      <option>Comedy conversation</option><option>Mystery storytelling</option><option value="custom">Custom…</option>
+                    </select>
+                    <input id="customFormat" class="hidden mt-10" type="text" placeholder="Describe the format" />
+                  </div>
+
+                  <fieldset class="field full">
+                    <legend>Tone</legend>
+                    <div id="toneChoices" class="choice-group">
+                      <input class="choice-input" id="toneInformative" type="checkbox" value="Informative" checked /><label class="chip-label" for="toneInformative">Informative</label>
+                      <input class="choice-input" id="toneCasual" type="checkbox" value="Casual" checked /><label class="chip-label" for="toneCasual">Casual</label>
+                      <input class="choice-input" id="toneSerious" type="checkbox" value="Serious" /><label class="chip-label" for="toneSerious">Serious</label>
+                      <input class="choice-input" id="toneCurious" type="checkbox" value="Curious" /><label class="chip-label" for="toneCurious">Curious</label>
+                      <input class="choice-input" id="toneHumorous" type="checkbox" value="Humorous" /><label class="chip-label" for="toneHumorous">Humorous</label>
+                      <input class="choice-input" id="toneDramatic" type="checkbox" value="Dramatic" /><label class="chip-label" for="toneDramatic">Dramatic</label>
+                      <input class="choice-input" id="toneCalm" type="checkbox" value="Calm" /><label class="chip-label" for="toneCalm">Calm</label>
+                      <input class="choice-input" id="toneEnergetic" type="checkbox" value="Energetic" /><label class="chip-label" for="toneEnergetic">Energetic</label>
+                    </div>
+                  </fieldset>
+
+                  <div class="field full">
+                    <details class="disclosure">
+                      <summary>Advanced episode instructions</summary>
+                      <div class="disclosure-content">
+                        <label for="instructions">Additional instructions</label>
+                        <textarea id="instructions" placeholder="Keep the science accurate. Use light humour. Avoid technical jargon."></textarea>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </section>
+
+              <div id="createLoading" class="inline-status" role="status" aria-live="polite" aria-atomic="true">
+                <div class="inline-status-row"><div><strong>Generating podcast script</strong><p id="createLoadingMessage">Planning the episode…</p></div><span id="createElapsed" class="elapsed">0:00</span></div>
+                <div class="indeterminate" aria-hidden="true"></div>
+              </div>
+            </div>
+
+            <aside class="speaker-column">
+              <section class="section-card subtle" aria-labelledby="speakersTitle">
+                <div class="section-title-row">
+                  <div><h3 id="speakersTitle">Speakers</h3><p>Two distinct voices, collapsed until you need the details.</p></div>
+                  <button id="swapCharacters" class="secondary-button compact-button" type="button">Swap</button>
+                </div>
+                <div id="speakerList" class="speaker-list"></div>
+              </section>
+            </aside>
+          </div>
+
+          <div class="action-dock">
+            <div class="action-dock-copy"><strong>Ready to write the episode</strong><span id="createActionHint">Approx. 420 words · 3:00</span></div>
+            <button id="generateScriptButton" class="primary-button" type="submit"><span>Generate script</span></button>
+          </div>
+        </form>
+      </section>
+
+      <section id="scriptStage" class="stage" aria-labelledby="scriptStageTitle">
+        <div class="stage-inner">
+          <div class="script-layout">
+            <div class="script-main">
+              <div class="stage-heading">
+                <div>
+                  <p class="eyebrow">Script</p>
+                  <h2 id="scriptStageTitle" class="episode-title" tabindex="-1">Dialogue editor</h2>
+                  <p id="scriptSummaryText" class="episode-summary">Edit the conversation before generating audio.</p>
+                </div>
+              </div>
+
+              <div id="scriptTabs" class="tablist" role="tablist" aria-label="Script view">
+                <button id="editorTab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="scriptPanel" tabindex="0" data-script-view="editor">Editor</button>
+                <button id="transcriptTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="scriptPanel" tabindex="-1" data-script-view="transcript">Transcript</button>
+                <button id="ttsTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="scriptPanel" tabindex="-1" data-script-view="tts">TTS preview</button>
+              </div>
+
+              <div id="scriptPanel" class="script-content" role="tabpanel" aria-labelledby="editorTab"></div>
+              <p id="reorderStatus" class="visually-hidden" aria-live="polite"></p>
+            </div>
+
+            <aside class="episode-panel" aria-labelledby="episodePanelTitle">
+              <h3 id="episodePanelTitle">Episode</h3>
+              <div id="scriptMetrics" class="metric-list"></div>
+              <div id="scriptValidation" class="validation-status"></div>
+
+              <details id="refineMenu" class="menu">
+                <summary class="menu-summary full-width"><span>Refine script</span><span aria-hidden="true">▾</span></summary>
+                <div class="menu-popover">
+                  <button class="menu-item" type="button" data-script-action="shorten">Shorten</button>
+                  <button class="menu-item" type="button" data-script-action="expand">Expand</button>
+                  <button class="menu-item" type="button" data-script-action="conversational">More conversational</button>
+                  <button class="menu-item" type="button" data-script-action="serious">More serious</button>
+                  <button class="menu-item" type="button" data-script-action="humour">Add humour</button>
+                </div>
+              </details>
+
+              <div class="button-row">
+                <button id="undoButton" class="secondary-button compact-button" type="button">Undo</button>
+                <button id="redoButton" class="secondary-button compact-button" type="button">Redo</button>
+                <details id="scriptMoreMenu" class="menu icon-menu">
+                  <summary class="menu-summary" aria-label="More script actions" title="More actions"></summary>
+                  <div class="menu-popover">
+                    <button class="menu-item" type="button" data-script-action="regenerate">Regenerate</button>
+                    <button class="menu-item" type="button" data-script-action="reset">Reset changes</button>
+                    <button class="menu-item" type="button" data-script-action="copy">Copy transcript</button>
+                    <button class="menu-item" type="button" data-script-action="download-json">Download JSON</button>
+                  </div>
+                </details>
+              </div>
+
+              <div id="scriptLoading" class="inline-status" role="status" aria-live="polite" aria-atomic="true">
+                <div class="inline-status-row"><div><strong id="scriptLoadingTitle">Working on script</strong><p id="scriptLoadingMessage">Preparing…</p></div><span id="scriptElapsed" class="elapsed">0:00</span></div>
+                <div class="indeterminate" aria-hidden="true"></div>
+              </div>
+
+              <button id="generateAudioButton" class="primary-button" type="button"><span>Generate audio</span></button>
+              <button id="backToCreateButton" class="ghost-button" type="button">Back to create</button>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="audioStage" class="stage" aria-labelledby="audioStageTitle">
+        <div class="stage-inner audio-layout">
+          <div id="audioContent"></div>
+        </div>
+      </section>
+    </section>
+
+    <section id="serviceError" class="service-error" role="alert">
+      <h3 id="serviceErrorTitle">Generation failed</h3>
+      <p id="serviceErrorMessage"></p>
+      <p><strong>Suggested action:</strong> <span id="serviceErrorSuggestion"></span></p>
+      <div class="button-row mt-14">
+        <button id="retryButton" class="secondary-button" type="button">Try again</button>
+        <button id="dismissErrorButton" class="ghost-button" type="button">Dismiss</button>
+      </div>
+      <details><summary>View technical details</summary><pre id="serviceErrorDetails">No details available.</pre></details>
+    </section>
+
+    <p id="liveStatus" class="visually-hidden" aria-live="polite"></p>
+    <footer>Personal testing tool. API keys are never written into exported scripts, downloaded audio or debug output.</footer>
+  </main>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <div><h2 id="settingsTitle">Settings</h2><p>Connection and generation preferences are stored locally. The API key is only stored when explicitly enabled.</p></div>
+        <button id="closeSettingsIcon" class="icon-button" type="button" aria-label="Close settings"></button>
+      </div>
+      <section aria-labelledby="connectionSettingsTitle">
+        <h3 id="connectionSettingsTitle">Gemini connection</h3>
+        <div id="connectionSettingsForm" class="mt-14"></div>
+      </section>
+      <section class="mt-24" aria-labelledby="generationSettingsTitle">
+        <h3 id="generationSettingsTitle">Generation</h3>
+        <div class="field-grid mt-14">
+          <div class="field">
+            <label for="maxTtsCharacters">Generation chunk target (request characters)</label>
+            <input id="maxTtsCharacters" type="number" min="4000" max="30000" step="500" value="24000" aria-describedby="ttsChunkTargetHelp" />
+            <small id="ttsChunkTargetHelp">Advanced troubleshooting override. The 24,000-character default is a conservative tested target for Gemini 3.1 Flash TTS Preview, below its 8,192-token maximum input context to allow for tokenisation variation. Smaller chunks use more requests and can reduce voice and conversational continuity.</small>
+          </div>
+          <div class="field"><label for="speakingRate">Words per minute</label><input id="speakingRate" type="number" min="100" max="200" step="5" value="140" /></div>
+        </div>
+      </section>
+      <div class="dialog-actions">
+        <button id="clearStoredDataButton" class="danger-button" type="button">Clear stored data</button>
+        <div class="dialog-actions-right"><button id="closeSettingsButton" class="primary-button" type="button">Done</button></div>
+      </div>
+    </div>
+  </dialog>
+  <script type="module" src="./js/main.js"></script>
+
+</body>
+</html>

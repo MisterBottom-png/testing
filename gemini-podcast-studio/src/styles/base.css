@@ -1,0 +1,39 @@
+@layer base {
+      body {
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 28rem),
+          var(--bg);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+        box-shadow: var(--focus);
+      }
+
+      h1, h2, h3 { letter-spacing: -0.025em; line-height: 1.15; }
+      h1 { font-size: 1.35rem; }
+      h2 { font-size: clamp(1.55rem, 3vw, 2rem); }
+      h3 { font-size: 1.05rem; }
+      p { max-width: 72ch; }
+      button { cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: 0.5; }
+      input, select, textarea {
+        width: 100%;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--outline);
+        border-radius: var(--radius-md);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      }
+      input, select { min-height: 46px; padding: 0 13px; }
+      textarea { min-height: 112px; padding: 12px 13px; resize: vertical; line-height: 1.55; }
+      input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: var(--focus); }
+      [aria-invalid="true"] { border-color: var(--danger) !important; }
+    }

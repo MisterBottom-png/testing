@@ -1,0 +1,78 @@
+@layer utilities {
+      .hidden { display: none !important; }
+      .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+      .warning-text { color: var(--warning); }
+      .success-text { color: var(--success); }
+      .full-width { width: 100%; }
+      .mt-10 { margin-top: 10px; }
+      .mt-12 { margin-top: 12px; }
+      .mt-14 { margin-top: 14px; }
+      .mt-24 { margin-top: 24px; }
+      .max-w-180 { max-width: 180px; }
+    }
+
+@layer responsive {
+      @media (max-width: 920px) {
+        .create-layout, .script-layout { grid-template-columns: 1fr; }
+        .speaker-column { order: 2; }
+        .episode-panel { position: static; }
+        .metric-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .audio-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 700px) {
+        .app-shell { width: min(100% - 20px, 1180px); padding-top: 8px; }
+        .app-bar { min-height: 62px; }
+        .brand-mark { width: 34px; height: 34px; }
+        .brand-copy p, .save-state { display: none; }
+        .connection-chip { width: 40px; min-height: 40px; justify-content: center; padding: 0; }
+        .connection-chip span:not(.connection-dot) { display: none; }
+        .stepper-shell { margin-top: 2px; }
+        .step-item:not(:last-child)::after { left: calc(50% + 28px); right: calc(-50% + 28px); }
+        .step-button { gap: 5px; padding-inline: 4px; font-size: 0.74rem; }
+        .step-number { width: 24px; height: 24px; }
+        .stage-inner { padding: 18px; }
+        .stage-heading { display: block; }
+        .field-grid, .field-grid.three { grid-template-columns: 1fr; }
+        .field.full { grid-column: auto; }
+        .action-dock { align-items: stretch; flex-direction: column; margin: 22px -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); }
+        .action-dock .primary-button, .action-dock .secondary-button { width: 100%; }
+        .speaker-card-head { grid-template-columns: auto minmax(0, 1fr); }
+        .speaker-actions { grid-column: 1 / -1; justify-content: flex-end; }
+        .section-title-row { display: block; }
+        .section-title-row > button { margin-top: 12px; width: 100%; }
+        .metric-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .tablist { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+        .tab-button { padding-inline: 5px; }
+        .segment-header { grid-template-columns: minmax(0, 1fr) auto; }
+        .drag-handle { display: none; }
+        .performance-input { width: 100%; }
+        .segment-identity { align-items: stretch; flex-direction: column; }
+        .segment-speaker { width: fit-content; }
+        .audio-header { display: block; }
+        .audio-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .audio-actions > * { flex: 1 1 100%; }
+        .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
+        .dialog-actions-right { display: grid; }
+      }
+
+      @media (max-width: 370px) {
+        .app-shell { width: min(100% - 12px, 1180px); }
+        .brand-copy h1 { font-size: 1.1rem; }
+        .app-actions { gap: 4px; }
+        .icon-button { width: 40px; min-height: 40px; }
+        .step-button { font-size: 0.68rem; }
+        .choice-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .chip-label { width: 100%; }
+        .metric-list, .audio-meta { grid-template-columns: 1fr 1fr; }
+      }
+
+      @media (forced-colors: active) {
+        .speaker-card::before { width: 6px; }
+        .choice-input:checked + .chip-label { border: 2px solid ButtonText; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+      }
+    }

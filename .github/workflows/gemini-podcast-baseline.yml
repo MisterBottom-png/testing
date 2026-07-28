@@ -1,0 +1,62 @@
+name: Gemini Podcast Studio baseline
+
+on:
+  push:
+    branches:
+      - agent/gemini-podcast-modular-source
+    paths:
+      - gemini-podcast-studio/**
+      - .github/workflows/gemini-podcast-baseline.yml
+  pull_request:
+    paths:
+      - gemini-podcast-studio/**
+      - .github/workflows/gemini-podcast-baseline.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-baseline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gemini-podcast-studio
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check JavaScript syntax
+        run: |
+          for file in src/js/*.js tests/*.mjs vite.config.js; do node --check "$file"; done
+
+      - name: Build and test
+        run: npm run check
+
+      - name: Smoke-test Vite preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/gemini-vite.log 2>&1 &
+          preview_pid=$!
+          trap 'kill ${preview_pid} 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /tmp/gemini-index.html; then
+              break
+            fi
+            sleep 0.25
+          done
+          grep -q 'Podcast Studio' /tmp/gemini-index.html
+          timeout 30s google-chrome --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=3000 --dump-dom http://127.0.0.1:4173/ > /tmp/gemini-dom.html 2> /tmp/gemini-chrome.log
+          grep -q 'id="speakerName0"' /tmp/gemini-dom.html
+          grep -q 'Saved locally' /tmp/gemini-dom.html
+          if grep -E 'Uncaught|ReferenceError|TypeError' /tmp/gemini-chrome.log; then
+            cat /tmp/gemini-chrome.log >&2
+            exit 1
+          fi
