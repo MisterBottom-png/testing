@@ -41,7 +41,8 @@ export function installConnectionUi(services) {
   function renderConnectionForms() {
     services.els.connectionSetupForm.innerHTML = connectionFormMarkup('setup');
     services.els.connectionSettingsForm.innerHTML = connectionFormMarkup('settings');
-    services.els.connectionSetup.classList.toggle('hidden', Boolean(services.appState.connection.apiKey));
+    // Connection setup is available from Settings; keep the Create workspace focused on the episode brief.
+    services.els.connectionSetup.classList.add('hidden');
     renderConnectionStatus();
   }
   function renderConnectionStatus() {
