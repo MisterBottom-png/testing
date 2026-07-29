@@ -28,7 +28,7 @@ test('focused extraction modules exist and expose explicit module syntax', async
     'pcm-audio.js', 'wav-encoder.js', 'tts-chunking.js', 'tts-generation.js',
     'indexeddb.js', 'media-cache.js', 'ui-create.js', 'ui-script.js',
     'ui-audio.js', 'ui-status.js', 'ui-events.js', 'voice-preview.js',
-    'conversation-preview.js', 'final-review.js', 'main.js'
+    'conversation-preview.js', 'final-review.js', 'bug-repairs.js', 'main.js'
   ];
   const files = new Set(await readdir(jsRoot));
   for (const file of expected) {
@@ -40,7 +40,7 @@ test('focused extraction modules exist and expose explicit module syntax', async
 test('main is a thin composition root', async () => {
   const main = await source('main.js');
   assert.ok(main.split('\n').length <= 120, 'main.js contains feature implementation instead of composition');
-  for (const file of ['runtime.js', 'constants.js', 'state.js', 'preferences.js', 'script-generation.js', 'tts-generation.js', 'ui-events.js', 'conversation-preview.js']) {
+  for (const file of ['runtime.js', 'constants.js', 'state.js', 'preferences.js', 'script-generation.js', 'tts-generation.js', 'bug-repairs.js', 'ui-events.js', 'conversation-preview.js']) {
     assert.match(main, new RegExp(`from ['"]\\./${file.replace('.', '\\.')}['"]`));
   }
   assert.doesNotMatch(main, /function\s+(?:buildConversationPreview|generatePodcastAudio|generatePodcastScript|renderSpeakerCards)\b/);
@@ -82,5 +82,6 @@ test('package scripts preserve Vite development and produce the verified standal
   assert.equal(packageJson.scripts.build, 'node scripts/build-single-file.mjs');
   assert.equal(packageJson.scripts.preview, 'node scripts/serve-dist.mjs');
   assert.equal(packageJson.scripts['verify:single'], 'node scripts/verify-single-file.mjs');
-  assert.equal(packageJson.scripts.check, 'npm test && npm run build');
+  assert.equal(packageJson.scripts['test:runtime'], 'node scripts/runtime-smoke-repaired.mjs');
+  assert.equal(packageJson.scripts.check, 'npm test && npm run build && npm run verify:single && npm run test:runtime');
 });

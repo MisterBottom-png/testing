@@ -1,0 +1,35 @@
+Gemini Podcast Studio bug repair verification
+Date: 2026-07-28
+Branch: agent/gemini-podcast-bug-repairs
+
+Focused commands:
+  node --check src/js/bug-repairs.js
+  node --test tests/bug-repairs.test.mjs
+  node --check scripts/runtime-smoke-repaired.mjs
+
+Latest result:
+  tests: 8
+  pass: 8
+  fail: 0
+  cancelled: 0
+  skipped: 0
+  todo: 0
+  duration_ms: 68.640445
+
+Covered regressions:
+  1. Blank edited dialogue blocks TTS readiness.
+  2. Transient TTS server errors retry, while quota errors do not.
+  3. Failed audio regeneration preserves the previous audio and cache state.
+  4. Impossible segment actions produce no state or audio side effects.
+  5. Pending typing history is flushed before undo.
+  6. New-project reset uses central duration/model/speaking-rate defaults.
+  7. Settings values commit through the dialog close path.
+  8. Current-schema saved projects reject blank dialogue.
+
+Additional source checks:
+  - src/js/bug-repairs.js passed node --check.
+  - scripts/runtime-smoke-repaired.mjs passed node --check.
+  - temporary workflow and payload files were removed from the pull-request diff.
+
+Incomplete verification:
+  The private repository could not be cloned into the local execution container because outbound network access and GitHub CLI credentials were unavailable. The latest GitHub Actions baseline job completed with failure before reporting any steps (steps: []). Therefore the full existing Node suite, Vite build, standalone-file verification and browser runtime smoke test have not been freshly completed on the repaired branch, and dist/gemini-podcast-studio.html has not been regenerated.
