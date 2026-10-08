@@ -3,46 +3,8 @@
 
 use photocraft_doc::VectorLayer;
 use photocraft_geom::{Rect, TILE_SIZE};
-use vectorcraft_color::{Color, Paint};
-use vectorcraft_doc::{Appearance, Document, Node};
-use vectorcraft_geom::{Point, shapes};
 use vectorcraft_render::{RenderOptions, Renderer, painted_bounds};
-use vlayer::{VectorTiles, dirty_px, layer_affine};
-
-/// Mixed paths: filled+stroked ellipses, filled rectangles at 80 % opacity, stroked stars.
-/// Same recipe as `synthetic()` in vectorcraft@8b036df apps/vectorcraft-cli/src/perf.rs
-/// (MIT OR Apache-2.0, Copyright (c) 2026 ArtCraft Team and the VectorCraft contributors).
-fn synthetic(n: usize, w: f64, h: f64) -> Document {
-    struct Rng(u64);
-    impl Rng {
-        fn next(&mut self) -> f64 {
-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            (self.0 >> 11) as f64 / (1u64 << 53) as f64
-        }
-    }
-    let mut d = Document::new(w, h);
-    let l = d.layers.first().map(|l| l.id);
-    let mut r = Rng(42);
-    for i in 0..n {
-        let (x, y, s) = (r.next() * w, r.next() * h, 3.0 + r.next() * 22.0);
-        let c = Color::rgb(r.next() as f32, r.next() as f32, r.next() as f32);
-        let id = d.alloc_id();
-        let mut node = match i % 3 {
-            0 => Node::path(
-                id,
-                shapes::ellipse(vectorcraft_geom::Rect::from_center_size(Point::new(x, y), (2.0 * s, 2.0 * s))),
-                Appearance::basic(Paint::solid(c), Paint::solid(Color::BLACK), 0.5),
-            ),
-            1 => Node::path(id, shapes::rectangle(vectorcraft_geom::Rect::new(x, y, x + 2.0 * s, y + s)), Appearance::basic(Paint::solid(c), Paint::None, 0.0)),
-            _ => Node::path(id, shapes::star(Point::new(x, y), s, s / 2.0, 5, 0.0), Appearance::basic(Paint::None, Paint::solid(c), 2.0)),
-        };
-        if i % 3 == 1 {
-            node.opacity = 0.8;
-        }
-        d.insert(l, usize::MAX, node).expect("insert");
-    }
-    d
-}
+use vlayer::{VectorTiles, dirty_px, layer_affine, synthetic};
 
 fn export_opts() -> RenderOptions {
     RenderOptions { artboards: false, background: None, skip_templates: true, ..RenderOptions::default() }

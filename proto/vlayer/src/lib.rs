@@ -143,3 +143,47 @@ impl VectorTiles {
         count
     }
 }
+
+/// Mixed paths: filled+stroked ellipses, filled rectangles at 80 % opacity, stroked stars.
+/// Same recipe as `synthetic()` in vectorcraft@8b036df apps/vectorcraft-cli/src/perf.rs
+/// (MIT OR Apache-2.0, Copyright (c) 2026 ArtCraft Team and the VectorCraft contributors).
+pub fn synthetic(n: usize, w: f64, h: f64) -> vectorcraft_doc::Document {
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> f64 {
+            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (self.0 >> 11) as f64 / (1u64 << 53) as f64
+        }
+    }
+    let mut d = vectorcraft_doc::Document::new(w, h);
+    let l = d.layers.first().map(|l| l.id);
+    let mut r = Rng(42);
+    for i in 0..n {
+        let (x, y, s) = (r.next() * w, r.next() * h, 3.0 + r.next() * 22.0);
+        let c = vectorcraft_color::Color::rgb(r.next() as f32, r.next() as f32, r.next() as f32);
+        let id = d.alloc_id();
+        let mut node = match i % 3 {
+            0 => vectorcraft_doc::Node::path(
+                id,
+                vectorcraft_geom::shapes::ellipse(vectorcraft_geom::Rect::from_center_size(vectorcraft_geom::Point::new(x, y), (2.0 * s, 2.0 * s))),
+                vectorcraft_doc::Appearance::basic(vectorcraft_color::Paint::solid(c), vectorcraft_color::Paint::solid(vectorcraft_color::Color::BLACK), 0.5),
+            ),
+            1 => vectorcraft_doc::Node::path(
+                id,
+                vectorcraft_geom::shapes::rectangle(vectorcraft_geom::Rect::new(x, y, x + 2.0 * s, y + s)),
+                vectorcraft_doc::Appearance::basic(vectorcraft_color::Paint::solid(c), vectorcraft_color::Paint::None, 0.0),
+            ),
+            _ => vectorcraft_doc::Node::path(
+                id,
+                vectorcraft_geom::shapes::star(vectorcraft_geom::Point::new(x, y), s, s / 2.0, 5, 0.0),
+                vectorcraft_doc::Appearance::basic(vectorcraft_color::Paint::None, vectorcraft_color::Paint::solid(c), 2.0),
+            ),
+        };
+        if i % 3 == 1 {
+            node.opacity = 0.8;
+        }
+        // Inserting into the document's own first layer cannot fail; skip the node if it does.
+        let _ = d.insert(l, usize::MAX, node);
+    }
+    d
+}

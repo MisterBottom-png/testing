@@ -165,6 +165,17 @@ fn layer_m(l: &Layer, sink: &mut dyn Sink) -> LayerM {
             stack_mode: s.stack_mode,
             perspective: s.perspective,
         },
+        // A-Studio P1. `save_with` only fails for invalid options (these are the defaults) and its
+        // output is JSON it just wrote; on the impossible failure the layer is saved empty
+        // (`null`) and fails to load with a clear error rather than crashing the save.
+        LayerContent::Vector(v) => ContentM::Vector {
+            document: vectorcraft_format::save_with(&v.doc, &vectorcraft_format::SaveOptions::default())
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .unwrap_or(serde_json::Value::Null),
+            transform: v.transform,
+            cache: v.cache.as_ref().map(|c| surface_m(c, sink)),
+        },
     };
     LayerM {
         id: l.id.0,
@@ -447,6 +458,17 @@ impl Loader<'_> {
                     stack_mode: *stack_mode,
                     perspective: perspective.filter(|p| p.iter().all(|v| v.is_finite())),
                 })
+            }
+            // A-Studio P1.
+            ContentM::Vector { document, transform, cache } => {
+                if !transform.m.iter().all(|v| v.is_finite()) {
+                    return Err(FormatError::Corrupt("vector layer transform is not finite".into()));
+                }
+                let bytes = serde_json::to_vec(document)?;
+                let doc = vectorcraft_format::load(&bytes).map_err(|e| FormatError::Corrupt(format!("vector layer: {e}")))?;
+                let cache = self.opt_surface(cache)?;
+                let fresh = u64::from(cache.is_some());
+                LayerContent::Vector(photocraft_doc::VectorLayer { doc: Arc::new(doc), transform: *transform, revision: 1, cache, cache_revision: fresh })
             }
         };
         let mask = match &m.mask {

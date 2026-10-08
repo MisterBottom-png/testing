@@ -296,6 +296,14 @@ pub enum ContentM {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         perspective: Option<[f64; 9]>,
     },
+    /// A-Studio P1: a Vector layer. `document` is the layer's VectorCraft document exactly as a
+    /// `.vectorcraft` v3 file holds it (what `vectorcraft_format::save` writes, images inline);
+    /// `cache` is the last rendered pixels, so the file opens without re-rendering.
+    Vector {
+        document: serde_json::Value,
+        transform: Affine,
+        cache: Option<SurfaceM>,
+    },
 }
 
 fn yes() -> bool {

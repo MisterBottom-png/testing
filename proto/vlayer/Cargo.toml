@@ -17,6 +17,4 @@ photocraft-raster = { path = "../../upstream/photocraft/crates/raster" }
 vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
 vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }
 vectorcraft-render = { path = "../../upstream/vectorcraft/crates/render" }
-
-[dev-dependencies]
 vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
