@@ -18,7 +18,7 @@ layer, which is drawn into tiles, saved and reopened unchanged, and on a 24-mega
 | Save and reopen | round trip | identical drawing, position and pixels after reopening (P1-03 test) | yes |
 | PSD + vector path, end to end | works | works (exit test) | yes |
 | Redraw one changed layer, 24 MP, 1,000 paths | under 100 ms | 7.3 ms (dense paths), 5.7 ms (sparse); Linux dev machine | yes |
-| Same on Windows (D7) | under 100 ms | pending: running on GitHub's Windows machine (`p1-measure` workflow) | to be added |
+| Same on Windows (D7) | under 100 ms | 7.2 ms (dense), 3.9 ms (sparse); GitHub Windows machine, 2 threads; all prototype tests pass on Windows | yes |
 
 Other numbers: first full drawing of the 1,000-path layer 0.2 to 0.3 s; the vector layer's tile cache
 is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
@@ -43,7 +43,7 @@ is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
   match one big whole-canvas VectorCraft render pixel for pixel. The P1-02 bar ("within 1/255 of
   VectorCraft's render") is met against VectorCraft drawing the same tile, not the whole canvas.
 - **Only small edits are fast.** Changing the whole vector layer at once (moving or scaling all of it)
-  redraws everything: about 0.7 s at 24 MP on the test machine. Dragging a whole layer smoothly
+  redraws everything: about 0.7 s at 24 MP on the Linux test machine, 1.1 s on the 2-thread Windows one. Dragging a whole layer smoothly
   will need a shortcut in P3/P4, such as sliding the already drawn tiles during the drag and
   redrawing once at the end.
 - The Windows numbers come from a GitHub machine, not a typical laptop.

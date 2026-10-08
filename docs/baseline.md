@@ -46,5 +46,18 @@ this machine. Only small edits are under 100 ms; whole-layer changes need a fast
 Criterion benchmark (`cargo bench -p vlayer --bench p1`, the same edit on one path repeatedly):
 3.1 ms (dense).
 
-Windows (GitHub Actions windows-latest): see the `p1-measure` workflow log; recorded here when run.
+### Windows (D7)
+
+GitHub Actions `windows-latest`, run 37825571138 (`.github/workflows/p1-measure.yml`): AMD EPYC 7763,
+2 CPU threads, 8 GB RAM. Same program, three runs, medians. All prototype tests pass on Windows.
+
+| Measure | Dense | Sparse |
+| --- | --- | --- |
+| Change one path: redraw + composite | **7.2 ms** (7.2, 7.2, 7.3) | **3.9 ms** (4.3, 3.9, 3.9) |
+| First render of the Vector layer | 184 ms (186, 184, 149) | 120 ms (167, 119, 120) |
+| Full composite of the 24 MP canvas | 886 ms | 755 ms |
+| Criterion benchmark | 3.6 ms | 3.1 ms |
+
+Target (under 100 ms) met on Windows too. A whole-layer change costs about 1.1 s there
+(first render plus full composite on 2 threads).
 

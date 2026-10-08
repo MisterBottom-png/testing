@@ -39,7 +39,8 @@
   windows-latest. Run 37817543646 was still running at the end of the session (over 1.5 hours). When
   it finishes, take the numbers from its log (artifact `baseline-windows`), fill the table in
   `docs/baseline.md`, and mark P0-03 done.
-- **P1-04 on Windows:** `.github/workflows/p1-measure.yml` run 37825571138: the three timed runs finished; the numbers go into `docs/baseline.md` and `docs/p1-report.md` from its log.
+- P1-04 on Windows is done: 7.2 ms for a one-path edit on GitHub's Windows machine (in `docs/baseline.md`
+  and `docs/p1-report.md`); all prototype tests pass on Windows.
 
 ## Questions for the owner
 
