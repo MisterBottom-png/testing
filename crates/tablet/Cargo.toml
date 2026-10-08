@@ -1,6 +1,6 @@
 [package]
 name = "astudio-tablet"
-description = "A-Studio: Pen tablet input; the only crate allowed `unsafe` (macOS AppKit)"
+description = "A-Studio: Pen tablet input; the only crate allowed `unsafe` (Windows pen APIs)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

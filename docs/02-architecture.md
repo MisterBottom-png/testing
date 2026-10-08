@@ -43,7 +43,7 @@ pc = PhotoCraft, vc = VectorCraft.
 ## Rules that carry over unchanged
 
 - Never crash: no `unwrap`, `expect`, `panic!`, indexing on input data, or unchecked arithmetic in shipped code; a guard catches panics per entry point and rolls back.
-- No `unsafe` except `astudio-tablet` on macOS.
+- No `unsafe` except `astudio-tablet` on Windows (pen input; D7).
 - Everything is a command; the UI is thin.
 - Never break wasm: L0 to L6 must build for `wasm32-unknown-unknown`.
 - Bit depth and colour model are runtime data.

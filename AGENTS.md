@@ -14,7 +14,8 @@ pixel-and-vector editor. Read `docs/00-decisions.md` and `docs/02-architecture.m
 - **Never crash.** No `unwrap`, `expect`, `panic!`, `unreachable!`, `todo!`, `unimplemented!` outside
   tests. Use `?`, `ok_or`, `let … else`. Use `.get(i)` for indices that come from data. Cap sizes read
   from files. Every crash fix comes with a test that panicked before.
-- **No `unsafe`**, except `astudio-tablet` on macOS, each block with a `SAFETY:` comment.
+- **No `unsafe`**, except `astudio-tablet` on Windows (pen input through Wintab / Windows Ink), each block
+  with a `SAFETY:` comment.
 - **Everything is a command.** User-visible behaviour = a command in `astudio-engine` (id, label, menu
   path, shortcut, params doc, `enabled`, `run`) plus tests. The UI, CLI, control channel and MCP call commands by id.
 - **Layers.** A crate depends only on lower layers (`cargo run -p xtask -- layers`). Nothing below L6 uses egui, eframe, winit or rfd.
