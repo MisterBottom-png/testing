@@ -32,6 +32,25 @@ pub(crate) fn check_nesting(layers: &[Layer]) -> Result<()> {
     if too_deep_at(layers, 0) { Err(too_deep()) } else { Ok(()) }
 }
 
+/// A-Studio P1: refuses to save a Vector layer whose VectorCraft document would not open again
+/// (for example nested deeper than VectorCraft's own reader accepts): the save fails with an error
+/// instead of writing a file that cannot be reopened.
+pub(crate) fn check_vector_layers(layers: &[Layer]) -> Result<()> {
+    for l in layers {
+        match &l.content {
+            LayerContent::Vector(v) => {
+                let bytes = vectorcraft_format::save_with(&v.doc, &vectorcraft_format::SaveOptions::default())
+                    .map_err(|e| FormatError::Unsupported(format!("vector layer \"{}\": {e}", l.name)))?;
+                vectorcraft_format::load(&bytes).map_err(|e| FormatError::Unsupported(format!("vector layer \"{}\" cannot be saved: {e}", l.name)))?;
+            }
+            // Group depth is already bounded by `check_nesting`, which runs first.
+            LayerContent::Group(g) => check_vector_layers(&g.children)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub(crate) trait Sink {
     /// Register a tile, returning its hash.
     fn tile(&mut self, format: PixelFormat, tile: &Arc<Tile>) -> Hash;
@@ -165,16 +184,17 @@ fn layer_m(l: &Layer, sink: &mut dyn Sink) -> LayerM {
             stack_mode: s.stack_mode,
             perspective: s.perspective,
         },
-        // A-Studio P1. `save_with` only fails for invalid options (these are the defaults) and its
-        // output is JSON it just wrote; on the impossible failure the layer is saved empty
-        // (`null`) and fails to load with a clear error rather than crashing the save.
+        // A-Studio P1. `check_vector_layers` (run before any layer is converted) has already
+        // encoded this document and read it back, so neither step can fail here; `null` is only
+        // a type-level fallback. Only up-to-date pixels are saved: stale ones would reopen as
+        // fresh.
         LayerContent::Vector(v) => ContentM::Vector {
             document: vectorcraft_format::save_with(&v.doc, &vectorcraft_format::SaveOptions::default())
                 .ok()
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
                 .unwrap_or(serde_json::Value::Null),
             transform: v.transform,
-            cache: v.cache.as_ref().map(|c| surface_m(c, sink)),
+            cache: v.fresh_cache().map(|c| surface_m(c, sink)),
         },
     };
     LayerM {

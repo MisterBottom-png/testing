@@ -106,8 +106,8 @@ impl VectorTiles {
     /// `dirty` is where the one edit since the last redraw changed pixels (old ∪ new painted
     /// bounds, see [`dirty_px`]). The whole canvas is redrawn when `dirty` is `None`, when there
     /// is no cache, or when the cache is not exactly one edit behind (`cache_revision + 1 !=
-    /// revision`: one dirty rectangle cannot describe several edits). On error the cache is left
-    /// stale, so the next redraw is a full one.
+    /// revision`: one dirty rectangle cannot describe several edits). On error the cache is
+    /// dropped, so the next redraw is a full one.
     pub fn redraw(&mut self, layer: &mut VectorLayer, canvas: Rect, dirty: Option<Rect>) -> Result<RedrawStats, RedrawError> {
         let within = |v: i32| (-MAX_SIDE..=MAX_SIDE).contains(&v);
         if !(within(canvas.x0) && within(canvas.y0) && within(canvas.x1) && within(canvas.y1)) {
@@ -126,8 +126,8 @@ impl VectorTiles {
         let mut stats = RedrawStats { full: partial.is_none(), ..RedrawStats::default() };
         let result = self.redraw_area(layer, area, &mut cache, &mut stats);
         stats.tiles_cached = cache.tile_count();
-        layer.cache = Some(cache);
         if result.is_ok() {
+            layer.cache = Some(cache);
             layer.cache_revision = layer.revision;
         }
         result.map(|()| stats)

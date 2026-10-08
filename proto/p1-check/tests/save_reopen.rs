@@ -50,3 +50,48 @@ fn vector_layer_round_trips_through_pcraft() {
     let (m1, m2) = (photocraft_format::read_manifest(&bytes).expect("m1"), photocraft_format::read_manifest(&again).expect("m2"));
     assert_eq!(serde_json::to_value(&m1.document.layers).ok(), serde_json::to_value(&m2.document.layers).ok());
 }
+
+fn doc_with(v: VectorLayer) -> Document {
+    let mut doc = Document::new("p1-03", Size::new(400, 300), ColorMode::Rgb, SampleType::U8);
+    doc.layers.push(Layer::new("V", LayerContent::Vector(v)));
+    doc
+}
+
+/// A vector document nested deeper than VectorCraft's reader accepts must fail to save with an
+/// error, never write a file that cannot be reopened (review finding).
+#[test]
+fn too_deep_vector_document_is_a_save_error_not_an_unreadable_file() {
+    use std::sync::Arc;
+    for (depth, saves) in [(30usize, true), (60, false)] {
+        let mut vdoc = synthetic(3, 200.0, 200.0);
+        let target = vdoc.layers.first().map(|l| l.id);
+        let mut node = vectorcraft_doc::Node::path(
+            vdoc.alloc_id(),
+            vectorcraft_geom::shapes::rectangle(vectorcraft_geom::Rect::new(10.0, 10.0, 50.0, 50.0)),
+            vectorcraft_doc::Appearance::basic(vectorcraft_color::Paint::solid(vectorcraft_color::Color::BLACK), vectorcraft_color::Paint::None, 0.0),
+        );
+        for _ in 0..depth {
+            node = vectorcraft_doc::Node::group(vdoc.alloc_id(), vec![Arc::new(node)]);
+        }
+        vdoc.insert(target, usize::MAX, node).expect("insert");
+        let saved = photocraft_format::save_to_bytes(&doc_with(VectorLayer::new(vdoc, 72.0)), &Default::default());
+        assert_eq!(saved.is_ok(), saves, "depth {depth}");
+        if let Ok(bytes) = saved {
+            photocraft_format::load_from_bytes(&bytes).expect("whatever saves, opens");
+        }
+    }
+}
+
+/// Saving before the renderer caught up must not store old pixels as up to date.
+#[test]
+fn stale_pixels_are_not_saved_as_fresh() {
+    let mut v = VectorLayer::new(synthetic(30, 200.0, 200.0), 72.0);
+    VectorTiles::new().redraw(&mut v, Rect::new(0, 0, 400, 300), None).expect("render");
+    let target = v.doc.layers.first().map(|l| l.id);
+    let id = v.doc.children(target).and_then(|c| c.first()).map(|n| n.id).expect("node");
+    v.edit().node_mut(id).expect("node").opacity = 0.1;
+    let bytes = photocraft_format::save_to_bytes(&doc_with(v), &Default::default()).expect("save");
+    let back = photocraft_format::load_from_bytes(&bytes).expect("load");
+    let LayerContent::Vector(b) = &back.layers[0].content else { panic!("not a vector layer") };
+    assert!(b.fresh_cache().is_none(), "the reopened layer is redrawn, not shown with old pixels");
+}
