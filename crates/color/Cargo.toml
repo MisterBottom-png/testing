@@ -8,7 +8,11 @@ license.workspace = true
 publish = false
 
 [dependencies]
+kurbo = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+moxcms = { workspace = true }
 
 # Large conversions run on all cores on native builds; the web build stays single-threaded.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -17,6 +21,7 @@ rayon = { workspace = true }
 [dev-dependencies]
 # Test oracle only (D8): the colour engine is checked against an independent implementation.
 moxcms = { workspace = true }
+proptest = { workspace = true }
 
 [lints]
 workspace = true

@@ -2,7 +2,8 @@
 //!
 //! Colour for every A-Studio crate: pixel formats, colour models and blend-mode math (the crate
 //! root and [`blend`], [`convert`], from PhotoCraft's `color`), and the one colour engine [`cms`]
-//! (PhotoCraft's `cms`; decision D8, `docs/13-colour-engine.md`).
+//! (PhotoCraft's `cms`; decision D8, `docs/13-colour-engine.md`). [`vector`] is the colour layer
+//! of vector work (VectorCraft's `color`): colours that keep their model, gradients, swatches.
 //!
 //! Bit depth and colour model are *runtime data*: nothing in the engine assumes 8-bit or RGB.
 //!
@@ -13,6 +14,7 @@
 pub mod blend;
 pub mod cms;
 pub mod convert;
+pub mod vector;
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "L0";

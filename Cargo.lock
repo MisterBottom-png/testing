@@ -57,9 +57,13 @@ version = "0.0.1"
 name = "astudio-color"
 version = "0.0.1"
 dependencies = [
+ "kurbo",
  "moxcms",
+ "proptest",
  "rayon",
  "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
