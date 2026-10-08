@@ -8,7 +8,7 @@ P0-06,P0,Rebrand,"Change ArtCraft text and links in ui-egui menus, panels, links
 P0-07,P0,Assets,Draw the A-Studio app icon master (SVG 1024),,"Icon reviewed at 16, 32, 512 px",Not started,
 P0-08,P0,Assets,"Export icon sets: ico, 1024 PNG, web icons, .astudio document icon (Windows only, D7)",P0-07,All sizes in assets/app-icon with ASSETS.md rows,Not started,
 P0-09,P0,Legal,Write NOTICE and ASSETS.md for A-Studio; keep upstream copyright lines,P0-04,cargo xtask assets passes,Not started,
-P0-10,P0,CI,"Make ci.yml green: fmt, clippy, tests, layers, wasm, cargo deny",P0-02,All gates green on main,Not started,
+P0-10,P0,CI,"Make ci.yml green: fmt, clippy, tests, layers, wasm, cargo deny",P0-02,All gates green on main,Done,
 P1-01,P1,Prototype,Add LayerContent::Vector holding a VectorCraft node tree to the PhotoCraft doc crate,P0-10,Compiles; unit test builds a doc with one vector layer,Not started,
 P1-02,P1,Prototype,"Render vector layers with vello_cpu into 256-px tiles, cached per layer revision",P1-01,Pixel diff vs VectorCraft render <= 1/255,Not started,
 P1-03,P1,Prototype,Save and load the vector layer inside the .pcraft manifest as a .vectorcraft v3 subtree,P1-01,Round trip test passes,Not started,
