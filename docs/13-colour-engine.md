@@ -99,6 +99,16 @@ What is dropped: nothing a user sees. moxcms leaves the shipped app (it stays as
   bit-identical output to LittleCMS. Not used: too new, licence and maintenance unverified. Look again
   at the next upstream sync.
 
+## Notes from the port (P2-02)
+
+- The **absolute colorimetric** intent can give slightly different numbers from VectorCraft's old
+  moxcms path for Wide Gamut RGB and Display P3: moxcms stored a D65 media white for them, the
+  engine's built-in profiles store D50 (ICC v4). The other three intents are unchanged; no test
+  covers absolute colorimetric yet (add one with P2-12).
+- Built-in profile descriptions still name the upstream apps ("... (Photocraft)", "VectorCraft
+  Generic CMYK (SWOP-like)"). They are written into exported files and used to match profiles
+  again on import, so renaming them is a file-format change: decide with the rebrand work (P3).
+
 ## Sources
 
 - PhotoCraft `crates/cms` (photocraft@e5e3e39), VectorCraft `crates/color` (vectorcraft@8b036df),

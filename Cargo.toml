@@ -49,6 +49,8 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 proptest = "1"
+rayon = "1"
+moxcms = "0.8"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
