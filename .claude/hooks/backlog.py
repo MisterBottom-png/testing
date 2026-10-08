@@ -16,11 +16,13 @@ def load():
         r = csv.DictReader(f)
         return r.fieldnames, list(r)
 
+CLOSED = ("done", "dropped")  # Dropped = removed by an owner decision; never blocks other tasks
+
 def ready(rows):
-    done = {r["id"] for r in rows if r["status"].strip().lower() == "done"}
+    done = {r["id"] for r in rows if r["status"].strip().lower() in CLOSED}
     out = []
     for r in rows:
-        if r["status"].strip().lower() == "done":
+        if r["status"].strip().lower() in CLOSED:
             continue
         deps = [d.strip() for d in r["depends_on"].split(",") if d.strip()]
         if all(d in done for d in deps):

@@ -1,5 +1,7 @@
 # Developer setup
 
+A-Studio ships for Windows only (D7). Linux and macOS work for development, not as targets.
+
 ## Every machine
 
 ```sh

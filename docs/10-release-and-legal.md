@@ -2,6 +2,9 @@
 
 ## Packages per platform (same set as upstream)
 
+A-Studio ships for Windows only (D7). The macOS, Linux and FreeBSD rows are kept for reference and are
+not built.
+
 | Platform | Packages | Tooling |
 | --- | --- | --- |
 | macOS | Universal `.dmg` (arm64 + x86_64), signed and notarized; CLI as signed zip | Xcode tools, `codesign`, `notarytool`; `cargo xtask bundle` upstream |
@@ -25,7 +28,7 @@
 1. `cargo xtask ci` and `cargo deny check` green.
 2. Version bumped in one place (`cargo xtask version`, upstream pattern).
 3. `CHANGELOG.md` updated.
-4. Builds signed (macOS, Windows), notarized (macOS), checksums published.
+4. Windows builds signed, checksums published.
 5. `NOTICE` and `ASSETS.md` shipped inside every package with every licence text (OFL fonts, Lucide ISC, SCOWL, CC BY 3.0 credit, Adobe CMap BSD-3 notice from `hayro-cmap`, jpeg-encoder IJG notice).
 6. Rebrand scan clean.
 7. Web build smoke-tested in Chrome, Firefox and Safari.
