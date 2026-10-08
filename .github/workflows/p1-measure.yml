@@ -1,0 +1,39 @@
+name: p1-measure
+# Runs the P1-04 prototype measurement on Windows (D7) once, when this file changes.
+# About 20 Windows minutes (they count double on private repositories).
+concurrency:
+  group: p1-measure
+  cancel-in-progress: true
+on:
+  push:
+    paths:
+      - .github/workflows/p1-measure.yml
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  measure:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Machine
+        shell: bash
+        run: |
+          echo "runner: $RUNNER_OS $RUNNER_ARCH, $(nproc) CPUs"
+          echo "RAM GB: $(powershell -Command "[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)" | tr -d '\r')"
+          powershell -Command "(Get-CimInstance Win32_Processor).Name"
+      - name: Clone upstream at the pinned commits
+        shell: bash
+        run: scripts/bootstrap.sh
+      - name: Prototype tests
+        shell: bash
+        working-directory: proto
+        run: cargo test --workspace --release
+      - name: Measure three times
+        shell: bash
+        working-directory: proto
+        run: for i in 1 2 3; do echo "== run $i"; cargo run --release -p vlayer --example p1_measure; done

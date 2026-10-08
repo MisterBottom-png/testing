@@ -56,6 +56,11 @@ fn tile_aligned(r: Rect) -> Rect {
     Rect::new(floor_to(r.x0, TILE_SIZE), floor_to(r.y0, TILE_SIZE), up(r.x1), up(r.y1))
 }
 
+/// The tiles a dirty rectangle touches (what to composite again after a redraw).
+pub fn tile_region(r: Rect) -> Rect {
+    if r.is_empty() { Rect::EMPTY } else { tile_aligned(r) }
+}
+
 /// The viewport origin [`VectorTiles`] uses for the tile holding document pixel `(x, y)` (for
 /// tests that compare with VectorCraft's render through the same viewport).
 pub fn tile_viewport_origin(x: i32, y: i32) -> (i32, i32) {
@@ -256,3 +261,6 @@ pub fn synthetic(n: usize, w: f64, h: f64) -> vectorcraft_doc::Document {
     }
     d
 }
+
+#[doc(hidden)]
+pub mod bench_doc;
