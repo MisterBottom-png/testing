@@ -18,3 +18,11 @@ vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
 vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }
 vectorcraft-render = { path = "../../upstream/vectorcraft/crates/render" }
 vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
+
+[dev-dependencies]
+photocraft-compose = { package = "proto-pc-compose", path = "../pc-compose" }
+criterion = { workspace = true }
+
+[[bench]]
+name = "p1"
+harness = false
