@@ -15,8 +15,18 @@ use photocraft_raster::Surface;
 use vectorcraft_geom::kurbo::{self, Affine};
 use vectorcraft_render::{RenderOptions, Renderer};
 
-/// Rows rendered per renderer call: one tile row, so each call fills a band of whole tiles.
-const BAND: i32 = TILE_SIZE;
+/// Every tile is drawn through a viewport whose origin depends only on where the tile is: its
+/// top edge, and the left edge of the `CHUNK`-wide column it sits in (absolute document pixels).
+/// VectorCraft's renderer moves some anti-aliased edge pixels when the viewport origin moves
+/// (measured up to 45/255 on single pixels), so a fixed origin per tile is what keeps a redrawn
+/// tile identical to a first render, and seamless with the tiles around it. One call renders
+/// one row of tiles of up to one chunk.
+const CHUNK: i32 = 16 * TILE_SIZE;
+
+/// Largest canvas coordinate the renderer accepts; keeps all tile arithmetic far from `i32`
+/// overflow. (VectorCraft's own raster limit is 32768 px a side per render call; chunks stay
+/// well below it.)
+pub const MAX_SIDE: i32 = 1 << 20;
 
 /// Points → document pixels for a layer.
 pub fn layer_affine(layer: &VectorLayer) -> Affine {
@@ -24,21 +34,32 @@ pub fn layer_affine(layer: &VectorLayer) -> Affine {
 }
 
 /// Pixel rectangle (rounded out, plus a 2-px margin for anti-aliasing and hairline strokes)
-/// covering `bounds_pt`, a rectangle in the vector document's points.
+/// covering `bounds_pt`, a rectangle in the vector document's points. Pass the union of an
+/// object's painted bounds before and after an edit.
 pub fn dirty_px(layer: &VectorLayer, bounds_pt: kurbo::Rect) -> Rect {
     let r = layer_affine(layer).transform_rect_bbox(bounds_pt);
     if !(r.x0.is_finite() && r.y0.is_finite() && r.x1.is_finite() && r.y1.is_finite()) {
         return Rect::EMPTY;
     }
-    let clamp = |v: f64| v.clamp(f64::from(i32::MIN / 2), f64::from(i32::MAX / 2)) as i32;
-    Rect::new(clamp(r.x0.floor()) - 2, clamp(r.y0.floor()) - 2, clamp(r.x1.ceil()) + 2, clamp(r.y1.ceil()) + 2)
+    let clamp = |v: f64| v.clamp(-f64::from(MAX_SIDE), f64::from(MAX_SIDE)) as i32;
+    Rect::new(clamp(r.x0.floor() - 2.0), clamp(r.y0.floor() - 2.0), clamp(r.x1.ceil() + 2.0), clamp(r.y1.ceil() + 2.0))
 }
 
-/// `r` grown to whole tiles.
+/// `v` rounded down to a multiple of `step` (step > 0).
+fn floor_to(v: i32, step: i32) -> i32 {
+    v.div_euclid(step) * step
+}
+
+/// `r` grown to whole tiles. Callers keep coordinates within ±[`MAX_SIDE`].
 fn tile_aligned(r: Rect) -> Rect {
-    let down = |v: i32| v.div_euclid(TILE_SIZE) * TILE_SIZE;
-    let up = |v: i32| (v + TILE_SIZE - 1).div_euclid(TILE_SIZE) * TILE_SIZE;
-    Rect::new(down(r.x0), down(r.y0), up(r.x1), up(r.y1))
+    let up = |v: i32| floor_to(v.saturating_add(TILE_SIZE - 1), TILE_SIZE);
+    Rect::new(floor_to(r.x0, TILE_SIZE), floor_to(r.y0, TILE_SIZE), up(r.x1), up(r.y1))
+}
+
+/// The viewport origin [`VectorTiles`] uses for the tile holding document pixel `(x, y)` (for
+/// tests that compare with VectorCraft's render through the same viewport).
+pub fn tile_viewport_origin(x: i32, y: i32) -> (i32, i32) {
+    (floor_to(x, CHUNK), floor_to(y, TILE_SIZE))
 }
 
 /// What a redraw did (for tests and the benchmark).
@@ -48,6 +69,16 @@ pub struct RedrawStats {
     pub tiles_rendered: usize,
     /// Tiles stored in the cache afterwards (non-empty ones).
     pub tiles_cached: usize,
+    /// Whether the whole canvas was redrawn.
+    pub full: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RedrawError {
+    /// The canvas lies (partly) outside ±[`MAX_SIDE`].
+    TooLarge,
+    /// The renderer returned an image of the wrong size; the cache stays stale.
+    Renderer,
 }
 
 /// Renders vector layers into tiles. Keep one per layer: VectorCraft's renderer caches text
@@ -70,53 +101,91 @@ impl VectorTiles {
         Self { renderer: Renderer::new(), opts }
     }
 
-    /// Redraws the tiles of `layer` that intersect `dirty ∩ canvas` (all of `canvas` when
-    /// `dirty` is `None` or there is no valid cache) and marks the cache fresh.
-    pub fn redraw(&mut self, layer: &mut VectorLayer, canvas: Rect, dirty: Option<Rect>) -> RedrawStats {
-        let full = dirty.is_none() || layer.cache.is_none();
-        let area = if full { canvas } else { dirty.unwrap_or(canvas).intersect(&canvas) };
-        let mut cache = if full { Surface::new(PixelFormat::RGBA8) } else { layer.cache.take().unwrap_or_else(|| Surface::new(PixelFormat::RGBA8)) };
-        let mut stats = RedrawStats::default();
-        if !area.is_empty() {
-            let region = tile_aligned(area);
-            drop(cache.take_tiles(region));
-            let view = layer_affine(layer);
-            let doc = Arc::clone(&layer.doc);
-            let mut y = region.y0;
-            while y < region.y1 {
-                let band = Rect::new(region.x0, y, region.x1, (y + BAND).min(region.y1));
-                stats.tiles_rendered += self.render_band(&doc, view, band, &mut cache);
-                y += BAND;
-            }
+    /// Brings the cache of `layer` up to date for `canvas`.
+    ///
+    /// `dirty` is where the one edit since the last redraw changed pixels (old ∪ new painted
+    /// bounds, see [`dirty_px`]). The whole canvas is redrawn when `dirty` is `None`, when there
+    /// is no cache, or when the cache is not exactly one edit behind (`cache_revision + 1 !=
+    /// revision`: one dirty rectangle cannot describe several edits). On error the cache is left
+    /// stale, so the next redraw is a full one.
+    pub fn redraw(&mut self, layer: &mut VectorLayer, canvas: Rect, dirty: Option<Rect>) -> Result<RedrawStats, RedrawError> {
+        let within = |v: i32| (-MAX_SIDE..=MAX_SIDE).contains(&v);
+        if !(within(canvas.x0) && within(canvas.y0) && within(canvas.x1) && within(canvas.y1)) {
+            return Err(RedrawError::TooLarge);
         }
+        let one_edit_behind = layer.cache_revision.wrapping_add(1) == layer.revision;
+        let partial = match (dirty, &layer.cache) {
+            (Some(d), Some(_)) if one_edit_behind => Some(d),
+            _ => None,
+        };
+        let area = partial.map_or(canvas, |d| d.intersect(&canvas));
+        let mut cache = match (partial, layer.cache.take()) {
+            (Some(_), Some(c)) => c,
+            _ => Surface::new(PixelFormat::RGBA8),
+        };
+        let mut stats = RedrawStats { full: partial.is_none(), ..RedrawStats::default() };
+        let result = self.redraw_area(layer, area, &mut cache, &mut stats);
         stats.tiles_cached = cache.tile_count();
         layer.cache = Some(cache);
-        layer.cache_revision = layer.revision;
-        stats
+        if result.is_ok() {
+            layer.cache_revision = layer.revision;
+        }
+        result.map(|()| stats)
     }
 
-    /// Renders one tile-aligned band and stores its non-empty tiles. Returns the tile count.
-    fn render_band(&mut self, doc: &vectorcraft_doc::Document, view: Affine, band: Rect, cache: &mut Surface) -> usize {
-        let (w, h) = (band.width(), band.height());
-        if w == 0 || h == 0 {
-            return 0;
+    fn redraw_area(&mut self, layer: &VectorLayer, area: Rect, cache: &mut Surface, stats: &mut RedrawStats) -> Result<(), RedrawError> {
+        if area.is_empty() {
+            return Ok(());
         }
-        let shift = Affine::translate((-f64::from(band.x0), -f64::from(band.y0)));
+        let region = tile_aligned(area);
+        drop(cache.take_tiles(region));
+        let view = layer_affine(layer);
+        let doc = Arc::clone(&layer.doc);
+        let mut y = region.y0;
+        while y < region.y1 {
+            let mut cx = floor_to(region.x0, CHUNK);
+            while cx < region.x1 {
+                // The tiles of this row and chunk that need drawing.
+                let (x0, x1) = (region.x0.max(cx), region.x1.min(cx + CHUNK));
+                if x0 < x1 {
+                    stats.tiles_rendered += self.render_row(&doc, view, (cx, y), x0, x1, cache)?;
+                }
+                cx += CHUNK;
+            }
+            y += TILE_SIZE;
+        }
+        Ok(())
+    }
+
+    /// Renders the tiles `x0..x1` of the tile row whose top is `origin.1`, through a viewport whose
+    /// top left is `origin` (a chunk corner, `origin.0 <= x0`), and stores the non-empty ones.
+    fn render_row(
+        &mut self,
+        doc: &vectorcraft_doc::Document,
+        view: Affine,
+        origin: (i32, i32),
+        x0: i32,
+        x1: i32,
+        cache: &mut Surface,
+    ) -> Result<usize, RedrawError> {
+        let (ox, oy) = origin;
+        let (Ok(w), Ok(h)) = (u32::try_from(x1 - ox), u32::try_from(TILE_SIZE)) else { return Err(RedrawError::Renderer) };
+        let shift = Affine::translate((-f64::from(ox), -f64::from(oy)));
         let out = self.renderer.render(doc, w, h, shift * view, &self.opts);
         if out.width != w || out.height != h {
-            return 0;
+            return Err(RedrawError::Renderer);
         }
         let ts = TILE_SIZE as usize;
         let row_bytes = w as usize * 4;
         let mut count = 0;
-        let mut tx = band.x0;
-        while tx < band.x1 {
+        let mut tx = x0;
+        while tx < x1 {
             count += 1;
-            let coord = TileCoord { tx: tx.div_euclid(TILE_SIZE), ty: band.y0.div_euclid(TILE_SIZE) };
+            let coord = TileCoord { tx: tx.div_euclid(TILE_SIZE), ty: oy.div_euclid(TILE_SIZE) };
             let mut data = vec![0u8; ts * ts * 4];
             let mut any = false;
-            let x_off = (tx - band.x0) as usize * 4;
-            for row in 0..(h as usize).min(ts) {
+            let x_off = (tx - ox) as usize * 4;
+            for row in 0..ts {
                 let src_start = row * row_bytes + x_off;
                 let (Some(src), Some(dst)) = (out.pixels.get(src_start..src_start + ts * 4), data.get_mut(row * ts * 4..(row + 1) * ts * 4)) else {
                     continue;
@@ -140,7 +209,7 @@ impl VectorTiles {
             }
             tx += TILE_SIZE;
         }
-        count
+        Ok(count)
     }
 }
 
