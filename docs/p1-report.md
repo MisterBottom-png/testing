@@ -61,7 +61,11 @@ is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
    prototype simply used both. Merging them is the bulk of P2.
 5. **File format.** PhotoCraft's file reader drops fields it does not know when it saves again, and
    very deep vector drawings could hit its nesting limit; `.astudio` (P5) needs both handled.
-6. **Rendering cost of the first draw** (0.2 to 0.3 s for a 24 MP layer) is fine for opening a file,
+6. **Not yet tested in the prototype:** blurs, drop shadows, glows and text that cross tile edges.
+   They are drawn consistently (no seams), but on 1 to 2 core machines VectorCraft draws such
+   effects only inside its window, so they could look slightly different from VectorCraft's own
+   view. P2 should add them to the tests.
+7. **Rendering cost of the first draw** (0.2 to 0.3 s for a 24 MP layer) is fine for opening a file,
    but zooming and panning will need the renderer to draw at screen resolution, not full size.
 
 ## Recommendation
