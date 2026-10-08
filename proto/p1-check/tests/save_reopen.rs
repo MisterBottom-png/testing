@@ -21,7 +21,7 @@ fn sample_doc() -> Document {
     doc.layers.push(bg);
     let mut v = VectorLayer::new(synthetic(300, 800.0, 600.0), doc.resolution_dpi);
     v.transform.m[4] = 20.0;
-    VectorTiles::new().redraw(&mut v, Rect::new(0, 0, 1200, 900), None);
+    VectorTiles::new().redraw(&mut v, Rect::new(0, 0, 1200, 900), None).expect("render");
     doc.layers.push(Layer::new("Vector 1", LayerContent::Vector(v)));
     doc
 }

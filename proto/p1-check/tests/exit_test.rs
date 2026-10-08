@@ -61,7 +61,7 @@ fn psd_plus_vector_path_renders_saves_and_reopens() {
     let mut v = VectorLayer::new(vdoc, 72.0);
 
     // 3. Render it into tiles and composite.
-    let stats = VectorTiles::new().redraw(&mut v, canvas, None);
+    let stats = VectorTiles::new().redraw(&mut v, canvas, None).expect("render");
     assert!(stats.tiles_cached >= 1);
     doc.layers.push(Layer::new("Star", LayerContent::Vector(v)));
     let after = photocraft_compose::render(&doc, canvas);
