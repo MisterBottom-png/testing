@@ -48,21 +48,31 @@ fn dist_to_segment(p: Point, a: Point, b: Point) -> f64 {
     p.distance(a + ab * t)
 }
 
-/// Douglas–Peucker simplification.
+/// Douglas–Peucker simplification. Iterative (an explicit stack of ranges), so long lopsided
+/// strokes cannot overflow the call stack; a range whose interior has no point strictly farther
+/// than 0 (or only NaN distances) keeps just its ends.
 fn simplify(pts: &[Point], tol: f64) -> Vec<Point> {
-    if pts.len() < 3 {
+    let n = pts.len();
+    if n < 3 {
         return pts.to_vec();
     }
-    let (a, b) = (pts[0], pts[pts.len() - 1]);
-    let (i, d) = pts[1..pts.len() - 1].iter().enumerate().map(|(i, p)| (i + 1, dist_to_segment(*p, a, b))).fold((0, 0.0), |m, x| if x.1 > m.1 { x } else { m });
-    if d <= tol {
-        return vec![a, b];
+    let mut keep = vec![false; n];
+    keep[0] = true;
+    keep[n - 1] = true;
+    let mut ranges = vec![(0, n - 1)];
+    while let Some((lo, hi)) = ranges.pop() {
+        let (Some(&a), Some(&b), Some(inner)) = (pts.get(lo), pts.get(hi), pts.get(lo + 1..hi)) else { continue };
+        let (i, d) = inner.iter().enumerate().map(|(i, p)| (lo + 1 + i, dist_to_segment(*p, a, b))).fold((0, 0.0), |m, x| if x.1 > m.1 { x } else { m });
+        if i == 0 || d <= tol {
+            continue;
+        }
+        if let Some(k) = keep.get_mut(i) {
+            *k = true;
+        }
+        ranges.push((i, hi));
+        ranges.push((lo, i));
     }
-    let mut left = simplify(&pts[..=i], tol);
-    let right = simplify(&pts[i..], tol);
-    left.pop();
-    left.extend(right);
-    left
+    pts.iter().zip(&keep).filter(|(_, k)| **k).map(|(p, _)| *p).collect()
 }
 
 fn area(poly: &[Point]) -> f64 {
@@ -227,5 +237,20 @@ mod tests {
             })
             .collect();
         assert_eq!(recognize(&curl), None);
+    }
+
+    /// Before P2-01 `simplify` recursed once per point on lopsided input (a stack overflow on long
+    /// strokes) and forever when the tolerance or a point was NaN.
+    #[test]
+    fn simplify_terminates_on_nan_and_long_strokes() {
+        let p = Point::new(1.0, 1.0);
+        assert_eq!(simplify(&[p, p, p], f64::NAN), vec![p, p]);
+        let nan = Point::new(f64::NAN, 0.0);
+        let _ = simplify(&[Point::ZERO, nan, Point::new(5.0, 5.0), nan], 0.5);
+        let _ = recognize(&[Point::ZERO, nan, Point::new(5.0, 5.0), Point::new(0.0, 5.0), Point::ZERO]);
+        // Each split leaves all but one point on one side: a recursion as deep as the stroke.
+        let long: Vec<Point> = (0..200_000).map(|i| Point::new(i as f64, 0.5f64.powi(i.min(1000)) * 1e6)).collect();
+        let s = simplify(&long, 1e-9);
+        assert!(s.len() >= 2 && s.first() == long.first() && s.last() == long.last());
     }
 }

@@ -203,19 +203,25 @@ impl SubPath {
             n - 1
         }
     }
-    /// Segment `i` as a cubic (lines are cubics with handles on the anchors).
-    pub fn segment(&self, i: usize) -> CubicBez {
+    /// The two anchors of segment `i` (indices wrap around); `None` for an empty subpath.
+    fn segment_anchors(&self, i: usize) -> Option<(&Anchor, &Anchor)> {
         let n = self.anchors.len();
-        let a = &self.anchors[i % n];
-        let b = &self.anchors[(i + 1) % n];
-        CubicBez::new(a.p, a.h_out, b.h_in, b.p)
+        if n == 0 {
+            return None;
+        }
+        Some((self.anchors.get(i % n)?, self.anchors.get(i.wrapping_add(1) % n)?))
     }
-    /// True if segment `i` is a straight line.
+    /// Segment `i` as a cubic (lines are cubics with handles on the anchors). An empty subpath
+    /// gives a degenerate cubic at the origin.
+    pub fn segment(&self, i: usize) -> CubicBez {
+        match self.segment_anchors(i) {
+            Some((a, b)) => CubicBez::new(a.p, a.h_out, b.h_in, b.p),
+            None => CubicBez::new(Point::ZERO, Point::ZERO, Point::ZERO, Point::ZERO),
+        }
+    }
+    /// True if segment `i` is a straight line (always for an empty subpath).
     pub fn segment_is_line(&self, i: usize) -> bool {
-        let n = self.anchors.len();
-        let a = &self.anchors[i % n];
-        let b = &self.anchors[(i + 1) % n];
-        !a.has_out() && !b.has_in()
+        self.segment_anchors(i).is_none_or(|(a, b)| !a.has_out() && !b.has_in())
     }
     pub fn to_bezpath_into(&self, out: &mut BezPath) {
         let Some(first) = self.anchors.first() else { return };
@@ -249,7 +255,11 @@ impl SubPath {
         }
     }
     /// Split segment `seg` at parameter `t`, inserting a new anchor. Returns the new anchor index.
+    /// When `seg` is not a segment (`seg >= segment_count()`) nothing changes and `seg` is returned.
     pub fn insert_anchor(&mut self, seg: usize, t: f64) -> usize {
+        if seg >= self.segment_count() {
+            return seg;
+        }
         let n = self.anchors.len();
         let c = self.segment(seg);
         let line = self.segment_is_line(seg);
@@ -259,8 +269,12 @@ impl SubPath {
         let mid = if line {
             Anchor::corner(l.p3)
         } else {
-            self.anchors[i0].h_out = l.p1;
-            self.anchors[i1].h_in = r.p2;
+            if let Some(a) = self.anchors.get_mut(i0) {
+                a.h_out = l.p1;
+            }
+            if let Some(b) = self.anchors.get_mut(i1) {
+                b.h_in = r.p2;
+            }
             Anchor { p: l.p3, h_in: l.p2, h_out: r.p1, kind: AnchorKind::Smooth }
         };
         self.anchors.insert(seg + 1, mid);
@@ -624,5 +638,20 @@ mod tests {
         let s = serde_json::to_string(&p).unwrap();
         let back: PathData = serde_json::from_str(&s).unwrap();
         assert_eq!(p, back);
+    }
+
+    /// An empty subpath (`"anchors": []` in a file) or an out-of-range segment must not panic;
+    /// before P2-01 `segment` divided by zero (`i % 0`) and `insert_anchor` inserted past the end.
+    #[test]
+    fn empty_subpaths_and_bad_segments_do_not_panic() {
+        let mut empty = SubPath::new(vec![], false);
+        let _ = (empty.segment(0), empty.segment_is_line(3));
+        assert_eq!(empty.insert_anchor(0, 0.5), 0);
+        assert!(empty.anchors.is_empty());
+        let mut two = SubPath::polyline(&[Point::ZERO, Point::new(10.0, 0.0)], false);
+        assert_eq!(two.insert_anchor(5, 0.5), 5);
+        assert_eq!(two.anchors.len(), 2, "an out-of-range segment inserts nothing");
+        assert_eq!(two.insert_anchor(0, 0.5), 1);
+        assert_eq!(two.anchors.len(), 3);
     }
 }

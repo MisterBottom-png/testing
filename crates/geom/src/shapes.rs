@@ -128,9 +128,15 @@ pub fn ellipse(r: Rect) -> PathData {
     PathData::single(SubPath::new(anchors, true))
 }
 
-/// Regular polygon with `sides` (≥ 3), first vertex straight up from the centre.
+/// Most sides, star tips and spiral segments a shape may have (the engine's own limit; counts
+/// also arrive from files, so the shapes cap them too).
+pub const MAX_SHAPE_COUNT: u32 = 1000;
+/// Most divider lines or rings in a grid.
+pub const MAX_GRID_LINES: u32 = 999;
+
+/// Regular polygon with `sides` (3 to [`MAX_SHAPE_COUNT`]), first vertex straight up from the centre.
 pub fn polygon(center: Point, radius: f64, sides: u32, rotation_deg: f64) -> PathData {
-    let n = sides.max(3);
+    let n = sides.clamp(3, MAX_SHAPE_COUNT);
     let rot = rotation_deg.to_radians();
     let pts: Vec<Point> = (0..n)
         .map(|i| {
@@ -141,9 +147,9 @@ pub fn polygon(center: Point, radius: f64, sides: u32, rotation_deg: f64) -> Pat
     PathData::single(SubPath::polyline(&pts, true))
 }
 
-/// Star with `points` tips (≥ 2), outer radius `r1`, inner radius `r2`, first tip up.
+/// Star with `points` tips (2 to [`MAX_SHAPE_COUNT`]), outer radius `r1`, inner radius `r2`, first tip up.
 pub fn star(center: Point, r1: f64, r2: f64, points: u32, rotation_deg: f64) -> PathData {
-    let n = points.max(2) * 2;
+    let n = points.clamp(2, MAX_SHAPE_COUNT) * 2;
     let rot = rotation_deg.to_radians();
     let pts: Vec<Point> = (0..n)
         .map(|i| {
@@ -182,7 +188,9 @@ pub fn arc(a: Point, b: Point, slope: f64, closed: bool) -> PathData {
 }
 
 /// Archimedean-style spiral approximating Illustrator's Spiral tool (decay-based, `segments` quarter turns).
+/// At most [`MAX_SHAPE_COUNT`] segments.
 pub fn spiral(center: Point, radius: f64, decay_percent: f64, segments: u32, clockwise: bool) -> PathData {
+    let segments = segments.min(MAX_SHAPE_COUNT);
     let decay = (decay_percent / 100.0).clamp(0.05, 0.9999);
     let dir = if clockwise { 1.0 } else { -1.0 };
     let mut anchors = Vec::new();
@@ -205,9 +213,11 @@ pub fn spiral(center: Point, radius: f64, decay_percent: f64, segments: u32, clo
     PathData::single(sp)
 }
 
-/// Rectangular grid as separate open lines (plus an optional frame rectangle).
+/// Rectangular grid as separate open lines (plus an optional frame rectangle); at most
+/// [`MAX_GRID_LINES`] dividers each way.
 pub fn rectangular_grid(r: Rect, h_dividers: u32, v_dividers: u32, frame: bool) -> Vec<PathData> {
     let r = r.abs();
+    let (h_dividers, v_dividers) = (h_dividers.min(MAX_GRID_LINES), v_dividers.min(MAX_GRID_LINES));
     let mut out = Vec::new();
     for i in 1..=h_dividers {
         let y = r.y0 + r.height() * i as f64 / (h_dividers + 1) as f64;
@@ -223,9 +233,10 @@ pub fn rectangular_grid(r: Rect, h_dividers: u32, v_dividers: u32, frame: bool) 
     out
 }
 
-/// Polar grid: concentric ellipses plus radial dividers.
+/// Polar grid: concentric ellipses plus radial dividers, at most [`MAX_GRID_LINES`] of each.
 pub fn polar_grid(r: Rect, concentric: u32, radial: u32) -> Vec<PathData> {
     let r = r.abs();
+    let (concentric, radial) = (concentric.min(MAX_GRID_LINES), radial.min(MAX_GRID_LINES));
     let c = r.center();
     let mut out = Vec::new();
     for i in 1..=concentric + 1 {
@@ -378,5 +389,22 @@ mod tests {
     fn arc_open_and_closed() {
         assert_eq!(arc(Point::ZERO, Point::new(10.0, 10.0), 0.0, false).anchor_count(), 2);
         assert!(arc(Point::ZERO, Point::new(10.0, 10.0), 0.0, true).subpaths[0].closed);
+    }
+
+    /// Shape counts come from files (`LiveShape::Polygon { sides }`) and parameters; before P2-01
+    /// `u32::MAX` sides asked for ~64 GB and the star and grid counts overflowed. They are capped
+    /// at the engine's limits (1000 sides, tips and spiral segments; 999 grid lines).
+    #[test]
+    fn huge_counts_are_capped() {
+        let c = Point::new(50.0, 50.0);
+        assert_eq!(star(c, 10.0, 5.0, u32::MAX, 0.0).anchor_count(), 2000);
+        assert_eq!(polygon(c, 10.0, u32::MAX, 0.0).anchor_count(), 1000);
+        assert_eq!(spiral(c, 10.0, 80.0, u32::MAX, true).anchor_count(), 1001);
+        let r = Rect::new(0.0, 0.0, 100.0, 100.0);
+        assert_eq!(rectangular_grid(r, u32::MAX, u32::MAX, true).len(), 999 * 2 + 1);
+        assert_eq!(polar_grid(r, u32::MAX, u32::MAX).len(), 1000 + 999);
+        // Counts inside the limits are unchanged.
+        assert_eq!(polygon(c, 10.0, 7, 0.0).anchor_count(), 7);
+        assert_eq!(rectangular_grid(r, 3, 2, false).len(), 5);
     }
 }

@@ -13,6 +13,7 @@
 // Test support only: a failed setup or assertion must panic, like `assert!`, so the shipped-code
 // ban on panicking (AGENTS.md › Never crash) does not apply here.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![deny(clippy::todo, clippy::unimplemented)]
 #![forbid(unsafe_code)]
 
 pub mod geom;

@@ -587,9 +587,12 @@ impl Warp {
             WarpStyle::None => true,
             WarpStyle::Custom => match &self.mesh {
                 None => true,
+                // An invalid mesh is not the identity, and fitting its knots could allocate far
+                // more points than the mesh holds.
+                Some(m) if !m.is_valid() => false,
                 Some(m) => {
                     let id = BezierMesh::fit(&|s, t| self.box_point(s, t), m.us.clone(), m.vs.clone());
-                    m.points.iter().zip(&id.points).all(|(a, b)| (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9)
+                    id.points.len() == m.points.len() && m.points.iter().zip(&id.points).all(|(a, b)| (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9)
                 }
             },
             _ => self.style_warp().is_none(),
