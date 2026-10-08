@@ -9,6 +9,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D3 | Text engine | VectorCraft's engine, with four PhotoCraft pieces ported onto it | Recommended, accepted |
 | D4 | Native file | The `.pcraft` bundle layout under a new `.astudio` extension; vector layers stored as `.vectorcraft` v3 subtrees | Recommended, accepted |
 | D5 | Name | A-Studio | Owner |
+| D6 | Full merge after the P1 prototype | GO: one app | Owner, 8 October 2026 |
 | D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
 
 ## D1 Fork
@@ -46,6 +47,19 @@ layers. Readers for `.pcraft` and `.vectorcraft` stay. Spec: `docs/05-file-forma
 A-Studio. A quick web search on 8 October 2026 found no graphics editor of that name. That is not a
 trademark clearance: search the EUIPO (TMview) and USPTO registers before the first public build.
 Avoid any Adobe-like naming (Ps, Ai, "Photo-", "-shop").
+
+## D6 Go/no-go after P1
+
+Decided by the owner on 8 October 2026: **GO**, merge PhotoCraft and VectorCraft into one app.
+
+- Basis: `docs/p1-report.md`. The P1 prototype (`proto/`) passed the exit test: a PSD with a
+  VectorCraft path as a Vector layer, drawn into tiles, saved and reopened; a one-path edit on a
+  24 MP canvas with 1,000 paths in about 7 ms (target under 100 ms, Linux dev machine; the Windows
+  run was still pending when the owner decided).
+- Known limits carried into P2 to P4: VectorCraft's renderer shifts some edge pixels with its
+  viewport origin (each tile always uses the same viewport); whole-layer changes redraw everything
+  (about 0.7 s at 24 MP); the effects-to-plug-ins link breaks the layer rules and must be moved in P2.
+- `proto/` stays as a throwaway reference; P2 ports code for real into `crates/`.
 
 ## D7 Platforms
 
