@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>A-Studio document icon (placeholder)</title>
+  <path d="M200 48 H648 L824 224 V976 H200 Z" fill="#F4F1EA"/>
+  <path d="M648 48 V224 H824 Z" fill="#C9C4B8"/>
+  <rect x="272" y="400" width="480" height="480" rx="96" fill="#1D2130"/>
+  <path d="M344 562 L383 562 L383 523 L422 523 L422 484 L461 484 L461 484 L500 484 L500 796 L461 796 L461 796 L422 796 L422 757 L383 757 L383 718 L344 718 Z" fill="#FF7A45"/>
+  <path d="M500 484 A156 156 0 0 1 500 796 Z" fill="#3CC8B4"/>
+  <line x1="656" y1="550.405" x2="656" y2="729.595" stroke="#F4F1EA" stroke-width="10.5405" stroke-linecap="round"/>
+  <circle cx="656" cy="550.405" r="15.8108" fill="#F4F1EA"/>
+  <circle cx="656" cy="729.595" r="15.8108" fill="#F4F1EA"/>
+  <rect x="634.919" y="618.919" width="42.1622" height="42.1622" fill="#1D2130" stroke="#F4F1EA" stroke-width="10.5405"/>
+</svg>

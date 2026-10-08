@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>A-Studio maskable web icon (placeholder)</title>
+  <rect width="1024" height="1024" fill="#1D2130"/>
+  <path d="M270 397 L327.5 397 L327.5 339.5 L385 339.5 L385 282 L442.5 282 L442.5 282 L500 282 L500 742 L442.5 742 L442.5 742 L385 742 L385 684.5 L327.5 684.5 L327.5 627 L270 627 Z" fill="#FF7A45"/>
+  <path d="M500 282 A230 230 0 0 1 500 742 Z" fill="#3CC8B4"/>
+  <line x1="730" y1="379.905" x2="730" y2="644.095" stroke="#F4F1EA" stroke-width="15.5405" stroke-linecap="round"/>
+  <circle cx="730" cy="379.905" r="23.3108" fill="#F4F1EA"/>
+  <circle cx="730" cy="644.095" r="23.3108" fill="#F4F1EA"/>
+  <rect x="698.919" y="480.919" width="62.1622" height="62.1622" fill="#1D2130" stroke="#F4F1EA" stroke-width="15.5405"/>
+</svg>
