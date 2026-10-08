@@ -97,6 +97,23 @@ fn rank(c: Class) -> u8 {
     }
 }
 
+/// Checks one dependency edge `name` (class `from`) -> `dep` (class `to`) listed in `section`.
+fn edge_error(name: &str, from: Class, section: &str, dep: &str, to: Class) -> Option<String> {
+    let dev = section.contains("dev-dependencies");
+    if to == Class::Testkit {
+        // The testkit as a dev-dependency is how tests use it, from any layer.
+        return (!dev).then(|| format!("{name} -> {dep}: testkit may only be a dev-dependency"));
+    }
+    if from == Class::Standalone {
+        return Some(format!("{name} -> {dep}: standalone crates have no workspace dependencies"));
+    }
+    let same_layer_ok = INTRA_LAYER.iter().any(|(a, b)| *a == name && *b == dep);
+    if rank(to) > rank(from) || (rank(to) == rank(from) && !same_layer_ok) {
+        return Some(format!("{name} (L{}) -> {dep} (L{}): may only depend on lower layers", rank(from), rank(to)));
+    }
+    None
+}
+
 fn check_layers(root: &Path) -> Result<usize, Vec<String>> {
     let mut manifests = BTreeMap::new();
     let crates_dir = root.join("crates");
@@ -118,18 +135,8 @@ fn check_layers(root: &Path) -> Result<usize, Vec<String>> {
                 errors.push(format!("{} -> {dep}: dependency not in the layering table", m.name));
                 continue;
             };
-            let dev = section.contains("dev-dependencies");
-            if to == Class::Testkit && !dev {
-                errors.push(format!("{} -> {dep}: testkit may only be a dev-dependency", m.name));
-                continue;
-            }
-            if from == Class::Standalone {
-                errors.push(format!("{} -> {dep}: standalone crates have no workspace dependencies", m.name));
-                continue;
-            }
-            let same_layer_ok = INTRA_LAYER.iter().any(|(a, b)| *a == m.name && *b == dep.as_str());
-            if rank(to) > rank(from) || (rank(to) == rank(from) && !same_layer_ok && to != Class::Testkit) {
-                errors.push(format!("{} (L{}) -> {dep} (L{}): may only depend on lower layers", m.name, rank(from), rank(to)));
+            if let Some(e) = edge_error(&m.name, from, section, dep, to) {
+                errors.push(e);
             }
         }
     }
@@ -151,6 +158,18 @@ mod tests {
     #[test]
     fn workspace_passes() {
         assert!(check_layers(&workspace_root()).is_ok());
+    }
+
+    #[test]
+    fn testkit_is_a_dev_dependency_from_any_layer() {
+        let (geom, kit) = (Class::Layer(0), Class::Testkit);
+        assert_eq!(edge_error("astudio-geom", geom, "dev-dependencies", "astudio-testkit", kit), None);
+        assert!(edge_error("astudio-geom", geom, "dependencies", "astudio-testkit", kit).is_some());
+        assert!(edge_error("astudio-psd", Class::Standalone, "dev-dependencies", "astudio-testkit", kit).is_none());
+        // Upward dev-dependencies on real crates stay forbidden.
+        assert!(edge_error("astudio-geom", geom, "dev-dependencies", "astudio-doc", Class::Layer(1)).is_some());
+        assert!(edge_error("astudio-effects", Class::Layer(2), "dependencies", "astudio-plugins", Class::Layer(2)).is_none());
+        assert!(edge_error("astudio-plugins", Class::Layer(2), "dependencies", "astudio-effects", Class::Layer(2)).is_some());
     }
 
     #[test]

@@ -11,7 +11,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p xtask -- layers
-cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask
+cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask --exclude astudio-testkit
 cargo deny check
 scripts/rebrand-scan.sh --shipped
 ```

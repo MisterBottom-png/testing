@@ -8,7 +8,7 @@
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` | Any warning, including the no-panic lints |
 | Tests | `cargo test --workspace` | Any test fails |
 | Layers | `cargo run -p xtask -- layers` | A crate depends on its own or a higher layer, or UI below L6 |
-| Web | `cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask` | L0 to L6 stop building for the web |
+| Web | `cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask --exclude astudio-testkit` | L0 to L6 stop building for the web (the test-only `astudio-testkit` is left out, as upstream does) |
 | Licences | `cargo deny check` | A dependency licence is not on the allow list, or has a known advisory |
 | Assets | `cargo xtask assets` | A file under `assets/` has no row in `ASSETS.md` |
 | Rebrand | `scripts/rebrand-scan.sh --shipped` | ArtCraft marks in shipped files |
