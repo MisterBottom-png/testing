@@ -13,7 +13,7 @@ P1-01,P1,Prototype,Add LayerContent::Vector holding a VectorCraft node tree to t
 P1-02,P1,Prototype,"Render vector layers with vello_cpu into 256-px tiles, cached per layer revision",P1-01,Pixel diff vs VectorCraft render <= 1/255,Done,
 P1-03,P1,Prototype,Save and load the vector layer inside the .pcraft manifest as a .vectorcraft v3 subtree,P1-01,Round trip test passes,Done,
 P1-04,P1,Prototype,"Benchmark: 24 MP canvas, 1,000 paths, redraw one changed layer",P1-02,Result in docs/baseline.md; target < 100 ms,Done,
-P1-05,P1,Decision,Go or no-go on the full merge; write D6 in docs/00-decisions.md,P1-04,Decision recorded,Not started,
+P1-05,P1,Decision,Go or no-go on the full merge; write D6 in docs/00-decisions.md,P1-04,Decision recorded,Done,
 P2-01,P2,Core,Create astudio-geom from vc geom (kurbo) + pc geom pixel types and warp,P1-05,Both apps build against it,Not started,
 P2-02,P2,Core,"Create astudio-color: merge pc color, pc cms, vc color",P1-05,Colour tests of both repos pass,Not started,
 P2-03,P2,Core,"Unify the 17 crates with different versions (harfrust, skrifa, usvg, vello_cpu, ...)",P1-05,One Cargo.lock; cargo tree -d shows no avoidable duplicates,Not started,
