@@ -29,11 +29,18 @@ jobs:
       - name: Clone upstream at the pinned commits
         shell: bash
         run: scripts/bootstrap.sh
-      - name: Prototype tests
-        shell: bash
-        working-directory: proto
-        run: cargo test --workspace --release
       - name: Measure three times
         shell: bash
         working-directory: proto
         run: for i in 1 2 3; do echo "== run $i"; cargo run --release -p vlayer --example p1_measure; done
+      - name: Criterion benchmark
+        shell: bash
+        working-directory: proto
+        run: cargo bench -p vlayer --bench p1
+      # After the measurement, so a test that trips over Windows line endings in the upstream
+      # clones cannot stop the numbers from being recorded.
+      - name: Prototype tests
+        if: always()
+        shell: bash
+        working-directory: proto
+        run: cargo test --workspace --release
