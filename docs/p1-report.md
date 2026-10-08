@@ -21,7 +21,7 @@ layer, which is drawn into tiles, saved and reopened unchanged, and on a 24-mega
 | Same on Windows (D7) | under 100 ms | WINDOWS_RESULT | WINDOWS_MET |
 
 Other numbers: first full drawing of the 1,000-path layer 0.2 to 0.3 s; the vector layer's tile cache
-is about 94 MB at 24 MP.
+is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
 
 ## What worked
 
@@ -42,6 +42,10 @@ is about 94 MB at 24 MP.
   window, so a redrawn tile is identical to a first drawing and no seams appear. But the tiles do not
   match one big whole-canvas VectorCraft render pixel for pixel. The P1-02 bar ("within 1/255 of
   VectorCraft's render") is met against VectorCraft drawing the same tile, not the whole canvas.
+- **Only small edits are fast.** Changing the whole vector layer at once (moving or scaling all of it)
+  redraws everything: about 0.7 s at 24 MP on the test machine. Dragging a whole layer smoothly
+  will need a shortcut in P3/P4, such as sliding the already drawn tiles during the drag and
+  redrawing once at the end.
 - The Windows numbers come from a GitHub machine, not a typical laptop.
 
 ## Risks for P2 and P3
