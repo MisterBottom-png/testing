@@ -74,5 +74,4 @@ is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
 met by more than ten times, and the problems found have clear fixes in P2 and P3. None of them argues
 for keeping two apps.
 
-The decision is yours. When you decide, I will write it into `docs/00-decisions.md` as D6 and not
-start P2 before that.
+**Decision (owner, 8 October 2026): GO.** Recorded as D6 in `docs/00-decisions.md`.
