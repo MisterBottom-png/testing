@@ -14,7 +14,7 @@
 
 **Result: 7.3 ms to change one path and show it (target: under 100 ms). Target met.**
 
-Measured on 8 October 2026, commit of task P1-04, `proto/` prototype, release build,
+Measured on 8 October 2026 with upstream photocraft@e5e3e39 and vectorcraft@8b036df, `proto/` prototype, release build,
 `cargo run --release -p vlayer --example p1_measure` three times, medians of the three runs.
 Machine: Linux cloud VM, Intel Xeon @ 2.1 GHz, 4 threads, 15 GB RAM (a development machine, not the
 Windows target; Windows numbers are below when recorded).
@@ -31,8 +31,17 @@ stroked stars). Edit: move one path by 6 pt, redraw its dirty tiles, composite t
 | Full composite of the 24 MP canvas | 419 ms | 410 ms |
 | Vector layer cache | 378 tiles, 94 MB | 367 tiles, 92 MB |
 
-Peak memory of the measuring process: 655 MB (it keeps four 24 MP documents alive at once; one
-document with its cache is about 200 MB).
+Memory: one document is about 96 MB of raster pixels plus the 94 MB vector cache. The measuring
+process peaks at 655 MB, mostly the 384 MB floating-point buffer of the full-canvas composite.
+
+Undo: copying the document for an undo step before each edit (the engine's pattern; tiles and vector
+nodes are shared, not copied) adds about 1 ms (reviewer's measurement: 8.5 to 9.9 ms dense with
+undo, 50 undo states kept).
+
+A change to the whole layer (moving or scaling the whole layer, select-all and move, or a cache that
+fell more than one edit behind) redraws all of it: first render plus full composite, about 0.7 s on
+this machine. Only small edits are under 100 ms; whole-layer changes need a faster path in P3/P4
+(for example, moving the cached tiles while dragging, then redrawing once).
 
 Criterion benchmark (`cargo bench -p vlayer --bench p1`, the same edit on one path repeatedly):
 3.1 ms (dense).
