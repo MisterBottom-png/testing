@@ -16,7 +16,7 @@ P1-04,P1,Prototype,"Benchmark: 24 MP canvas, 1,000 paths, redraw one changed lay
 P1-05,P1,Decision,Go or no-go on the full merge; write D6 in docs/00-decisions.md,P1-04,Decision recorded,Done,
 P2-00,P2,Core,"Fix the effects-to-plug-ins layer conflict (P1 report risk 1): astudio-plugins to L2, same-layer edges for effects and trace",P1-05,xtask layers allows effects -> plugins/pathops/text and trace -> pathops; plugins needs only L0/L1,Done,
 P2-01,P2,Core,Create astudio-geom from vc geom (kurbo) + pc geom pixel types and warp,P1-05,Both apps build against it,Done,
-P2-02,P2,Core,"Create astudio-color: merge pc color, pc cms, vc color",P1-05,Colour tests of both repos pass,Not started,
+P2-02,P2,Core,"Create astudio-color: merge pc color, pc cms, vc color",P1-05,Colour tests of both repos pass,Done,
 P2-03,P2,Core,"Unify the 17 crates with different versions (harfrust, skrifa, usvg, vello_cpu, ...)",P1-05,One Cargo.lock; cargo tree -d shows no avoidable duplicates,Not started,
 P2-04,P2,Text,Adopt vc text as astudio-text,P2-02,vc text tests pass in the merged workspace,Not started,
 P2-05,P2,Text,Port PSD EngineData read/write (T1),P2-04,PSD text corpus round-trips at PhotoCraft's rate,Not started,
