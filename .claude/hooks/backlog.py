@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Backlog helper for docs/data/backlog.csv.
 
-  backlog.py next          tasks whose dependencies are all Done (first = do this one)
+  backlog.py next          tasks whose dependencies are all Done or Dropped (first = do this one)
   backlog.py show <id>     one task in full
   backlog.py done <id>     mark a task Done
   backlog.py status        count per phase and status
