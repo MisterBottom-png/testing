@@ -1,0 +1,3 @@
+[alias]
+# `cargo xtask <task>`, as in both upstream repos, plus --quiet to hide cargo's own progress lines.
+xtask = "run --quiet -p xtask --"

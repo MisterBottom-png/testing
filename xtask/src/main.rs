@@ -1,9 +1,14 @@
 //! A-Studio developer tasks.
 //!
 //! `cargo run -p xtask -- layers` checks that every workspace crate depends only on crates in
-//! lower layers (docs/02-architecture.md). More tasks (assets, corpus, bundle, ico, version) are
-//! ported from the upstream xtasks during P0 and P5.
+//! lower layers (docs/02-architecture.md). `cargo run -p xtask -- assets` checks that every asset
+//! file has a row in ASSETS.md. More tasks (corpus, bundle, ico, version) are ported from the
+//! upstream xtasks in later phases.
 
+#![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
+mod assets;
 mod table;
 
 use std::collections::BTreeMap;
@@ -29,8 +34,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        "assets" => match assets::run(&workspace_root()) {
+            Ok(n) => {
+                println!("assets: all {n} asset files attributed in ASSETS.md");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("assets: {e}");
+                ExitCode::FAILURE
+            }
+        },
         _ => {
-            eprintln!("usage: cargo run -p xtask -- <task>\n\ntasks:\n  layers   check crate layering");
+            eprintln!("usage: cargo run -p xtask -- <task>\n\ntasks:\n  layers   check crate layering\n  assets   check every asset file has an ASSETS.md row");
             ExitCode::from(2)
         }
     }
