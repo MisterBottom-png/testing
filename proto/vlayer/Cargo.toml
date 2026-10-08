@@ -1,8 +1,22 @@
 [package]
 name = "vlayer"
+description = "A-Studio P1 prototype: renders Vector layers into PhotoCraft 256-px tiles with VectorCraft's renderer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
+photocraft-doc = { package = "proto-pc-doc", path = "../pc-doc" }
+photocraft-geom = { path = "../../upstream/photocraft/crates/geom" }
+photocraft-color = { path = "../../upstream/photocraft/crates/color" }
+photocraft-raster = { path = "../../upstream/photocraft/crates/raster" }
+vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
+vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }
+vectorcraft-render = { path = "../../upstream/vectorcraft/crates/render" }
+
+[dev-dependencies]
+vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
