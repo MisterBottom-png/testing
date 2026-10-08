@@ -8,7 +8,7 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 
 | Layer | A-Studio crate | Built from (upstream crate) | Notes |
 | --- | --- | --- | --- |
-| L0 | `astudio-geom` | vc `geom` + pc `geom` | kurbo-based paths (vc); integer pixel rects, tiles and warp (pc) |
+| L0 | `astudio-geom` | vc `geom` + pc `geom` | Done (P2-01). Crate root = vc `geom` (kurbo-based paths); `pixel` = pc `geom` root (integer rects, tiles, pc's float `Point`/`Affine`); `warp` = pc `geom::warp`. `scripts/geom-compat.sh` builds both upstream apps against it |
 | L0 | `astudio-color` | pc `color` + pc `cms` + vc `color` | Runtime bit depth and colour model; ICC; blend math once. One engine (pc `cms`) with vc's colour layer on top: `docs/13-colour-engine.md` |
 | L0 | `astudio-raster` | pc `raster` | Copy-on-write 256-px tiles |
 | L0 standalone | `astudio-psd`, `astudio-codecs`, `astudio-heif`, `astudio-raw`, `astudio-tablet` | pc same names | No workspace deps; `tablet` keeps the only `unsafe` |

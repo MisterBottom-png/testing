@@ -44,6 +44,11 @@ repository = "https://github.com/<github-user>/a-studio"
 # External dependencies are added here as crates are ported (docs/03-dependencies.md lists every
 # crate and version both upstream workspaces use, and the version to pick where they differ).
 [workspace.dependencies]
+kurbo = { version = "0.13", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+proptest = "1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
