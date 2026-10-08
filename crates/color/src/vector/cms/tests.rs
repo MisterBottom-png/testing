@@ -23,8 +23,8 @@ fn intents_parse_and_name() {
 }
 
 #[test]
-fn srgb_via_moxcms_matches_analytic() {
-    // The built-in sRGB ICC profile through moxcms agrees with our analytic sRGB maths.
+fn srgb_via_engine_matches_analytic() {
+    // The built-in sRGB ICC profile through the colour engine agrees with our analytic sRGB maths.
     let p = icc::builtin_rgb(SRGB).unwrap();
     for rgb in [[0.2, 0.5, 0.8], [1.0, 0.0, 0.0], [0.5, 0.5, 0.5]] {
         let out = p.to_srgb(&rgb, Intent::RelativeColorimetric).unwrap();
@@ -240,4 +240,32 @@ fn lab_colours_round_trip_through_the_cms() {
     assert!(c.out_of_gamut(&Color::lab(30.0, 60.0, -100.0)));
     let Color::Gray { k } = c.convert(&Color::lab(50.0, 0.0, 0.0), Model::Gray, ri) else { panic!("Gray") };
     assert!((k - 0.53).abs() < 0.01, "{k}");
+}
+
+/// D8 oracle: a CMYK `.icc` the user loads converts through the one engine as through an
+/// independent implementation (moxcms, test-only), within a fraction of an 8-bit step on average.
+#[test]
+fn user_cmyk_profile_matches_moxcms_oracle() {
+    use moxcms::{ColorProfile, Layout, RenderingIntent, TransformOptions};
+    let bytes = crate::cms::builtin::COATED_CMYK_ICC;
+    let ours = icc::IccProfile::from_bytes(None, bytes).unwrap();
+    assert_eq!(ours.kind, ProfileKind::Cmyk);
+    let theirs = ColorProfile::new_from_slice(bytes).unwrap();
+    let opts = TransformOptions { rendering_intent: RenderingIntent::RelativeColorimetric, ..Default::default() };
+    let xf = theirs.create_transform_f32(Layout::Rgba, &ColorProfile::new_srgb(), Layout::Rgb, opts).unwrap();
+    let (mut worst, mut sum, mut n) = (0.0f32, 0.0f32, 0);
+    for i in 0..625u32 {
+        let cmyk = [i % 5, i / 5 % 5, i / 25 % 5, i / 125].map(|v| v as f32 / 4.0);
+        let a = ours.to_srgb(&cmyk, Intent::RelativeColorimetric).unwrap();
+        let mut b = [0.0f32; 3];
+        xf.transform(&cmyk, &mut b).unwrap();
+        for (x, y) in a.iter().zip(b) {
+            let d = (x - y.clamp(0.0, 1.0)).abs() * 255.0;
+            worst = worst.max(d);
+            sum += d;
+            n += 1;
+        }
+    }
+    let mean = sum / n as f32;
+    assert!(mean < 1.0 && worst < 16.0, "mean {mean:.3}, worst {worst:.2} (8-bit steps)");
 }

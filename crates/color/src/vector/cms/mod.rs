@@ -1,11 +1,11 @@
 //! Colour management: working spaces, RGB ↔ CMYK ↔ Lab conversions with rendering intents,
 //! gamut checks and soft-proof transforms.
 //!
-//! * **RGB working spaces** are ICC matrix/shaper profiles via [`moxcms`] (sRGB, Wide Gamut RGB
+//! * **RGB working spaces** are ICC matrix/shaper profiles via the engine ([`crate::cms`]) (sRGB, Wide Gamut RGB
 //!   (1998 primaries), Display P3, ProPhoto RGB) or user `.icc` files. Display output is sRGB.
 //! * **CMYK spaces:** [`GENERIC_CMYK`] is our own documented parametric press model
 //!   ([`generic`]); [`DEVICE_CMYK`] is the old profile-free formula (kept for exact legacy numbers);
-//!   any CMYK `.icc` the user loads goes through `moxcms` (LUT-based profiles).
+//!   any CMYK `.icc` the user loads goes through the engine (LUT-based profiles).
 //! * The **active settings** (Edit → Color Settings) are process-wide; [`crate::vector::Color::to_rgb`]
 //!   uses them. Code that needs deterministic numbers builds its own [`Cms`] with [`Cms::new`].
 

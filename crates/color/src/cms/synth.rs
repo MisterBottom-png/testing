@@ -350,11 +350,11 @@ fn lab_node_legacy(i: usize, n: usize) -> f64 {
 }
 
 /// Decodes a legacy (lut16) Lab node coordinate triple.
-fn decode_v2(v: [f64; 3]) -> [f64; 3] {
+pub(crate) fn decode_v2(v: [f64; 3]) -> [f64; 3] {
     [v[0] * 100.0 * 65535.0 / 65280.0, v[1] * 65535.0 / 256.0 - 128.0, v[2] * 65535.0 / 256.0 - 128.0]
 }
 
-fn encode_v2(lab: [f64; 3]) -> [f32; 3] {
+pub(crate) fn encode_v2(lab: [f64; 3]) -> [f32; 3] {
     [
         (lab[0] / (100.0 * 65535.0 / 65280.0)).clamp(0.0, 1.0) as f32,
         ((lab[1] + 128.0) * 256.0 / 65535.0).clamp(0.0, 1.0) as f32,
@@ -398,7 +398,7 @@ fn b2a_table(model: &CmykModel, p: &CmykParams, gbd: Option<&Gbd>) -> Clut {
     Clut::new(vec![n; 3], 4, data)
 }
 
-fn lut16(clut: Clut) -> Lut {
+pub(crate) fn lut16(clut: Clut) -> Lut {
     let (i, o) = (clut.inputs, clut.outputs);
     Lut {
         kind: LutKind::Lut16,
