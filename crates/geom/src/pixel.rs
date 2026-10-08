@@ -117,7 +117,7 @@ impl TileCoord {
         Self::new(x.div_euclid(TILE_SIZE), y.div_euclid(TILE_SIZE))
     }
     pub fn rect(&self) -> Rect {
-        Rect::from_xywh(self.tx * TILE_SIZE, self.ty * TILE_SIZE, TILE_SIZE as u32, TILE_SIZE as u32)
+        Rect::from_xywh(self.tx.saturating_mul(TILE_SIZE), self.ty.saturating_mul(TILE_SIZE), TILE_SIZE as u32, TILE_SIZE as u32)
     }
 }
 
@@ -269,5 +269,13 @@ mod tests {
         assert_eq!(r.width(), u32::MAX);
         assert_eq!(r.height(), u32::MAX - 25);
         assert_eq!(r.size(), Size::new(u32::MAX, u32::MAX - 25));
+    }
+
+    /// Tile indices can come from files; the tile rect saturates instead of overflowing.
+    #[test]
+    fn tile_rect_saturates_on_extreme_indices() {
+        let r = TileCoord::new(i32::MAX, i32::MIN).rect();
+        assert_eq!((r.x0, r.y0), (i32::MAX, i32::MIN));
+        assert!(r.is_empty() || r.width() <= TILE_SIZE as u32);
     }
 }

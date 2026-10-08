@@ -318,7 +318,11 @@ impl BezierMesh {
 
     /// Fits a mesh with patch boundaries `us`/`vs` to the map `f` (normalised → output) by
     /// interpolating it at the patch's thirds. Exact for bicubic maps (affine maps included).
+    /// Fewer than two knots on either axis gives a mesh without points (not [`Self::is_valid`]).
     pub fn fit(f: &dyn Fn(f64, f64) -> [f64; 2], us: Vec<f64>, vs: Vec<f64>) -> BezierMesh {
+        if us.len() < 2 || vs.len() < 2 {
+            return BezierMesh { us, vs, points: Vec::new() };
+        }
         let (pc, pr) = (us.len() - 1, vs.len() - 1);
         let (nx, ny) = (3 * pc + 1, 3 * pr + 1);
         let mut points = vec![[0.0; 2]; nx * ny];
@@ -352,17 +356,24 @@ impl BezierMesh {
 
     /// Control points per row.
     pub fn nx(&self) -> usize {
-        3 * (self.us.len() - 1) + 1
+        3 * self.us.len().saturating_sub(1) + 1
     }
     /// Control point rows.
     pub fn ny(&self) -> usize {
-        3 * (self.vs.len() - 1) + 1
+        3 * self.vs.len().saturating_sub(1) + 1
     }
+    /// Control point `i` of row `j`; the origin when the mesh has no such point.
     pub fn point(&self, i: usize, j: usize) -> [f64; 2] {
-        self.points[j * self.nx() + i]
+        let nx = self.nx();
+        if i >= nx {
+            return [0.0; 2];
+        }
+        j.checked_mul(nx).and_then(|r| r.checked_add(i)).and_then(|k| self.points.get(k)).copied().unwrap_or([0.0; 2])
     }
 
     /// Checks the invariants (knots and point count); malformed data from files is rejected.
+    /// The editing methods (`split_*`, `remove_split_*`) refuse invalid meshes; evaluating one
+    /// treats missing control points as the origin.
     pub fn is_valid(&self) -> bool {
         let knots_ok = |k: &[f64]| k.len() >= 2 && k[0] == 0.0 && k[k.len() - 1] == 1.0 && k.windows(2).all(|w| w[1] > w[0]);
         knots_ok(&self.us)
@@ -372,14 +383,15 @@ impl BezierMesh {
     }
 
     fn locate(knots: &[f64], s: f64) -> (usize, f64) {
-        let n = knots.len() - 1;
+        let n = knots.len().saturating_sub(1);
         let s = s.clamp(0.0, 1.0);
+        let knot = |k: usize| knots.get(k).copied().unwrap_or(0.0);
         let mut i = 0;
-        while i + 1 < n && s > knots[i + 1] {
+        while i + 1 < n && s > knot(i + 1) {
             i += 1;
         }
-        let w = knots[i + 1] - knots[i];
-        (i, if w > 0.0 { (s - knots[i]) / w } else { 0.0 })
+        let w = knot(i + 1) - knot(i);
+        (i, if w > 0.0 { (s - knot(i)) / w } else { 0.0 })
     }
 
     /// Evaluates the surface at normalised `(s, t)`.
@@ -391,7 +403,7 @@ impl BezierMesh {
         let mut out = [0.0; 2];
         for (j, wb) in bb.iter().enumerate() {
             for (i, wa) in ba.iter().enumerate() {
-                let p = self.points[(3 * pj + j) * nx + 3 * pi + i];
+                let p = self.points.get((3 * pj + j) * nx + 3 * pi + i).copied().unwrap_or([0.0; 2]);
                 let k = wa * wb;
                 out[0] += p[0] * k;
                 out[1] += p[1] * k;
@@ -403,6 +415,9 @@ impl BezierMesh {
     /// Splits the patch column containing `s` at `s` (a vertical split line). Exact: the surface
     /// is unchanged. Returns false when `s` is on or too close to an existing boundary.
     pub fn split_u(&mut self, s: f64) -> bool {
+        if !self.is_valid() {
+            return false;
+        }
         let (pi, a) = Self::locate(&self.us, s);
         if !(0.01..=0.99).contains(&a) {
             return false;
@@ -423,6 +438,9 @@ impl BezierMesh {
 
     /// Splits the patch row containing `t` at `t` (a horizontal split line). Exact.
     pub fn split_v(&mut self, t: f64) -> bool {
+        if !self.is_valid() {
+            return false;
+        }
         self.transpose();
         let ok = self.split_u(t);
         self.transpose();
@@ -433,7 +451,7 @@ impl BezierMesh {
     /// Exact when the patches came from an unedited split; otherwise the outer control points are
     /// kept and the inner handles extrapolated.
     pub fn remove_split_u(&mut self, k: usize) -> bool {
-        if k == 0 || k + 1 >= self.us.len() {
+        if k == 0 || k + 1 >= self.us.len() || !self.is_valid() {
             return false;
         }
         let a = (self.us[k] - self.us[k - 1]) / (self.us[k + 1] - self.us[k - 1]);
@@ -457,6 +475,9 @@ impl BezierMesh {
 
     /// Removes interior horizontal boundary `k`.
     pub fn remove_split_v(&mut self, k: usize) -> bool {
+        if !self.is_valid() {
+            return false;
+        }
         self.transpose();
         let ok = self.remove_split_u(k);
         self.transpose();
@@ -742,5 +763,30 @@ mod tests {
         assert!(close(t.map(50.0, 50.0), (55.0, 48.0), 1e-9));
         let ob = Warp::none(B).output_bounds();
         assert!((ob[0] - 10.0).abs() < 1e-9 && (ob[3] - 70.0).abs() < 1e-9);
+    }
+
+    /// Malformed meshes (from damaged files or plug-ins) must never panic; before P2-01 each of
+    /// these indexed out of bounds or underflowed `us.len() - 1`.
+    #[test]
+    fn malformed_meshes_do_not_panic() {
+        let meshes = [
+            BezierMesh { us: vec![], vs: vec![], points: vec![] },
+            BezierMesh { us: vec![0.0, 1.0], vs: vec![0.0, 1.0], points: vec![[1.0, 2.0]; 3] },
+            BezierMesh { us: vec![0.0, 0.5, 1.0], vs: vec![0.0, 1.0], points: vec![[0.0; 2]; 5] },
+            BezierMesh { us: vec![1.0], vs: vec![f64::NAN, 1.0], points: vec![[0.0; 2]; 40] },
+        ];
+        for m in meshes {
+            assert!(!m.is_valid());
+            let _ = (m.nx(), m.ny(), m.point(0, 0), m.point(usize::MAX, usize::MAX));
+            let _ = (m.eval(0.5, 0.5), m.eval(f64::NAN, 2.0), m.param_at([1.0, 1.0]), m.control_bounds());
+            let mut e = m.clone();
+            assert!(!e.split_u(0.5) && !e.split_v(0.5) && !e.remove_split_u(1) && !e.remove_split_v(1));
+            assert_eq!(format!("{e:?}"), format!("{m:?}"), "a refused edit leaves the mesh unchanged");
+            let w = Warp::custom(m.clone(), B);
+            let _ = (w.is_identity(), w.map(50.0, 40.0), w.to_mesh(2, 2), w.then_affine([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]), w.output_bounds());
+            let _ = BezierMesh::fit(&|s, t| [s, t], m.us.clone(), m.vs.clone());
+        }
+        let empty = BezierMesh::fit(&|s, t| [s, t], vec![], vec![0.0, 1.0]);
+        assert!(empty.points.is_empty() && !empty.is_valid());
     }
 }
