@@ -20,7 +20,7 @@ const BAND: i32 = TILE_SIZE;
 
 /// Points → document pixels for a layer.
 pub fn layer_affine(layer: &VectorLayer) -> Affine {
-    Affine::new(layer.transform)
+    Affine::new(layer.transform.m)
 }
 
 /// Pixel rectangle (rounded out, plus a 2-px margin for anti-aliasing and hairline strokes)
