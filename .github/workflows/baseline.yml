@@ -3,6 +3,9 @@ name: baseline
 # Runs when this file or the upstream pins change (and by hand once the workflow is on the
 # repository's default branch). It uses about an hour of Windows minutes, which count double on
 # private repositories.
+concurrency:
+  group: baseline
+  cancel-in-progress: true
 on:
   push:
     paths:
@@ -26,11 +29,12 @@ jobs:
         shell: bash
         run: |
           echo "runner: $RUNNER_OS $RUNNER_ARCH, $(nproc) CPUs"
-          powershell -Command "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB" | xargs echo "RAM GB:"
+          echo "RAM GB: $(powershell -Command "[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)" | tr -d '\r')"
           rustc --version
       - name: Clone upstream at the pinned commits
         shell: bash
         run: scripts/bootstrap.sh
+      # Note: photocraft is built without its optional `heif` feature (upstream release builds use it).
       - name: Build and test both upstream apps
         shell: bash
         run: scripts/baseline.sh 2>&1 | tee baseline-windows.log
@@ -38,4 +42,6 @@ jobs:
         if: always()
         with:
           name: baseline-windows
-          path: baseline-windows.log
+          path: |
+            baseline-windows.log
+            target/baseline/test-*.log
