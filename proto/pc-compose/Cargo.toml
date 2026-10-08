@@ -1,0 +1,27 @@
+[package]
+name = "proto-pc-compose"
+publish.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Keeps the upstream crate name in code, so the copied files need no renames.
+[lib]
+name = "photocraft_compose"
+
+[lints]
+workspace = true
+
+[dependencies]
+photocraft-geom = { path = "../../upstream/photocraft/crates/geom" }
+photocraft-color = { path = "../../upstream/photocraft/crates/color" }
+photocraft-raster = { path = "../../upstream/photocraft/crates/raster" }
+photocraft-doc = { package = "proto-pc-doc", path = "../pc-doc" }
+photocraft-vector = { package = "proto-pc-vector", path = "../pc-vector" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
