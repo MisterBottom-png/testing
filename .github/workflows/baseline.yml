@@ -1,0 +1,41 @@
+name: baseline
+# Builds and tests both upstream apps on Windows (task P0-03, D7) and uploads the log.
+# Runs when this file or the upstream pins change (and by hand once the workflow is on the
+# repository's default branch). It uses about an hour of Windows minutes, which count double on
+# private repositories.
+on:
+  push:
+    paths:
+      - .github/workflows/baseline.yml
+      - upstream.lock
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  baseline:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Machine
+        shell: bash
+        run: |
+          echo "runner: $RUNNER_OS $RUNNER_ARCH, $(nproc) CPUs"
+          powershell -Command "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB" | xargs echo "RAM GB:"
+          rustc --version
+      - name: Clone upstream at the pinned commits
+        shell: bash
+        run: scripts/bootstrap.sh
+      - name: Build and test both upstream apps
+        shell: bash
+        run: scripts/baseline.sh 2>&1 | tee baseline-windows.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-windows
+          path: baseline-windows.log
