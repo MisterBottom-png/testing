@@ -10,8 +10,10 @@ workspace, and to port code for real in P2/P3 only if the P1 result is GO.
   `compose`, `format` from photocraft@e5e3e39 (MIT OR Apache-2.0, Copyright (c) 2026 ArtCraft Team
   and the PhotoCraft contributors). Package names carry a `proto-pc-` prefix; the library names stay
   `photocraft_*` so the copied code needs no renames. A-Studio changes are marked `A-Studio P1`.
-- `vlayer`: renders a Vector layer into 256-px tiles with VectorCraft's renderer (P1-02).
-- `p1-check`: the P1 exit test end to end and the benchmark (P1-03, P1-04).
+- `vlayer` (placeholder until P1-02): renders a Vector layer into 256-px tiles with VectorCraft's
+  renderer.
+- `p1-check` (placeholder until P1-03/P1-04): the P1 exit test end to end and the benchmark.
+- `clippy.toml` and `rustfmt.toml` are upstream PhotoCraft's, so the copied code is checked the same way.
 
 ```sh
 cd proto

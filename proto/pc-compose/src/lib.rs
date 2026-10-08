@@ -796,7 +796,8 @@ fn empty_in(layer: &Layer, rect: Rect) -> bool {
         return transparent_outside(layer) && layer_bounds(layer, canvas).inflate(effects::margin(layer)).intersect(&rect).is_empty();
     }
     match &layer.content {
-        LayerContent::Raster(_) | LayerContent::Text(_) | LayerContent::Shape(_) | LayerContent::Smart(_) => match layer.surface() {
+        // A-Studio P1: Vector layers too (their pixels are the render cache).
+        LayerContent::Raster(_) | LayerContent::Text(_) | LayerContent::Shape(_) | LayerContent::Smart(_) | LayerContent::Vector(_) => match layer.surface() {
             Some(s) => !s.has_tiles_in(rect) && s.default_pixel().last().is_some_and(|a| *a <= 0.0) && s.format().alpha,
             None => true,
         },
