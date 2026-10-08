@@ -1,4 +1,5 @@
 /target
+/proto/target
 /upstream
 /dist
 *.swp

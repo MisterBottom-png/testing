@@ -58,9 +58,13 @@ fn shrink_layer(l: &mut Layer, k: u32) {
         LayerContent::Text(t) => t.cache = t.cache.as_ref().map(|s| downsample(s, k)),
         LayerContent::Shape(sh) => sh.cache = sh.cache.as_ref().map(|s| downsample(s, k)),
         LayerContent::Smart(so) => so.cache = so.cache.as_ref().map(|s| downsample(s, k)),
-        // A-Studio P1: a reduced copy of the rendered vector pixels (re-rendering at the reduced
-        // scale would be sharper; good enough for the proxy).
-        LayerContent::Vector(v) => v.cache = v.cache.as_ref().map(|s| downsample(s, k)),
+        // A-Studio P1: a reduced copy of the rendered vector pixels, and the transform scaled the
+        // same way so a re-render of the proxy lands at the reduced size.
+        LayerContent::Vector(v) => {
+            v.cache = v.cache.as_ref().map(|s| downsample(s, k));
+            let inv = 1.0 / f64::from(k.max(1));
+            v.transform.m = v.transform.m.map(|c| c * inv);
+        }
         LayerContent::Adjustment(_) | LayerContent::Fill(_) => {}
     }
 }

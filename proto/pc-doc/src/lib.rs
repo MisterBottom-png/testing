@@ -428,14 +428,17 @@ pub struct FillCache {
 }
 
 /// A-Studio P1 prototype: a layer holding a whole VectorCraft document (paths, groups, text,
-/// symbols, swatches, styles). The vector document is in points; `transform` maps it to this
-/// document's pixels. `cache` holds the rendered pixels; it is valid while `cache_revision`
-/// equals `revision` (rendering lives in a higher-layer crate, see `proto/vlayer`).
+/// symbols, swatches, styles: nodes refer to document-level items by id, so a bare node tree
+/// would not do). The vector document is in points; `transform` maps it to this document's
+/// pixels. `cache` holds the last rendered pixels: [`Layer::surface`] returns them even when
+/// stale (the editor shows the old pixels until the renderer catches up); they are up to date
+/// while `cache_revision == revision`. Rendering lives in a higher-layer crate (`proto/vlayer`).
+/// Edit through [`VectorLayer::edit`] so the revision moves.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorLayer {
     pub doc: Arc<vectorcraft_doc::Document>,
-    /// Row-major affine `[a, b, c, d, e, f]` (x' = a·x + c·y + e, y' = b·x + d·y + f), points → pixels.
-    pub transform: [f64; 6],
+    /// Points → pixels (`[a c e; b d f]`, column vectors, like every PhotoCraft transform).
+    pub transform: Affine,
     /// Bumped on every edit of `doc` or `transform`.
     pub revision: u64,
     pub cache: Option<Surface>,
@@ -444,9 +447,17 @@ pub struct VectorLayer {
 
 impl VectorLayer {
     /// A vector layer at the document's resolution: 1 pt = dpi / 72 px, origin at the top left.
+    /// A non-finite or non-positive resolution (from a damaged file) counts as 72 dpi.
     pub fn new(doc: vectorcraft_doc::Document, resolution_dpi: f32) -> Self {
-        let k = f64::from(resolution_dpi) / 72.0;
-        Self { doc: Arc::new(doc), transform: [k, 0.0, 0.0, k, 0.0, 0.0], revision: 1, cache: None, cache_revision: 0 }
+        let dpi = if resolution_dpi.is_finite() && resolution_dpi > 0.0 { resolution_dpi } else { 72.0 };
+        let k = f64::from(dpi) / 72.0;
+        Self { doc: Arc::new(doc), transform: Affine { m: [k, 0.0, 0.0, k, 0.0, 0.0] }, revision: 1, cache: None, cache_revision: 0 }
+    }
+    /// The vector document for editing (copied first if an undo snapshot shares it); marks the
+    /// cached pixels stale.
+    pub fn edit(&mut self) -> &mut vectorcraft_doc::Document {
+        self.revision = self.revision.wrapping_add(1);
+        Arc::make_mut(&mut self.doc)
     }
     /// The cached pixels, if they are up to date.
     pub fn fresh_cache(&self) -> Option<&Surface> {
