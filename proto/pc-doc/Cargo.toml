@@ -1,0 +1,26 @@
+[package]
+name = "proto-pc-doc"
+publish.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Keeps the upstream crate name in code, so the copied files need no renames.
+[lib]
+name = "photocraft_doc"
+
+[lints]
+workspace = true
+
+[dependencies]
+# A-Studio P1: the Vector layer holds a VectorCraft document.
+vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
+photocraft-geom = { path = "../../upstream/photocraft/crates/geom" }
+photocraft-color = { path = "../../upstream/photocraft/crates/color" }
+photocraft-raster = { path = "../../upstream/photocraft/crates/raster" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }
+vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
