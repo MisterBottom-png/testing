@@ -11,6 +11,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D5 | Name | A-Studio | Owner |
 | D6 | Full merge after the P1 prototype | GO: one app | Owner, 8 October 2026 |
 | D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
+| D8 | Colour engine | One A-Studio engine: PhotoCraft `cms` at the core, VectorCraft's colour layer on top, new safe fast paths; default CMYK PhotoCraft Coated | Owner, 8 October 2026 |
 
 ## D1 Fork
 
@@ -73,3 +74,18 @@ Decided by the owner on 8 October 2026: A-Studio is a Windows-only desktop app.
   `wasm32-unknown-unknown`. They stay until the owner decides otherwise.
 - Developers and agents may still build and test on Linux or macOS; that is a dev convenience, not
   a supported platform.
+
+## D8 Colour engine
+
+Decided by the owner on 8 October 2026, from the study in `docs/13-colour-engine.md`.
+
+- One colour engine in `astudio-color`: PhotoCraft's `cms` (most accurate of the options measured:
+  4 to 5 times lower error on CMYK conversions than moxcms; pure Rust, no `unsafe`, builds for the web).
+- VectorCraft's colour layer sits on top: colour model kept per value, gradients, swatches, Lab and
+  Delta E 2000, proof setups. Its ICC handling moves onto the one engine. Its Generic CMYK model stays
+  as a named profile, so VectorCraft files open with the same colours. No user-visible feature is dropped.
+- New documents use PhotoCraft Coated CMYK by default. Existing files keep the profile they name.
+- moxcms leaves the shipped app; it stays a dev-dependency, as a test oracle.
+- Speed: new matrix-shaper and fixed-point paths in safe code (task P2-12), target within 2 times
+  moxcms's speed with accuracy unchanged. If that target is missed, using a second engine for the
+  screen only is a new decision for the owner.
