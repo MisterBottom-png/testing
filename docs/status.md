@@ -50,5 +50,5 @@
 ## Next task
 
 P0-03 (record the Windows baseline), then **P2-01**: create `astudio-geom` from VectorCraft's `geom`
-plus PhotoCraft's pixel types and warp (`/port-crate`). Before P2: fix the layer-rule conflict the P1
-report found (VectorCraft effects need its plug-in code, which sits higher in the layer plan).
+plus PhotoCraft's pixel types and warp (`/port-crate`). The layer-rule conflict the P1 report found is
+fixed (P2-00).
