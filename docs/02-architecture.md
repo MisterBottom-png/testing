@@ -8,8 +8,8 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 
 | Layer | A-Studio crate | Built from (upstream crate) | Notes |
 | --- | --- | --- | --- |
-| L0 | `astudio-geom` | vc `geom` + pc `geom` | Done (P2-01). Crate root = vc `geom` (kurbo-based paths); `pixel` = pc `geom` root (integer rects, tiles, pc's float `Point`/`Affine`); `warp` = pc `geom::warp`. `scripts/geom-compat.sh` builds both upstream apps against it |
-| L0 | `astudio-color` | pc `color` + pc `cms` + vc `color` | Runtime bit depth and colour model; ICC; blend math once. One engine (pc `cms`) with vc's colour layer on top: `docs/13-colour-engine.md` |
+| L0 | `astudio-geom` | vc `geom` + pc `geom` | Done (P2-01). Crate root = vc `geom` (kurbo-based paths); `pixel` = pc `geom` root (integer rects, tiles, pc's float `Point`/`Affine`); `warp` = pc `geom::warp`. `scripts/upstream-compat.sh` builds both upstream apps against it |
+| L0 | `astudio-color` | pc `color` + pc `cms` + vc `color` | P2-02. Crate root = pc `color` (runtime bit depth, colour modes, blend modes); `cms` = pc `cms`, the one colour engine (D8, `docs/13-colour-engine.md`); `vector` = vc `color` (colours that keep their model, gradients, swatches), its ICC work on `cms`. Still to do: merge the two blend-mode sets and the duplicated sRGB/Lab maths, make Coated CMYK the default for new documents (P3), move swatches to `astudio-vdoc` if it helps |
 | L0 | `astudio-raster` | pc `raster` | Copy-on-write 256-px tiles |
 | L0 standalone | `astudio-psd`, `astudio-codecs`, `astudio-heif`, `astudio-raw`, `astudio-tablet` | pc same names | No workspace deps; `tablet` keeps the only `unsafe` |
 | L1 | `astudio-vdoc` | vc `doc` | Vector node tree, appearance, symbols, swatches |

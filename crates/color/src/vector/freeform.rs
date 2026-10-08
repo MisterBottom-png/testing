@@ -328,8 +328,8 @@ impl Freeform {
     /// opacity and spread between the segment's ends. Returns the new point's index.
     pub fn split_line(&mut self, line: usize, segment: usize, t: f64) -> Option<usize> {
         let c = *self.segments(line).get(segment)?;
-        let l = &self.lines[line];
-        let (a, b) = (self.points[l[segment]], self.points[l[segment + 1]]);
+        let l = self.lines.get(line)?;
+        let (a, b) = (*self.points.get(*l.get(segment)?)?, *self.points.get(*l.get(segment + 1)?)?);
         let t = t.clamp(0.0, 1.0);
         let u = t as f32;
         let p = FreeformPoint {
@@ -339,7 +339,7 @@ impl Freeform {
             spread: a.spread + (b.spread - a.spread) * u,
         };
         let i = self.add_point(p);
-        self.lines[line].insert(segment + 1, i);
+        self.lines.get_mut(line)?.insert(segment + 1, i);
         Some(i)
     }
 }
