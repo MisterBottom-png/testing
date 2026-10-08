@@ -33,5 +33,14 @@ Krita, GIMP and Inkscape are GPL: rebuild the idea, never copy their code.
 | 14 | Brush tagging and shareable resource bundles | Krita | |
 | 15 | Shift+X swaps the last two tools; System colour scheme | GIMP 3.2 | Small |
 
+## Colour (from the colour engine study, `docs/13-colour-engine.md`)
+
+| Feature | Idea from | Notes |
+| --- | --- | --- |
+| Black-preserving CMYK to CMYK conversions (keep pure black text black) | LittleCMS | Rebuild the idea; LittleCMS is MIT, but C |
+| Oklab and Oklch colour pickers and gradient interpolation | moxcms, CSS Color 4 | Smoother gradients than RGB |
+| Soft-proof settings stored per document; gamut warning overlay | Krita, GIMP | Both upstream apps can soft-proof already |
+| HDR profiles (CICP, PQ, HLG) | moxcms | After 1.0 |
+
 Sources: [Krita features](https://krita.org/en/features/), [GIMP 3.0](https://gimp.org/release-notes/gimp-3.0.html),
 [GIMP 3.2](https://www.gimp.org/release-notes/gimp-3.2.html), [Inkscape features](https://inkscape.org/about/features/).
