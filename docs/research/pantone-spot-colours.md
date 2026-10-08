@@ -1,14 +1,18 @@
 # Research: Pantone colours for inserts and swing tags
 
-**Date:** 8 October 2026 · **Status:** research only, nothing built · **Decision needed:** see the questions at the end.
+**Date:** 8 October 2026 · **Status:** research done, owner answered the first round of questions,
+nothing built yet · **Decision needed:** how to ship the colour data (question 1 at the end).
 
 ## The ask
 
 Designers making inserts (printed fabric or paper slips) and swing tags (printed card tags) need to
 pick a Pantone colour, such as `PANTONE 186 C`, see it on screen, use tints of it, and send the
 printer a PDF where that colour is a named spot ink, not a CMYK mix. The owner wants this without
-paying for Pantone data. The Pantone systems in scope are the print ones: **C** (coated) and **U**
-(uncoated).
+paying for Pantone data.
+
+**Owner's answers (8 October 2026):** no printer files and no physical fan guide are available, so
+the app has to come with the colours; the whole Solid Coated (C) and Solid Uncoated (U) books, not
+just a house set; prototype it in VectorCraft upstream first, before the merge.
 
 ## What A-Studio already gets from its upstream code
 
@@ -59,65 +63,76 @@ Inkscape, Scribus, GIMP and Krita ship no Pantone books, and their developers sa
 license them. The values of a colour are facts and are not copyrightable, but **PANTONE** is a
 trademark, Pantone claims copyright on the *system* and sends cease-and-desist letters to sites that
 reproduce it, and its licence wording says any cross-reference to its system "may violate its
-rights". So the safe free routes are the ones where the user brings the names and values.
+rights".
 
-| Route | Cost | Quality | Legal risk | Work in A-Studio |
-| --- | --- | --- | --- | --- |
-| **A. User imports a swatch file** from the printer or brand guide (ASE is the usual format; printers and brand books hand these out) | Free | As good as the file | None for us: user data | ASE reader (new, about 300 lines plus tests) |
-| **B. User types the house colours** from the physical Pantone fan guide (Lab or CMYK printed on each chip) into a "Company colour book" | Free | Exact for the codes they own | None: user data | CSV reader plus a book editor in the Swatches panel |
-| **C. Bundle a community list** (for example `adonald/Pantone-CMYK-RGB-Hex`, MIT, about 1,000 PMS codes with CMYK derived from a printer's reference and hex computed; `ajesma/Pantoner`, MIT, 3,238 codes, hex only) | Free | Approximate: not official, no Lab, some values visibly off | Real: shipping "PANTONE" names in the app and in `assets/` is exactly what the brand deny list and Pantone's letters target | Reader plus a licence row; owner's call |
-| **D. Repos that extract Adobe's `.acb` books** (for example `unofficial-pantone-solid-coated-2024-v5`, Lab values, no licence) | Free | Best values | Highest: derived from Adobe's licensed asset; breaks the clean-room rule in `AGENTS.md` | Do not use |
-| **E. freieFarbe HLC Colour Atlas** (2,040 Lab colours, free ASE and Excel, CC or zlib licence, DIN SPEC 16699) | Free | Exact and printable, but it is **not** Pantone; the printer must mix from Lab | None | Good as a bundled open book and as test data for the ASE reader |
+### The free datasets, checked on 8 October 2026
 
-Recommendation: build **A and B** (the app reads ASE and CSV and keeps a book name on each swatch),
-bundle **E** as the one open book so the feature ships with real data, and leave **C** as an owner
-decision (it can be a separate download the user drops into the library folder rather than a
-shipped asset, which keeps A-Studio's shipped files clean of the trademark).
+| Dataset | Licence | Sets | Codes | Values | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| **`pantoner` 1.1.2 on npm** (James Pederson, 2014) | MIT | Coated, Uncoated, Metallics, Pastels & Neons, Skin, Colours of the Year | 1,341 C + 1,341 U + 301 metallic + 210 pastel/neon | sRGB hex only; `186-c` = `#c8102e`, which matches Pantone's own published simulation | **Best free data.** Every C code has its U twin. Pre-2019 book, so the 224 colours added since are missing. Its GitHub page now answers "451 Unavailable For Legal Reasons", which looks like a Pantone takedown; the npm package is still served |
+| `pantone-colors` 1.0.3 on npm | MIT | Unlabelled (looks coated) | 907 | sRGB hex; `186` = `#ce1126` | Smaller, older values; all 899 codes it shares with `pantoner` differ by a few points. Not needed |
+| `adonald/Pantone-CMYK-RGB-Hex` on GitHub | MIT | Unlabelled | 1,149 | CMYK copied from a printer's chart, RGB computed with the naive formula (`100` = `#FFFF7D`, real is `#F6EB61`) | Screen colours visibly wrong. Not usable |
+| `Margaret2/pantone-colors` and forks | none stated | Fashion, Home + Interiors (TCX/TPG) | 2,310 | hex | Textile book, not the print books. Not this task |
+| `pantonr`, `aj90909/unofficial-pantone-solid-coated-2024-v5`, `.acb` collections | MIT or none | Solid Coated 2024, with Lab | 3,219 | Lab, best quality | **Not allowed.** All derived from Adobe's or Pantone's own `.ase`/`.acb` library files; breaks the clean-room rule in `AGENTS.md` |
+| freieFarbe HLC Colour Atlas | CC / zlib | Not Pantone: an open Lab atlas | 2,040 | Lab, spectral, ASE, Excel | Good as a bundled open book and as test data for the reader; printers can mix from Lab |
 
-## How it would be built
+### What "sRGB hex only" means for quality
 
-Stage order follows the roadmap: VectorCraft's `color` crate becomes `astudio-color` in P2-02, the
-swatches reach the merged document in P3-01, PDF export in P5-04. The colour-book code can be built
-before that as a standalone crate, because it only needs plain structs.
+- A hex value is an 8-bit screen simulation. 279 of the 1,341 coated codes (and 125 uncoated) sit on
+  a channel limit (0 or 255), which means the real ink is outside the sRGB gamut and the stored
+  colour is a clipped, duller version. Oranges, bright blues and greens are the usual victims.
+- The ink definition A-Studio stores will be Lab computed from that hex (sRGB → XYZ D50 → Lab),
+  and the CMYK alternate will come from the colour management system. Both are approximations.
+- For spot printing this is fine: the printer mixes `PANTONE 186 C` from the **name** on the PDF's
+  separation; the stored colour only drives the screen, the tint ramps and the fallback if someone
+  converts spots to process. Every swatch should carry a note that values are approximate.
 
-1. **`astudio-colorbooks` (L0 standalone, no workspace deps, builds for wasm).** Readers for ASE
-   (`ASEF` header, group start and end blocks, colour entries with UTF-16 names, models `CMYK`,
-   `RGB `, `LAB `, `Gray`, type 0 global / 1 spot / 2 normal) and CSV
-   (`book,code,name,L,a,b,C,M,Y,K,hex`). Size caps, no panics, fuzz target. Writer for ASE so a
-   book can go back to the printer. Done when the freieFarbe ASE and a hand-made ASE round-trip.
-2. **Swatch fields (in `astudio-color`, P2-02).** Add `book: Option<String>` and `code:
-   Option<String>` with `#[serde(default)]` so v3 `.vectorcraft` files still open; keep the one
-   `Color` as the definition (Lab for ink books) and derive the CMYK alternate as today.
-3. **Library plumbing (P3-01).** `swatch.library.load` learns `.ase` and `.csv`; a "Colour Books"
-   category in the library panel; a library can flag "all spot"; adding a swatch whose book and code
-   already exist reuses it instead of making `… 2`.
-4. **Company colour book UI.** New Swatch and Swatch Options get Book and Code fields; a "Save as
-   book" action writes CSV or ASE to the user library folder.
-5. **PDF (P5-04).** No change needed for flat spots. Optional later: DeviceN for mixed gradients,
-   and an ink list in the export dialog.
-6. **Pixel mode (later).** Let a spot channel point at a book swatch so Lab survives, and fix the
-   PSD colour-book space read. Not needed for inserts and swing tags.
-7. **Templates (if wanted).** Artboard presets for tag and insert sizes with bleed, and a
-   non-printing `Dieline` spot swatch, which is how printers expect cut lines.
+### The best possible free solution
 
-Each step is one backlog task with a `done_when` and tests, per `AGENTS.md`.
+1. **Readers, not assets.** Give A-Studio a colour-book importer for CSV (`code,hex` or
+   `code,L,a,b`) and ASE, plus a book name and code on each swatch. User files never trip the brand
+   scan or the asset rules.
+2. **The data comes in as a separate download, not inside the app's files.** A small "Get colour
+   books" action fetches the MIT `pantoner` package from the npm registry (or a copy the owner keeps
+   in a release of this repo), converts the four CSV files into `.vcswatches` colour books in the
+   user library folder, and marks every swatch spot + global. The app's shipped files then contain
+   no PANTONE names and no Pantone-derived asset, which is the same line Inkscape and Scribus hold,
+   and the takedown of the `pantoner` GitHub page shows why that line matters.
+3. **Ship freieFarbe as the built-in open book** so the feature works out of the box and the
+   importer has real test data with a clean licence (one `ASSETS.md` row).
+4. If the owner prefers to bundle the Pantone lists inside the app anyway, it is one `ASSETS.md` row
+   (MIT) and a `brand-ok` exemption, and the trademark exposure is the owner's call; see question 1.
+
+## Prototype in VectorCraft upstream (owner's choice)
+
+Goal: prove, in the unmodified VectorCraft app at `upstream/vectorcraft` (pin `8b036df`), that a
+designer can open a swing tag, pick `PANTONE 186 C` and `PANTONE 186 U` from a library, tint them,
+and export a PDF/X-1a and a PDF/X-4 where both appear as named separations. The prototype lives in
+a scratch branch of the upstream checkout (or `proto/` of this repo, like P1) and is thrown away;
+the real work is ported into `astudio-*` crates later.
+
+| Step | What | Done when |
+| --- | --- | --- |
+| 1 | `crates/color/src/palette_io.rs`: add `PaletteFormat::Csv` (`code,hex` and `code,L,a,b` columns, sniffed by header) and an ASE reader (`ASEF` header, group blocks, colour blocks with UTF-16 names, models `RGB `, `CMYK`, `LAB `, `Gray`, type 0 global / 1 spot / 2 normal), both with size caps and no panics | The four `pantoner` CSV files and the freieFarbe ASE load as libraries with every swatch spot + global |
+| 2 | `Swatch`: add `book: Option<String>` and `code: Option<String>` with `#[serde(default)]` | Old `.vectorcraft` v3 files still open; new ones round-trip the fields |
+| 3 | A `convert_book` xtask or CLI command: hex → Lab (D50) on import, so the stored definition is Lab like a real ink book | Lab of `186-c` from `#c8102e` is close to L 47, a 68, b 44 |
+| 4 | `swatch.library.add`: when a swatch with the same book and code is already in the document, reuse it instead of creating `… 2` | Adding `186 C` twice gives one plate in Separations Preview |
+| 5 | Library panel: a "Colour Books" category that lists books from the user folder | Books appear without restarting the app |
+| 6 | End-to-end test in `crates/pdf`: document with `186 C` at 100 % and 40 %, `186 U` at 100 %, export X-1a and X-4, read back and assert two `/Separation` names and the tint values | Test green on Windows CI |
+| 7 | Measure: library load time for 3,193 swatches and panel scrolling | Under 100 ms to load; no visible lag |
+
+Then the A-Studio tasks (added to `docs/data/backlog.csv` once the prototype passes): the readers
+into `astudio-color` (P2-02), the book fields and library category into the merged document
+(P3-01), the "Get colour books" command in `astudio-engine`, and the freieFarbe asset with its row.
 
 ## Questions for the owner
 
-1. **Where do the values come from?** Does the printer or brand guide give you an ASE or Excel file
-   of the colours you use, or do you only have the physical Pantone fan guide to type from?
-2. **How many colours?** The handful of house colours used on tags and inserts, or the whole Solid
-   Coated and Uncoated books (about 2,300 codes)?
-3. **Bundle a community "Pantone" list in the app?** Free and approximate, but it puts the PANTONE
-   name in shipped files. Alternatives: ship only the readers, or offer it as a separate download.
-4. **Coated only, or coated and uncoated?** Swing tags are usually coated card (C); fabric or
-   uncoated inserts use U, which prints visibly different.
-5. **Which PDF does the printer want?** PDF/X-1a (CMYK plus spots, most common for tags) or
-   PDF/X-4 (keeps Lab spots and transparency)?
-6. **When?** Build the book readers now as a standalone crate alongside P2, or wait until swatches
-   exist in the merged app (after P3-01)?
-7. **Templates?** Should A-Studio come with swing tag and insert artboard presets, bleed and a
-   `Dieline` spot colour, or is that for later?
+1. **Where should the Pantone lists live?** (a) A separate download the app fetches on request, so
+   no PANTONE name ships inside A-Studio (recommended); (b) bundled inside the app as an MIT asset,
+   accepting the trademark exposure; (c) both: bundled now, moved out if Pantone objects.
+2. **Is a pre-2019 book acceptable?** The free data has 1,341 codes per book plus metallics and
+   pastels; the 224 colours Pantone added since 2019 and the 2023 additions are not in any free list.
+3. **Start the prototype now?** It touches only the upstream checkout and a throwaway branch.
 
 ## Sources
 
@@ -127,5 +142,6 @@ Each step is one backlog task with a `done_when` and tests, per `AGENTS.md`.
 - [Inkscape developers on Pantone licensing](https://lists.inkscape.org/hyperkitty/list/inkscape-devel@lists.inkscape.org/message/MMFGNCDLQKBL2GZCCEZXVCVBHBPTKY2O)
 - [freieFarbe HLC Colour Atlas](https://freiefarbe.de/en/thema-farbe/hlc-colour-atlas/)
 - [freieFarbe on Pantone's licence wording](https://freiefarbe.de/wp-content/uploads/2019/07/fFpresentation-lgm2019b.pdf)
-- [adonald/Pantone-CMYK-RGB-Hex](https://github.com/adonald/Pantone-CMYK-RGB-Hex), [ajesma/Pantoner](https://github.com/ajesma/Pantoner)
+- [`pantoner` on npm](https://www.npmjs.com/package/pantoner), [`pantone-colors` on npm](https://www.npmjs.com/package/pantone-colors)
+- [adonald/Pantone-CMYK-RGB-Hex](https://github.com/adonald/Pantone-CMYK-RGB-Hex), [Margaret2/pantone-colors](https://github.com/Margaret2/pantone-colors)
 - [Global Graphics licence note on Pantone-named swatch printouts](https://documentation.globalgraphics.com/hqnc/copyright-notices-and-trademarks)
