@@ -32,7 +32,7 @@ trademarks of Adobe Inc., used only to describe compatible workflows.
 | `docs/05-file-format.md` | The `.astudio` file format, version 1 |
 | `docs/06-text-engine.md` | Text engine plan: VectorCraft core plus four PhotoCraft ports |
 | `docs/07-fork-and-rebrand.md` | Step-by-step fork, removal of ArtCraft marks, new app ids |
-| `docs/08-dev-setup.md` | Machine setup on Linux, macOS and Windows |
+| `docs/08-dev-setup.md` | Machine setup (A-Studio targets Windows only, D7) |
 | `docs/09-quality-and-ci.md` | Rules, tests, fuzzing, CI gates |
 | `docs/10-release-and-legal.md` | Packaging, signing, licences, trademark |
 | `docs/11-ui-spec.md` | Modes, panels, tools and shortcuts, from the mockup |

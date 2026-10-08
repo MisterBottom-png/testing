@@ -66,9 +66,9 @@ None of these exist yet. Each must be original work (or CC0, OFL or MIT/Apache) 
 | Asset | Sizes and formats | Used where | Notes |
 | --- | --- | --- | --- |
 | App icon, master | SVG on a 1024 grid, plus a 1024 PNG | Everything below is exported from it | No Adobe-like letter tiles (Ps, Ai). Must read at 16 px |
-| macOS icon | `.icns` with 16, 32, 64, 128, 256, 512, 1024 px (1x and 2x) | App bundle | Upstream uses `packaging/icons.sh`; reuse the script, swap the source |
+| macOS icon (dropped, D7) | `.icns` with 16, 32, 64, 128, 256, 512, 1024 px (1x and 2x) | App bundle | Upstream uses `packaging/icons.sh`; reuse the script, swap the source |
 | Windows icon | `.ico` with 16, 24, 32, 48, 64, 128, 256 px | exe, MSI, shortcuts | `xtask ico` upstream builds it |
-| Linux icons | hicolor PNGs 16 to 512 and a scalable SVG, named after the new app id | AppImage, deb, rpm, Flatpak | File names change from `ai.storyteller.*` to the A-Studio app id |
+| Linux icons (dropped, D7) | hicolor PNGs 16 to 512 and a scalable SVG, named after the new app id | AppImage, deb, rpm, Flatpak | File names change from `ai.storyteller.*` to the A-Studio app id |
 | Web icons | favicon 32, apple-touch 180, PWA 192 and 512, maskable 512 | Web build | |
 | Document icon for `.astudio` | Same size sets as the app icon | File managers | One icon for the new format; keep upstream document icons out |
 | Wordmark | SVG, light and dark | About window, splash, README, website | Text "A-Studio" in an OFL font you ship (Inter is already bundled) |

@@ -1,0 +1,9 @@
+# Keep LF line endings on every OS (Git for Windows converts to CRLF by default, which breaks
+# bash scripts run by CI on windows-latest; D7).
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.png binary
+*.ico binary
+# CSV files are written by Python's csv module with CRLF row ends; keep them byte for byte.
+*.csv -text

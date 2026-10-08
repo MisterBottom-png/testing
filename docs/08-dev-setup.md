@@ -1,5 +1,8 @@
 # Developer setup
 
+A-Studio ships for Windows only (D7). Linux and macOS work for development, not as targets. On Windows, run `scripts/*.sh` from Git Bash
+(installed with Git for Windows).
+
 ## Every machine
 
 ```sh

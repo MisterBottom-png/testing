@@ -1,5 +1,8 @@
 # Fork and rebrand
 
+A-Studio ships for Windows only (D7): upstream Linux and macOS packaging (Flatpak, AppImage, deb, rpm,
+FreeBSD, `Info.plist`, `.icns`) is not ported at all, rather than renamed.
+
 Both repos carry ArtCraft branding that a fork may not keep. `docs/data/rebrand-hits.csv` lists every
 text file that mentions ArtCraft, `getartcraft` or the `ai.storyteller.*` app ids: 177 files, 437
 ArtCraft mentions and 501 app-id or `storytold` mentions across both repos (8 October 2026).

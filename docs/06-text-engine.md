@@ -34,5 +34,5 @@ Decision D3: keep VectorCraft's text engine, port four PhotoCraft pieces onto it
 ## Checks
 
 - Latin, Arabic (bidirectional), Japanese (vertical) paragraph rendered by the old and new engines; pixel diff stored as a golden.
-- Same font discovery result on Linux, macOS, Windows and web (web: bundled fonts only).
+- Same font discovery result on Windows and web (D7) (web: bundled fonts only).
 - Speed: lay out 10,000 glyphs in under 10 ms in release (measure the baseline first in P0).
