@@ -11,6 +11,8 @@ logs="$(cd .. && pwd)/target/baseline"; mkdir -p "$logs"   # full test output, k
 for app in $apps; do
   echo "== $app $(git -C $app rev-parse --short HEAD)"
   ( cd $app
+    # Download every crate first, so network time is not counted in the build times below.
+    cargo fetch --locked
     if [ "$part" != test ]; then
       start=$(date +%s); cargo build --release --locked -p $app; end=$(date +%s)
       echo "$app release build: $((end-start)) s"
