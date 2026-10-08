@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>A-Studio app icon (placeholder)</title>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="#1D2130"/>
+  <path d="M216 364 L290 364 L290 290 L364 290 L364 216 L438 216 L438 216 L512 216 L512 808 L438 808 L438 808 L364 808 L364 734 L290 734 L290 660 L216 660 Z" fill="#FF7A45"/>
+  <path d="M512 216 A296 296 0 0 1 512 808 Z" fill="#3CC8B4"/>
+  <line x1="808" y1="342" x2="808" y2="682" stroke="#F4F1EA" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="808" cy="342" r="30" fill="#F4F1EA"/>
+  <circle cx="808" cy="682" r="30" fill="#F4F1EA"/>
+  <rect x="768" y="472" width="80" height="80" fill="#1D2130" stroke="#F4F1EA" stroke-width="20"/>
+</svg>
