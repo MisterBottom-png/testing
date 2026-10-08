@@ -36,6 +36,7 @@ trademarks of Adobe Inc., used only to describe compatible workflows.
 | `docs/09-quality-and-ci.md` | Rules, tests, fuzzing, CI gates |
 | `docs/10-release-and-legal.md` | Packaging, signing, licences, trademark |
 | `docs/11-ui-spec.md` | Modes, panels, tools and shortcuts, from the mockup |
+| `docs/13-colour-engine.md` | Colour engine study: the options, measurements, and the one combined engine |
 | `docs/12-feature-backlog.md` | Features to build after the merge, including ideas from Krita, GIMP and Inkscape |
 | `docs/data/*.csv` | Generated inventories: dependencies, assets, rebrand hits; plus the task backlog |
 | `AGENTS.md` | Rules for people and AI agents working in this repo |

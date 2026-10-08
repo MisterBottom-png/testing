@@ -4,3 +4,4 @@
 /dist
 *.swp
 .DS_Store
+/scripts/cms-bench/target

@@ -1,0 +1,19 @@
+# Colour engine study (docs/13-colour-engine.md): PhotoCraft cms vs moxcms, speed and accuracy.
+# Its own workspace, not part of A-Studio. Run: cd scripts/cms-bench && cargo run --release
+[package]
+name = "cmsbench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+photocraft-cms = { path = "../../upstream/photocraft/crates/cms" }
+moxcms = "=0.8.1"
+rayon = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[workspace]
