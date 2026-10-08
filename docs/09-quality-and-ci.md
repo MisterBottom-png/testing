@@ -10,7 +10,7 @@
 | Layers | `cargo run -p xtask -- layers` | A crate depends on its own or a higher layer, or UI below L6 |
 | Web | `cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask` | L0 to L6 stop building for the web |
 | Licences | `cargo deny check` | A dependency licence is not on the allow list, or has a known advisory |
-| Assets | `cargo run -p xtask -- assets` (after P0) | A file under `assets/` has no row in `ASSETS.md` |
+| Assets | `cargo xtask assets` | A file under `assets/` has no row in `ASSETS.md` |
 | Rebrand | `scripts/rebrand-scan.sh --shipped` | ArtCraft marks in shipped files |
 
 ## No-panic lints (same as both upstream repos)
