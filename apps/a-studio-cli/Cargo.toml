@@ -1,0 +1,15 @@
+[package]
+name = "a-studio-cli"
+description = "A-Studio: Command-line tool and MCP server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-engine = { path = "../../crates/engine" }
+astudio-automation = { path = "../../crates/automation" }
+
+[lints]
+workspace = true

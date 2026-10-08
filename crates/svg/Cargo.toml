@@ -1,0 +1,17 @@
+[package]
+name = "astudio-svg"
+description = "A-Studio: SVG import and export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-text = { path = "../text" }
+
+[lints]
+workspace = true

@@ -1,0 +1,13 @@
+[package]
+name = "astudio-geom"
+description = "A-Studio: Geometry: kurbo-based paths, transforms, integer pixel rects, tiles, warp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

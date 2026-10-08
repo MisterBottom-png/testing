@@ -1,0 +1,15 @@
+[package]
+name = "a-studio-web"
+description = "A-Studio: Web app (built with trunk)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-engine = { path = "../../crates/engine" }
+astudio-ui = { path = "../../crates/ui" }
+
+[lints]
+workspace = true

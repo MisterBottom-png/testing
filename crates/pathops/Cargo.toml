@@ -1,0 +1,15 @@
+[package]
+name = "astudio-pathops"
+description = "A-Studio: Exact curve booleans (Pathfinder, Shape Builder)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-vdoc = { path = "../vdoc" }
+
+[lints]
+workspace = true

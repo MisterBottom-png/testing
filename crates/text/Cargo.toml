@@ -1,0 +1,18 @@
+[package]
+name = "astudio-text"
+description = "A-Studio: Text layout, shaping, PSD text, warp text, rasterizing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-doc = { path = "../doc" }
+
+[lints]
+workspace = true

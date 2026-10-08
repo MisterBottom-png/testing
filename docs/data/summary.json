@@ -1,0 +1,18 @@
+{
+ "total": 607,
+ "pc": 558,
+ "vc": 482,
+ "both": 433,
+ "differ": 17,
+ "direct": 86,
+ "git": [],
+ "assets": 356,
+ "assets_by_action": {
+  "KEEP (keep licence file + attribution row)": 324,
+  "REPLACE (upstream app icon / owner artwork)": 18,
+  "REMOVE (ArtCraft trademark)": 9,
+  "EXTERNAL (test input, fetched by script, never shipped)": 5
+ },
+ "hits_files": 177,
+ "hits_artcraft": 437
+}

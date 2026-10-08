@@ -1,0 +1,140 @@
+//! A-Studio developer tasks.
+//!
+//! `cargo run -p xtask -- layers` checks that every workspace crate depends only on crates in
+//! lower layers (docs/02-architecture.md). More tasks (assets, corpus, bundle, ico, version) are
+//! ported from the upstream xtasks during P0 and P5.
+
+mod table;
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+use table::{Class, INTRA_LAYER, TABLE};
+
+fn main() -> ExitCode {
+    let task = std::env::args().nth(1).unwrap_or_default();
+    match task.as_str() {
+        "layers" => match check_layers(&workspace_root()) {
+            Ok(n) => {
+                println!("layers: {n} crates checked, no violations");
+                ExitCode::SUCCESS
+            }
+            Err(errors) => {
+                for e in &errors {
+                    eprintln!("layers: {e}");
+                }
+                eprintln!("layers: {} violation(s)", errors.len());
+                ExitCode::FAILURE
+            }
+        },
+        _ => {
+            eprintln!("usage: cargo run -p xtask -- <task>\n\ntasks:\n  layers   check crate layering");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn workspace_root() -> PathBuf {
+    let here = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    here.parent().map(Path::to_path_buf).unwrap_or(here)
+}
+
+/// A crate's name and its `astudio-*` dependencies, by section.
+struct Manifest {
+    name: String,
+    deps: Vec<(String, String)>, // (section, dependency)
+}
+
+/// Reads the few fields the layer check needs, without a TOML parser (xtask has no dependencies).
+fn read_manifest(path: &Path) -> Option<Manifest> {
+    let text = fs::read_to_string(path).ok()?;
+    let mut section = String::new();
+    let mut name = None;
+    let mut deps = Vec::new();
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.starts_with('[') {
+            section = line.trim_matches(|c| c == '[' || c == ']').to_string();
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else { continue };
+        let key = key.trim();
+        if section == "package" && key == "name" {
+            name = Some(value.trim().trim_matches('"').to_string());
+        } else if section.ends_with("dependencies") && key.starts_with("astudio-") {
+            deps.push((section.clone(), key.to_string()));
+        }
+    }
+    Some(Manifest { name: name?, deps })
+}
+
+fn class_of(name: &str) -> Option<Class> {
+    TABLE.iter().find(|(n, _)| *n == name).map(|(_, c)| *c)
+}
+
+fn rank(c: Class) -> u8 {
+    match c {
+        Class::Layer(l) => l,
+        Class::Standalone => 0,
+        Class::Testkit => 6,
+    }
+}
+
+fn check_layers(root: &Path) -> Result<usize, Vec<String>> {
+    let mut manifests = BTreeMap::new();
+    let crates_dir = root.join("crates");
+    let entries = fs::read_dir(&crates_dir).map_err(|e| vec![format!("cannot read {}: {e}", crates_dir.display())])?;
+    for entry in entries.flatten() {
+        let path = entry.path().join("Cargo.toml");
+        if let Some(m) = read_manifest(&path) {
+            manifests.insert(m.name.clone(), m);
+        }
+    }
+    let mut errors = Vec::new();
+    for m in manifests.values() {
+        let Some(from) = class_of(&m.name) else {
+            errors.push(format!("{}: not in xtask/src/table.rs", m.name));
+            continue;
+        };
+        for (section, dep) in &m.deps {
+            let Some(to) = class_of(dep) else {
+                errors.push(format!("{} -> {dep}: dependency not in the layering table", m.name));
+                continue;
+            };
+            let dev = section.contains("dev-dependencies");
+            if to == Class::Testkit && !dev {
+                errors.push(format!("{} -> {dep}: testkit may only be a dev-dependency", m.name));
+                continue;
+            }
+            if from == Class::Standalone {
+                errors.push(format!("{} -> {dep}: standalone crates have no workspace dependencies", m.name));
+                continue;
+            }
+            let same_layer_ok = INTRA_LAYER.iter().any(|(a, b)| *a == m.name && *b == dep.as_str());
+            if rank(to) > rank(from) || (rank(to) == rank(from) && !same_layer_ok && to != Class::Testkit) {
+                errors.push(format!("{} (L{}) -> {dep} (L{}): may only depend on lower layers", m.name, rank(from), rank(to)));
+            }
+        }
+    }
+    if errors.is_empty() { Ok(manifests.len()) } else { Err(errors) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn table_has_no_duplicates() {
+        let mut names: Vec<_> = TABLE.iter().map(|(n, _)| *n).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), TABLE.len());
+    }
+
+    #[test]
+    fn workspace_passes() {
+        assert!(check_layers(&workspace_root()).is_ok());
+    }
+}

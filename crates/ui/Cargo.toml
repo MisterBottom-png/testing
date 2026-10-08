@@ -1,0 +1,14 @@
+[package]
+name = "astudio-ui"
+description = "A-Studio: egui UI: modes, panels, menus"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-engine = { path = "../engine" }
+
+[lints]
+workspace = true

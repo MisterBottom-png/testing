@@ -1,0 +1,178 @@
+repo,file,artcraft,storyteller_id,product_name,note
+photocraft,NOTICE,3,1,2,
+photocraft,ATTRIBUTION.md,5,5,35,
+photocraft,README.md,44,31,86,
+photocraft,LICENSE-MIT,1,0,1,
+photocraft,AGENTS.md,3,6,23,
+photocraft,packaging/icons.sh,0,2,11,
+photocraft,packaging/linux/flatpak-bundle.sh,0,2,11,
+photocraft,packaging/linux/ai.storyteller.photocraft.metainfo.xml.in,2,7,12,
+photocraft,packaging/linux/ai.storyteller.photocraft.desktop,0,1,6,
+photocraft,packaging/linux/AppRun,0,2,4,
+photocraft,packaging/linux/nfpm.yaml,1,0,8,
+photocraft,packaging/linux/apprun-test.sh,0,1,5,
+photocraft,packaging/linux/package.sh,0,2,25,
+photocraft,packaging/linux/ai.storyteller.photocraft.mime.xml,0,1,3,
+photocraft,packaging/linux/flatpak/ai.storyteller.photocraft.yml,0,11,18,
+photocraft,packaging/linux/flatpak/ai.storyteller.photocraft.bundle.yml,0,9,18,
+photocraft,packaging/freebsd/package.sh,0,1,24,
+photocraft,packaging/windows/sign.ps1,0,1,4,
+photocraft,packaging/windows/photocraft.wxs,3,0,41,
+photocraft,packaging/macos/Info.plist.in,0,5,17,
+photocraft,packaging/macos/package.sh,0,1,27,
+photocraft,book/book.toml,0,2,4,
+photocraft,book/src/README.md,0,2,4,
+photocraft,book/src/development/release-security.md,0,1,2,
+photocraft,book/src/automation/control-protocol.md,0,1,2,
+photocraft,book/src/formats/psd-psb.md,0,1,4,
+photocraft,book/src/formats/raster-formats.md,0,1,9,
+photocraft,book/src/project/licenses.md,1,5,6,
+photocraft,book/src/project/credits.md,1,0,2,
+photocraft,book/src/project/roadmap.md,0,2,2,
+photocraft,book/src/getting-started/installation.md,0,1,5,
+photocraft,book/src/getting-started/building.md,0,1,4,
+photocraft,book/src/getting-started/contributing.md,0,2,2,
+photocraft,book/src/architecture/command-engine.md,0,1,3,
+photocraft,book/src/architecture/rendering.md,0,1,8,
+photocraft,book/src/architecture/crates.md,0,1,7,
+photocraft,book/src/architecture/overview.md,0,1,10,
+photocraft,book/src/security/vulnerability-reporting.md,0,1,1,
+photocraft,xtask/src/corpus_pins.rs,0,4,7,
+photocraft,xtask/src/perf.rs,0,1,1,
+photocraft,xtask/src/scorecard.rs,0,2,3,
+photocraft,xtask/src/corpus.rs,0,1,16,
+photocraft,assets/app-icon/photocraft-1024.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/README.md,1,1,13,
+photocraft,assets/app-icon/photocraft.ico,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/photocraft.icns,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/LICENSE.txt,1,0,7,
+photocraft,assets/app-icon/hicolor/512x512/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/64x64/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/48x48/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/128x128/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/24x24/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/16x16/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/32x32/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,assets/app-icon/hicolor/256x256/apps/ai.storyteller.photocraft.png,0,0,0,"binary file, name matches"
+photocraft,.github/workflows/ci.yml,0,1,6,
+photocraft,.github/workflows/packaging-lint.yml,0,7,9,
+photocraft,.github/workflows/release.yml,0,7,14,
+photocraft,crates/ui-egui/src/panels.rs,1,0,32,
+photocraft,crates/ui-egui/src/menus.rs,3,0,29,
+photocraft,crates/ui-egui/src/brand.rs,0,1,8,
+photocraft,crates/ui-egui/src/links.rs,10,4,10,
+photocraft,crates/ui-egui/src/i18n/id.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/ko.tsv,8,0,23,
+photocraft,crates/ui-egui/src/i18n/it.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/pt-br.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/de.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/ja.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/zh-hant.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/fr.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/es.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/cs.tsv,7,0,23,
+photocraft,crates/ui-egui/src/i18n/zh-hans.tsv,6,0,23,
+photocraft,crates/ui-egui/src/i18n/ru.tsv,7,0,23,
+photocraft,crates/text/build.rs,0,1,2,
+photocraft,crates/text/src/craft_fonts.rs,0,1,0,
+photocraft,crates/engine/src/prefs.rs,0,1,5,
+photocraft,crates/engine/tests/photoshop_oracles.rs,0,1,8,
+photocraft,crates/cms/profiles/photocraft-coated-cmyk.icc,0,0,0,"binary file, name matches"
+photocraft,crates/io/tests/corpus.rs,0,2,13,
+photocraft,apps/photocraft/src/app_icon.rs,0,1,7,
+photocraft,apps/photocraft/src/main.rs,0,1,36,
+photocraft,docs/scorecard.md,0,178,182,
+photocraft,docs/architecture.md,0,2,56,
+photocraft,docs/development.md,0,7,59,
+photocraft,docs/contributors.md,0,1,3,
+photocraft,docs/releasing.md,1,12,56,
+photocraft,docs/localization-zh-hans.md,1,2,5,
+photocraft,docs/release-playbook.md,0,1,2,
+photocraft,docs/contributing.md,1,3,2,
+photocraft,docs/roadmap.md,0,3,8,
+photocraft,docs/images/photocraft-filters.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-vector.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-demo.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-export-light.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-type.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-masks.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-layer-styles.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-transform.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/images/photocraft-adjustments.jpg,0,0,0,"binary file, name matches"
+photocraft,docs/brand/artcraft-logo-white.png,0,0,0,"binary file, name matches"
+photocraft,docs/brand/artcraft-mark.svg,2,0,0,
+photocraft,docs/brand/artcraft-logo.png,0,0,0,"binary file, name matches"
+photocraft,docs/brand/artcraft-logo.svg,2,0,0,
+photocraft,docs/brand/LICENSE-brand.txt,17,0,7,
+photocraft,docs/brand/artcraft-mark.png,0,0,0,"binary file, name matches"
+photocraft,docs/brand/artcraft-logo-white.svg,2,0,0,
+photocraft,docs/brand/artcraft-mark-black.svg,2,0,0,
+photocraft,docs/brand/artcraft-mark-black.png,0,0,0,"binary file, name matches"
+photocraft,contributors/contributors.json,0,1,1,
+vectorcraft,Cargo.toml,0,1,26,
+vectorcraft,NOTICE,3,1,2,
+vectorcraft,README.md,43,28,85,
+vectorcraft,CLAUDE.md,1,6,20,
+vectorcraft,LICENSE-MIT,1,0,1,
+vectorcraft,AGENTS.md,1,6,20,
+vectorcraft,ASSETS.md,64,13,383,
+vectorcraft,packaging/icons.sh,0,1,11,
+vectorcraft,packaging/linux/flatpak-bundle.sh,0,2,11,
+vectorcraft,packaging/linux/ai.storyteller.vectorcraft.desktop,0,2,5,
+vectorcraft,packaging/linux/nfpm.yaml,1,0,7,
+vectorcraft,packaging/linux/package.sh,0,2,26,
+vectorcraft,packaging/linux/ai.storyteller.vectorcraft.metainfo.xml.in,2,7,10,
+vectorcraft,packaging/linux/flatpak/ai.storyteller.vectorcraft.yml,0,11,18,
+vectorcraft,packaging/linux/flatpak/ai.storyteller.vectorcraft.bundle.yml,0,9,18,
+vectorcraft,packaging/freebsd/package.sh,0,1,18,
+vectorcraft,packaging/windows/vectorcraft.wxs,3,0,16,
+vectorcraft,packaging/windows/sign.ps1,0,1,4,
+vectorcraft,packaging/macos/Info.plist.in,0,3,23,
+vectorcraft,xtask/src/bundle.rs,0,2,17,
+vectorcraft,assets/app-icon/vectorcraft.ico,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/vectorcraft-macos-512.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/README.md,1,5,22,
+vectorcraft,assets/app-icon/LICENSE.txt,1,0,9,
+vectorcraft,assets/app-icon/vectorcraft-1024.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/vectorcraft.icns,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/512x512/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/64x64/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/48x48/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/128x128/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/24x24/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/16x16/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/32x32/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,assets/app-icon/hicolor/256x256/apps/ai.storyteller.vectorcraft.png,0,0,0,"binary file, name matches"
+vectorcraft,.github/pull_request_template.md,0,2,3,
+vectorcraft,.github/workflows/packaging-lint.yml,0,7,10,
+vectorcraft,.github/workflows/release.yml,0,7,14,
+vectorcraft,.github/workflows/freebsd.yml,0,2,6,
+vectorcraft,crates/ui-egui/src/menus.rs,2,0,69,
+vectorcraft,crates/ui-egui/src/brand.rs,0,1,5,
+vectorcraft,crates/ui-egui/src/community.rs,8,1,4,
+vectorcraft,crates/ui-egui/src/dialogs/about.rs,1,0,4,
+vectorcraft,crates/ui-egui/src/i18n/it.tsv,12,0,41,
+vectorcraft,crates/ui-egui/src/i18n/pt-br.tsv,11,0,17,
+vectorcraft,crates/ui-egui/src/i18n/ja.tsv,12,0,19,
+vectorcraft,crates/ui-egui/src/i18n/zh-hant.tsv,13,0,24,
+vectorcraft,crates/ui-egui/src/i18n/es.tsv,12,0,41,
+vectorcraft,crates/ui-egui/src/i18n/cs.tsv,4,0,11,
+vectorcraft,crates/ui-egui/src/i18n/zh-hans.tsv,14,0,38,
+vectorcraft,crates/text/build.rs,0,1,0,
+vectorcraft,crates/text/src/craft_fonts.rs,0,1,0,
+vectorcraft,crates/engine/src/cmd/help.rs,10,2,5,
+vectorcraft,apps/vectorcraft/src/gpu.rs,0,1,5,
+vectorcraft,apps/vectorcraft/src/main.rs,0,3,36,
+vectorcraft,docs/development.md,0,4,35,
+vectorcraft,docs/contributors.md,0,1,3,
+vectorcraft,docs/releasing.md,0,6,46,
+vectorcraft,docs/brand/artcraft-logo-white.png,0,0,0,"binary file, name matches"
+vectorcraft,docs/brand/artcraft-mark.svg,2,0,0,
+vectorcraft,docs/brand/artcraft-logo.png,0,0,0,"binary file, name matches"
+vectorcraft,docs/brand/artcraft-logo.svg,2,0,0,
+vectorcraft,docs/brand/LICENSE-brand.txt,17,0,7,
+vectorcraft,docs/brand/artcraft-mark.png,0,0,0,"binary file, name matches"
+vectorcraft,docs/brand/artcraft-logo-white.svg,2,0,0,
+vectorcraft,docs/brand/artcraft-mark-black.svg,2,0,0,
+vectorcraft,docs/brand/artcraft-mark-black.png,0,0,0,"binary file, name matches"
+vectorcraft,contributors/contributors.json,0,1,1,

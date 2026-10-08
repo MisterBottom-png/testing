@@ -1,0 +1,23 @@
+[package]
+name = "astudio-engine"
+description = "A-Studio: One command registry, undo history and panic guard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-doc = { path = "../doc" }
+astudio-text = { path = "../text" }
+astudio-format = { path = "../format" }
+astudio-io = { path = "../io" }
+astudio-tools = { path = "../tools" }
+astudio-plugins = { path = "../plugins" }
+
+[lints]
+workspace = true

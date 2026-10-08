@@ -1,0 +1,608 @@
+crate,photocraft,vectorcraft,direct,kind_pc,kind_vc,used_by,source,status
+accesskit,0.24.1,0.24.1,no,,,,registry,both
+accesskit_atspi_common,0.18.1,0.18.1,no,,,,registry,both
+accesskit_consumer,0.35.0 0.36.0 0.38.0,0.35.0 0.36.0 0.38.0,no,,,,registry,both
+accesskit_macos,0.26.3,0.26.3,no,,,,registry,both
+accesskit_unix,0.21.1,0.21.1,no,,,,registry,both
+accesskit_windows,0.32.1,0.32.1,no,,,,registry,both
+accesskit_winit,0.32.2,0.32.2,no,,,,registry,both
+adler2,2.0.1,2.0.1,no,,,,registry,both
+aes,,0.8.4,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+ahash,0.8.12,0.8.12,no,,,,registry,both
+aho-corasick,1.1.5,,no,,,,registry,photocraft only
+aligned,0.4.3,,no,,,,registry,photocraft only
+aligned-vec,0.6.4,,no,,,,registry,photocraft only
+alloc-no-stdlib,,2.0.4,no,,,,registry,vectorcraft only
+alloc-stdlib,,0.2.4,no,,,,registry,vectorcraft only
+allocator-api2,0.2.21,0.2.21,no,,,,registry,both
+ambient-authority,0.0.2,,no,,,,registry,photocraft only
+android-activity,0.6.1,0.6.1,no,,,,registry,both
+android-properties,0.2.2,0.2.2,no,,,,registry,both
+android_system_properties,0.1.6,0.1.6,no,,,,registry,both
+anes,0.1.6,,no,,,,registry,photocraft only
+anstyle,1.0.14,,no,,,,registry,photocraft only
+anyhow,1.0.104,,no,,,,registry,photocraft only
+arbitrary,1.4.2,,no,,,,registry,photocraft only
+arboard,3.6.1,3.6.1,yes,runtime,runtime,photocraft; vectorcraft,registry,both
+arg_enum_proc_macro,0.3.4,,no,,,,registry,photocraft only
+arrayref,0.3.9,0.3.9,no,,,,registry,both
+arrayvec,0.7.8,0.7.8,no,,,,registry,both
+as-raw-xcb-connection,1.0.1,1.0.1,no,,,,registry,both
+as-slice,0.2.1,,no,,,,registry,photocraft only
+ash,0.38.0+1.3.281,0.38.0+1.3.281,no,,,,registry,both
+async-broadcast,0.7.2,0.7.2,no,,,,registry,both
+async-channel,2.5.0,2.5.0,no,,,,registry,both
+async-executor,1.14.0,1.14.0,no,,,,registry,both
+async-io,2.6.0,2.6.0,no,,,,registry,both
+async-lock,3.4.2,3.4.2,no,,,,registry,both
+async-process,2.5.0,2.5.0,no,,,,registry,both
+async-recursion,1.1.1,1.1.1,no,,,,registry,both
+async-signal,0.2.14,0.2.14,no,,,,registry,both
+async-task,4.7.1,4.7.1,no,,,,registry,both
+async-trait,0.1.92,0.1.92,no,,,,registry,both
+atomic-waker,1.1.2,1.1.2,no,,,,registry,both
+atspi,0.29.0,0.29.0,no,,,,registry,both
+atspi-common,0.13.0,0.13.0,no,,,,registry,both
+atspi-proxies,0.13.0,0.13.0,no,,,,registry,both
+autocfg,1.5.1,1.5.1,no,,,,registry,both
+av-scenechange,0.14.1,,no,,,,registry,photocraft only
+av1-grain,0.2.5,,no,,,,registry,photocraft only
+avif-serialize,0.8.9,,no,,,,registry,photocraft only
+base64,0.22.1,0.22.1 0.23.1,yes,runtime,,photocraft-automation; photocraft-ui-egui,registry,both / versions differ
+bit-set,0.10.0 0.8.0,0.10.0 0.8.0,no,,,,registry,both
+bit-vec,0.8.0 0.9.1,0.8.0 0.9.1,no,,,,registry,both
+bit_field,0.10.3,,no,,,,registry,photocraft only
+bitflags,1.3.2 2.13.2,1.3.2 2.13.2,no,,,,registry,both
+bitstream-io,4.10.0,,no,,,,registry,photocraft only
+blake3,1.8.7,,yes,runtime,,photocraft-engine; photocraft-format; photocraft-io,registry,photocraft only
+block-buffer,,0.10.4,no,,,,registry,vectorcraft only
+block2,0.5.1 0.6.2,0.5.1 0.6.2,yes,runtime,runtime,photocraft-tablet; vectorcraft,registry,both
+blocking,1.7.0,1.7.0,no,,,,registry,both
+brotli,,8.0.4,no,,,,registry,vectorcraft only
+brotli-decompressor,,5.0.3,no,,,,registry,vectorcraft only
+built,0.8.1,,no,,,,registry,photocraft only
+bumpalo,3.20.3,3.20.3,no,,,,registry,both
+bytemuck,1.25.2,1.25.2,no,,,,registry,both
+bytemuck_derive,1.12.1,1.12.1,no,,,,registry,both
+byteorder-lite,0.1.0,0.1.0,no,,,,registry,both
+bytes,1.12.1,1.12.1,no,,,,registry,both
+calloop,0.13.0 0.14.4,0.13.0 0.14.4,no,,,,registry,both
+calloop-wayland-source,0.3.0 0.4.1,0.3.0 0.4.1,no,,,,registry,both
+cap-primitives,4.0.3,,no,,,,registry,photocraft only
+cap-std,4.0.3,,yes,runtime,,photocraft-automation,registry,photocraft only
+cast,0.3.0,,no,,,,registry,photocraft only
+cc,1.5.1,1.5.1,no,,,,registry,both
+cfg-if,1.0.5,1.0.5,no,,,,registry,both
+cfg_aliases,0.2.2,0.2.2,no,,,,registry,both
+cgl,0.3.2,0.3.2,no,,,,registry,both
+chrono,0.4.45,,no,,,,registry,photocraft only
+ciborium,0.2.2,,no,,,,registry,photocraft only
+ciborium-io,0.2.2,,no,,,,registry,photocraft only
+ciborium-ll,0.2.2,,no,,,,registry,photocraft only
+cipher,,0.4.4,no,,,,registry,vectorcraft only
+clap,4.6.7,,no,,,,registry,photocraft only
+clap_builder,4.6.7,,no,,,,registry,photocraft only
+clap_lex,1.1.1,,no,,,,registry,photocraft only
+clipboard-win,5.4.1,5.4.1,yes,,runtime,vectorcraft,registry,both
+codespan-reporting,0.13.1,0.13.1,no,,,,registry,both
+color,0.3.3,0.3.3,no,,,,registry,both
+color_quant,1.1.0,1.1.0,no,,,,registry,both
+colored,2.2.0,,no,,,,registry,photocraft only
+combine,4.6.8,4.6.8,no,,,,registry,both
+concurrent-queue,2.5.0,2.5.0,no,,,,registry,both
+constant_time_eq,0.4.2,,no,,,,registry,photocraft only
+core-foundation,0.9.4,0.9.4,no,,,,registry,both
+core-foundation-sys,0.8.7,0.8.7,no,,,,registry,both
+core-graphics,0.23.2,0.23.2,no,,,,registry,both
+core-graphics-types,0.1.3,0.1.3,no,,,,registry,both
+core_maths,,0.1.1,no,,,,registry,vectorcraft only
+cpufeatures,0.3.1,0.2.17,no,,,,registry,both / versions differ
+crc32fast,1.5.2,1.5.2,no,,,,registry,both
+criterion,0.5.1,,yes,dev/test,,photocraft-compose,registry,photocraft only
+criterion-plot,0.5.0,,no,,,,registry,photocraft only
+crossbeam-channel,0.5.17,0.5.17,no,,,,registry,both
+crossbeam-deque,0.8.8,0.8.8,no,,,,registry,both
+crossbeam-epoch,0.9.21,0.9.21,no,,,,registry,both
+crossbeam-utils,0.8.23,0.8.23,no,,,,registry,both
+crunchy,0.2.4,0.2.4,no,,,,registry,both
+crypto-common,,0.1.7,no,,,,registry,vectorcraft only
+cursor-icon,1.2.0,1.2.0,no,,,,registry,both
+darling,0.24.1,,no,,,,registry,photocraft only
+darling_core,0.24.1,,no,,,,registry,photocraft only
+darling_macro,0.24.1,,no,,,,registry,photocraft only
+data-url,0.3.2,0.3.2,no,,,,registry,both
+dify,0.8.0,,no,,,,registry,photocraft only
+digest,,0.10.7,no,,,,registry,vectorcraft only
+dispatch,0.2.0,0.2.0,no,,,,registry,both
+dispatch2,0.3.1,0.3.1,no,,,,registry,both
+displaydoc,0.2.7,0.2.7,no,,,,registry,both
+dlib,0.5.3,0.5.3,no,,,,registry,both
+document-features,0.2.12,0.2.12,no,,,,registry,both
+downcast-rs,1.2.1,1.2.1,no,,,,registry,both
+dpi,0.1.2,0.1.2,no,,,,registry,both
+dyn-clone,1.0.20,,no,,,,registry,photocraft only
+ecolor,0.36.2,0.36.2,no,,,,registry,both
+eframe,0.36.2,0.36.2,yes,runtime,runtime,photocraft; photocraft-ui-egui; photocraft-web; vectorcraft; vectorcraft-web,registry,both
+egui,0.36.2,0.36.2,yes,runtime,runtime,photocraft; photocraft-ui-egui; photocraft-web; vectorcraft; vectorcraft-ui-egui; vectorcraft-web,registry,both
+egui-wgpu,0.36.2,0.36.2,no,,,,registry,both
+egui-winit,0.36.2,0.36.2,no,,,,registry,both
+egui_extras,0.36.2,0.36.2,yes,runtime,runtime,photocraft-ui-egui; vectorcraft-ui-egui,registry,both
+egui_glow,0.36.2,0.36.2,no,,,,registry,both
+egui_kittest,0.36.2,,yes,dev/test,,photocraft-ui-egui,registry,photocraft only
+either,1.18.0,1.18.0,no,,,,registry,both
+emath,0.36.2,0.36.2,no,,,,registry,both
+endi,1.1.1,1.1.1,no,,,,registry,both
+enum-map,2.7.3,2.7.3,no,,,,registry,both
+enum-map-derive,0.17.0,0.17.0,no,,,,registry,both
+enumflags2,0.7.12,0.7.12,no,,,,registry,both
+enumflags2_derive,0.7.12,0.7.12,no,,,,registry,both
+enumn,0.1.14,,no,,,,registry,photocraft only
+epaint,0.36.2,0.36.2,no,,,,registry,both
+epaint_default_fonts,0.36.2,0.36.2,no,,,,registry,both
+equator,0.4.2,,no,,,,registry,photocraft only
+equator-macro,0.4.2,,no,,,,registry,photocraft only
+equivalent,1.0.2,1.0.2,no,,,,registry,both
+errno,0.3.14,0.3.14,no,,,,registry,both
+error-code,3.4.0,3.4.0,no,,,,registry,both
+euclid,0.22.14,0.22.14,no,,,,registry,both
+event-listener,5.4.2,5.4.2,no,,,,registry,both
+event-listener-strategy,0.5.4,0.5.4,no,,,,registry,both
+exr,1.74.2,,yes,runtime,,photocraft-codecs,registry,photocraft only
+fastrand,2.5.0,2.5.0,no,,,,registry,both
+fax,0.2.6,0.2.7,no,,,,registry,both / versions differ
+fax_derive,0.2.0,,no,,,,registry,photocraft only
+fdeflate,0.3.7,0.3.7,no,,,,registry,both
+fearless_simd,0.4.1,0.4.1,no,,,,registry,both
+find-msvc-tools,0.1.14,0.1.14,no,,,,registry,both
+fixedbitset,0.5.7,0.5.7,no,,,,registry,both
+flate2,1.1.10,1.1.10,yes,runtime,runtime,photocraft-codecs; photocraft-engine; photocraft-format; photocraft-psd; photocraft-text; vectorcraft-engine; vectorcraft-eps; vectorcraft-format; vectorcraft-pdf; vectorcraft-render; vectorcraft-svg,registry,both
+float-cmp,0.9.0,0.9.0,no,,,,registry,both
+fmv-macos-events,0.1.0,,yes,runtime,,photocraft,registry,photocraft only
+fnv,1.0.7,1.0.7,no,,,,registry,both
+foldhash,0.1.5 0.2.0,0.1.5 0.2.0,no,,,,registry,both
+font-types,0.12.5,0.11.3 0.12.5,no,,,,registry,both / versions differ
+fontconfig-parser,,0.5.8,no,,,,registry,vectorcraft only
+fontdb,,0.24.0,no,,,,registry,vectorcraft only
+fontique,0.11.1,,no,,,,registry,photocraft only
+foreign-types,0.5.0,0.5.0,no,,,,registry,both
+foreign-types-macros,0.2.4,0.2.4,no,,,,registry,both
+foreign-types-shared,0.3.1,0.3.1,no,,,,registry,both
+form_urlencoded,,1.2.2,no,,,,registry,vectorcraft only
+fs-set-times,0.20.3,,no,,,,registry,photocraft only
+futures,0.3.34,,no,,,,registry,photocraft only
+futures-channel,0.3.34,,no,,,,registry,photocraft only
+futures-core,0.3.34,0.3.34,no,,,,registry,both
+futures-executor,0.3.34,,no,,,,registry,photocraft only
+futures-io,0.3.34,0.3.34,no,,,,registry,both
+futures-lite,2.6.1,2.6.1,no,,,,registry,both
+futures-macro,0.3.34,0.3.34,no,,,,registry,both
+futures-sink,0.3.34,,no,,,,registry,photocraft only
+futures-task,0.3.34,0.3.34,no,,,,registry,both
+futures-util,0.3.34,0.3.34,no,,,,registry,both
+generic-array,,0.14.7,no,,,,registry,vectorcraft only
+gethostname,1.1.0,1.1.0,no,,,,registry,both
+getopts,0.2.24,,no,,,,registry,photocraft only
+getrandom,0.3.4 0.4.3,0.3.4 0.4.3,yes,runtime,,photocraft-automation,registry,both
+gif,0.14.2,0.14.2,yes,,runtime,vectorcraft-render,registry,both
+gl_generator,0.14.0,0.14.0,no,,,,registry,both
+glifo,0.2.0,0.2.0 0.3.0,no,,,,registry,both / versions differ
+glow,0.17.0,0.17.0,no,,,,registry,both
+glutin,0.32.3,0.32.3,no,,,,registry,both
+glutin-winit,0.5.0,0.5.0,no,,,,registry,both
+glutin_egl_sys,0.7.1,0.7.1,no,,,,registry,both
+glutin_glx_sys,0.6.1,0.6.1,no,,,,registry,both
+glutin_wgl_sys,0.6.1,0.6.1,no,,,,registry,both
+gpu-allocator,0.28.0,0.28.0,no,,,,registry,both
+guillotiere,0.7.0,0.7.0,no,,,,registry,both
+half,2.7.1,2.7.1,yes,runtime,,photocraft-codecs; photocraft-gpu,registry,both
+harfrust,0.12.0,0.12.0 0.13.3,yes,,runtime,vectorcraft-text,registry,both / versions differ
+hashbrown,0.15.5 0.16.1 0.17.1,0.15.5 0.16.1 0.17.1,no,,,,registry,both
+hayro-ccitt,,0.3.0,no,,,,registry,vectorcraft only
+hayro-cmap,,0.1.0,no,,,,registry,vectorcraft only
+hayro-interpret,,0.7.0,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+hayro-jbig2,,0.3.0,no,,,,registry,vectorcraft only
+hayro-jpeg2000,,0.3.5,no,,,,registry,vectorcraft only
+hayro-postscript,,0.1.0,no,,,,registry,vectorcraft only
+hayro-syntax,,0.7.2,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+heic-rs,0.1.1,,yes,runtime,,photocraft-heif,registry,photocraft only
+hermit-abi,0.5.3,0.5.3,no,,,,registry,both
+hex,0.4.3,0.4.3,no,,,,registry,both
+iana-time-zone,0.1.65,,no,,,,registry,photocraft only
+iana-time-zone-haiku,0.1.2,,no,,,,registry,photocraft only
+icu_collections,2.3.0,2.3.0,no,,,,registry,both
+icu_locale_core,2.3.0,2.3.0,no,,,,registry,both
+icu_locale_fallback,2.3.0,,no,,,,registry,photocraft only
+icu_locale_fallback_data,2.3.0,,no,,,,registry,photocraft only
+icu_normalizer,2.3.0,2.3.0,no,,,,registry,both
+icu_normalizer_data,2.3.0,2.3.0,no,,,,registry,both
+icu_properties,2.3.0,2.3.0,no,,,,registry,both
+icu_properties_data,2.3.0,2.3.0,no,,,,registry,both
+icu_provider,2.3.1,2.3.1,no,,,,registry,both
+icu_segmenter,2.3.0,,no,,,,registry,photocraft only
+icu_segmenter_data,2.3.0,,no,,,,registry,photocraft only
+ident_case,1.0.1,,no,,,,registry,photocraft only
+idna,,1.1.0,no,,,,registry,vectorcraft only
+idna_adapter,,1.2.2,no,,,,registry,vectorcraft only
+image,0.25.10,0.25.10,yes,runtime,runtime,photocraft-codecs; vectorcraft; vectorcraft-cad; vectorcraft-doc; vectorcraft-engine; vectorcraft-eps; vectorcraft-mcp; vectorcraft-metafile; vectorcraft-pdf; vectorcraft-render; vectorcraft-svg; vectorcraft-testkit; vectorcraft-tools; vectorcraft-trace; vectorcraft-ui-egui,registry,both
+image-webp,0.2.4,0.2.4,yes,runtime,,photocraft-codecs,registry,both
+imagesize,0.13.0,0.13.0 0.14.0 0.15.0,no,,,,registry,both / versions differ
+imgref,1.12.3,,no,,,,registry,photocraft only
+indexmap,2.14.2,2.14.2,no,,,,registry,both
+inout,,0.1.4,no,,,,registry,vectorcraft only
+interpolate_name,0.2.4,,no,,,,registry,photocraft only
+io-extras,0.19.0,,no,,,,registry,photocraft only
+io-lifetimes,2.0.4 3.0.1,,no,,,,registry,photocraft only
+ipnet,2.12.2,,no,,,,registry,photocraft only
+is-docker,0.2.0,,no,,,,registry,photocraft only
+is-terminal,0.4.17,,no,,,,registry,photocraft only
+is-wsl,0.4.0,,no,,,,registry,photocraft only
+itertools,0.10.5 0.14.0 0.15.0,0.15.0,no,,,,registry,both / versions differ
+itoa,1.0.18,1.0.18,no,,,,registry,both
+jni,0.22.4,0.22.4,no,,,,registry,both
+jni-macros,0.22.4,0.22.4,no,,,,registry,both
+jni-sys,0.3.1 0.4.1,0.3.1 0.4.1,no,,,,registry,both
+jni-sys-macros,0.4.1,0.4.1,no,,,,registry,both
+jobserver,0.1.35,0.1.35,no,,,,registry,both
+jpeg-encoder,0.6.1,0.6.1,yes,runtime,runtime,photocraft-codecs; vectorcraft-doc; vectorcraft-pdf; vectorcraft-render,registry,both
+js-sys,0.3.106,0.3.106,yes,runtime,runtime,photocraft-web; vectorcraft-web,registry,both
+keyboard-types,0.8.3,0.8.3,no,,,,registry,both
+khronos-egl,6.0.0,6.0.0,no,,,,registry,both
+khronos_api,3.1.0,3.1.0,no,,,,registry,both
+kittest,0.4.0,,no,,,,registry,photocraft only
+krilla,,0.8.2,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+kurbo,0.11.3 0.13.1,0.11.3 0.13.1,yes,,runtime,vectorcraft-brush; vectorcraft-cad; vectorcraft-color; vectorcraft-doc; vectorcraft-effects; vectorcraft-engine; vectorcraft-eps; vectorcraft-geom; vectorcraft-metafile; vectorcraft-pathops; vectorcraft-pdf; vectorcraft-svg; vectorcraft-testkit; vectorcraft-text; vectorcraft-tools; vectorcraft-trace,registry,both
+lazy_static,1.5.0,,no,,,,registry,photocraft only
+leb128fmt,0.1.0,0.1.0,no,,,,registry,both
+lebe,0.5.3,,no,,,,registry,photocraft only
+libc,0.2.189,0.2.189,no,,,,registry,both
+libfuzzer-sys,0.4.13,,no,,,,registry,photocraft only
+libloading,0.8.9,0.8.9,no,,,,registry,both
+libm,0.2.16,0.2.16,no,,,,registry,both
+libredox,0.1.25,0.1.25,no,,,,registry,both
+linebender_resource_handle,0.1.1,0.1.1,no,,,,registry,both
+linesweeper,,0.4.0,yes,,runtime,vectorcraft-pathops,registry,vectorcraft only
+linux-raw-sys,0.12.1 0.4.15,0.12.1 0.4.15,no,,,,registry,both
+litemap,0.8.3,0.8.3,no,,,,registry,both
+litrs,1.0.0,1.0.0,no,,,,registry,both
+lock_api,0.4.14,0.4.14,no,,,,registry,both
+log,0.4.34,0.4.34,yes,runtime,runtime,photocraft; photocraft-gpu; photocraft-ui-egui; photocraft-web; vectorcraft; vectorcraft-engine; vectorcraft-mcp; vectorcraft-pdf; vectorcraft-render; vectorcraft-text; vectorcraft-ui-egui; vectorcraft-web,registry,both
+loop9,0.1.5,,no,,,,registry,photocraft only
+maybe-owned,0.3.4,,no,,,,registry,photocraft only
+maybe-rayon,0.1.1,,no,,,,registry,photocraft only
+md-5,,0.10.6,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+memchr,2.8.3,2.8.3,no,,,,registry,both
+memmap2,0.9.11,0.9.11,no,,,,registry,both
+memoffset,0.9.1,0.9.1,no,,,,registry,both
+memory-stats,1.2.0,,yes,runtime,,photocraft-testkit,registry,photocraft only
+miniz_oxide,0.8.9 0.9.1,0.8.9 0.9.1,no,,,,registry,both
+mio,1.2.3,,no,,,,registry,photocraft only
+moxcms,0.8.1,0.8.1,yes,dev/test,runtime,photocraft-cms; vectorcraft-color,registry,both
+muda,0.21.1,0.21.0,yes,runtime,runtime,photocraft; vectorcraft,registry,both / versions differ
+naga,30.0.1,30.0.1,no,,,,registry,both
+naga-types,30.0.1,30.0.1,no,,,,registry,both
+ndk,0.9.0,0.9.0,no,,,,registry,both
+ndk-context,0.1.1,0.1.1,no,,,,registry,both
+ndk-sys,0.6.0+11769913,0.6.0+11769913,no,,,,registry,both
+new_debug_unreachable,1.0.6,,no,,,,registry,photocraft only
+no_std_io2,0.9.4,,no,,,,registry,photocraft only
+nohash-hasher,0.2.0,0.2.0,no,,,,registry,both
+nom,8.0.0,8.0.0,no,,,,registry,both
+noop_proc_macro,0.3.0,,no,,,,registry,photocraft only
+num-bigint,0.4.8,,no,,,,registry,photocraft only
+num-complex,0.4.6,,no,,,,registry,photocraft only
+num-derive,0.4.2,,no,,,,registry,photocraft only
+num-integer,0.1.47,,no,,,,registry,photocraft only
+num-rational,0.4.2,,no,,,,registry,photocraft only
+num-traits,0.2.19,0.2.19,no,,,,registry,both
+num_enum,0.7.6,0.7.6,no,,,,registry,both
+num_enum_derive,0.7.6,0.7.6,no,,,,registry,both
+objc-sys,0.3.5,0.3.5,no,,,,registry,both
+objc2,0.5.2 0.6.4,0.5.2 0.6.4,yes,runtime,runtime,photocraft; photocraft-tablet; vectorcraft,registry,both
+objc2-app-kit,0.2.2 0.3.2,0.2.2 0.3.2,yes,runtime,runtime,photocraft; photocraft-tablet; vectorcraft,registry,both
+objc2-cloud-kit,0.2.2,0.2.2,no,,,,registry,both
+objc2-contacts,0.2.2,0.2.2,no,,,,registry,both
+objc2-core-data,0.2.2,0.2.2,no,,,,registry,both
+objc2-core-foundation,0.3.2,0.3.2,no,,,,registry,both
+objc2-core-graphics,0.3.2,0.3.2,yes,dev/test,,photocraft-tablet,registry,both
+objc2-core-image,0.2.2,0.2.2,no,,,,registry,both
+objc2-core-location,0.2.2,0.2.2,no,,,,registry,both
+objc2-encode,4.1.0,4.1.0,no,,,,registry,both
+objc2-foundation,0.2.2 0.3.2,0.2.2 0.3.2,yes,runtime,runtime,photocraft; photocraft-tablet; vectorcraft,registry,both
+objc2-io-surface,0.3.2,0.3.2,no,,,,registry,both
+objc2-link-presentation,0.2.2,0.2.2,no,,,,registry,both
+objc2-metal,0.2.2 0.3.2,0.2.2 0.3.2,no,,,,registry,both
+objc2-quartz-core,0.2.2 0.3.2,0.2.2 0.3.2,no,,,,registry,both
+objc2-symbols,0.2.2,0.2.2,no,,,,registry,both
+objc2-ui-kit,0.2.2 0.3.2,0.2.2 0.3.2,no,,,,registry,both
+objc2-uniform-type-identifiers,0.2.2,0.2.2,no,,,,registry,both
+objc2-user-notifications,0.2.2,0.2.2,no,,,,registry,both
+once_cell,1.21.4,1.21.4,no,,,,registry,both
+oorandom,11.1.5,,no,,,,registry,photocraft only
+open,5.4.4,,yes,runtime,,photocraft,registry,photocraft only
+orbclient,0.3.55,0.3.55,no,,,,registry,both
+ordered-channel,,1.2.0,no,,,,registry,vectorcraft only
+ordered-float,5.5.0,5.5.0,no,,,,registry,both
+ordered-stream,0.2.0,0.2.0,no,,,,registry,both
+os_pipe,1.2.3,1.2.3,no,,,,registry,both
+parking,2.2.1,2.2.1,no,,,,registry,both
+parking_lot,0.12.5,0.12.5,no,,,,registry,both
+parking_lot_core,0.9.12,0.9.12,no,,,,registry,both
+parlance,0.1.0,,no,,,,registry,photocraft only
+parley,0.11.1,,yes,runtime,,photocraft-text,registry,photocraft only
+parley_data,0.11.1,,no,,,,registry,photocraft only
+paste,1.0.15,,no,,,,registry,photocraft only
+pastey,0.1.1 0.2.3,,no,,,,registry,photocraft only
+pdf-writer,,0.15.0,no,,,,registry,vectorcraft only
+peniko,0.6.1,0.6.1,no,,,,registry,both
+percent-encoding,2.3.2,2.3.2,no,,,,registry,both
+petgraph,0.8.3,0.8.3,no,,,,registry,both
+phf,0.13.1,0.13.1,no,,,,registry,both
+phf_generator,0.13.1,0.13.1,no,,,,registry,both
+phf_macros,0.13.1,0.13.1,no,,,,registry,both
+phf_shared,0.13.1,0.13.1,no,,,,registry,both
+pico-args,0.5.0,0.5.0,no,,,,registry,both
+pin-project,1.1.13,1.1.13,no,,,,registry,both
+pin-project-internal,1.1.13,1.1.13,no,,,,registry,both
+pin-project-lite,0.2.17,0.2.17,no,,,,registry,both
+piper,0.2.5,0.2.5,no,,,,registry,both
+pkg-config,0.3.34,0.3.34,no,,,,registry,both
+plain,0.2.3,0.2.3,no,,,,registry,both
+png,0.17.16 0.18.1,0.17.16 0.18.1,yes,runtime,,photocraft-codecs; photocraft-raw,registry,both
+polling,3.11.0,3.11.0,no,,,,registry,both
+pollster,0.4.0 1.0.1,0.4.0 1.0.1,yes,dev/test,,photocraft-gpu,registry,both
+polycool,0.4.0,0.4.0,no,,,,registry,both
+portable-atomic,1.15.0,1.15.0,no,,,,registry,both
+portable-atomic-util,0.2.8,0.2.8,no,,,,registry,both
+potential_utf,0.1.6,0.1.6,no,,,,registry,both
+ppv-lite86,0.2.21,0.2.21,no,,,,registry,both
+presser,0.3.1,0.3.1,no,,,,registry,both
+proc-macro-crate,3.5.0,3.5.0,no,,,,registry,both
+proc-macro2,1.0.107,1.0.107,no,,,,registry,both
+profiling,1.0.18,1.0.18,no,,,,registry,both
+profiling-procmacros,1.0.18,,no,,,,registry,photocraft only
+proptest,1.11.0,1.11.0,yes,dev/test,runtime,photocraft-codecs; photocraft-compose; photocraft-format; photocraft-io; photocraft-psd; photocraft-raster; vectorcraft-color; vectorcraft-doc; vectorcraft-engine; vectorcraft-format; vectorcraft-geom; vectorcraft-mcp; vectorcraft-pathops; vectorcraft-render; vectorcraft-svg; vectorcraft-testkit,registry,both
+psd,,0.3.5,yes,,dev/test,vectorcraft-render,registry,vectorcraft only
+pulp,0.22.3,,no,,,,registry,photocraft only
+pulp-wasm-simd-flag,0.1.1,,no,,,,registry,photocraft only
+pxfm,0.1.30,0.1.30,no,,,,registry,both
+qoi,0.4.1,,no,,,,registry,photocraft only
+quick-error,1.2.3 2.0.1,1.2.3 2.0.1,no,,,,registry,both
+quick-xml,0.41.0,0.41.0,no,,,,registry,both
+quote,1.0.47,1.0.47,no,,,,registry,both
+r-efi,5.3.0 6.0.0,5.3.0 6.0.0,no,,,,registry,both
+rand,0.9.5,0.9.5,no,,,,registry,both
+rand_chacha,0.9.0,0.9.0,no,,,,registry,both
+rand_core,0.9.5,0.9.5,no,,,,registry,both
+rand_xorshift,0.4.0,0.4.0,no,,,,registry,both
+range-alloc,0.1.5,0.1.5,no,,,,registry,both
+rav1e,0.8.1,,no,,,,registry,photocraft only
+ravif,0.13.0,,no,,,,registry,photocraft only
+raw-cpuid,11.6.0,,no,,,,registry,photocraft only
+raw-window-handle,0.6.2,0.6.2,no,,,,registry,both
+raw-window-metal,1.1.0,1.1.0,no,,,,registry,both
+rayon,1.12.0,1.12.0,yes,runtime,,photocraft-algo; photocraft-cms; photocraft-codecs; photocraft-compose; photocraft-engine; photocraft-gpu; photocraft-plugins; photocraft-raw; photocraft-ui-egui; photocraft-vector,registry,both
+rayon-core,1.13.0,1.13.0,no,,,,registry,both
+read-fonts,0.41.0,0.39.2 0.41.0 0.43.3 0.44.0,no,,,,registry,both / versions differ
+reborrow,0.5.5,,no,,,,registry,photocraft only
+redox_syscall,0.4.1 0.5.18 0.9.4,0.4.1 0.5.18 0.9.4,no,,,,registry,both
+ref-cast,1.0.27,,no,,,,registry,photocraft only
+ref-cast-impl,1.0.27,,no,,,,registry,photocraft only
+regex,1.13.1,,no,,,,registry,photocraft only
+regex-automata,0.4.18,,no,,,,registry,photocraft only
+regex-syntax,0.8.11,0.8.11,no,,,,registry,both
+renderdoc-sys,1.1.0,1.1.0,no,,,,registry,both
+resvg,0.45.1,0.45.1,yes,,dev/test,vectorcraft-svg,registry,both
+rfd,0.17.2,0.17.2,yes,runtime,runtime,photocraft; photocraft-web; vectorcraft; vectorcraft-web,registry,both
+rgb,0.8.53,0.8.53,no,,,,registry,both
+rmcp,3.5.0,,yes,runtime,,photocraft-automation,registry,photocraft only
+rmcp-macros,3.5.0,,no,,,,registry,photocraft only
+ron,0.12.2,,yes,runtime,,photocraft,registry,photocraft only
+roxmltree,0.20.0,0.20.0 0.21.1,no,,,,registry,both / versions differ
+rustc-hash,1.1.0 2.1.3,1.1.0 2.1.3,no,,,,registry,both
+rustc_version,0.4.1,0.4.1,no,,,,registry,both
+rustix,0.38.44 1.1.5,0.38.44 1.1.5,no,,,,registry,both
+rustix-linux-procfs,0.1.1,,no,,,,registry,photocraft only
+rustversion,1.0.23,1.0.23,no,,,,registry,both
+rusty-fork,0.3.1,0.3.1,no,,,,registry,both
+rustybuzz,,0.20.1,no,,,,registry,vectorcraft only
+ruzstd,0.9.0,,yes,runtime,,photocraft-format,registry,photocraft only
+ryu,,1.0.23,no,,,,registry,vectorcraft only
+same-file,1.0.6,1.0.6,no,,,,registry,both
+schemars,1.2.2,,yes,runtime,,photocraft-automation,registry,photocraft only
+schemars_derive,1.2.2,,no,,,,registry,photocraft only
+scoped-tls,1.0.1,1.0.1,no,,,,registry,both
+scopeguard,1.2.0,1.2.0,no,,,,registry,both
+self_cell,1.3.0,1.3.0,no,,,,registry,both
+semver,1.0.28,1.0.28,no,,,,registry,both
+serde,1.0.229,1.0.229,yes,runtime,runtime,photocraft-algo; photocraft-automation; photocraft-color; photocraft-doc; photocraft-engine; photocraft-format; photocraft-geom; photocraft-paint; photocraft-plugins; photocraft-psd; photocraft-raster; photocraft-ui-egui; vectorcraft-brush; vectorcraft-color; vectorcraft-doc; vectorcraft-engine; vectorcraft-format; vectorcraft-geom; vectorcraft-pdf; vectorcraft-plugins; vectorcraft-svg; vectorcraft-tools; vectorcraft-trace; vectorcraft-ui-egui; xtask,registry,both
+serde_core,1.0.229,1.0.229,no,,,,registry,both
+serde_derive,1.0.229,1.0.229,no,,,,registry,both
+serde_derive_internals,0.30.0,,no,,,,registry,photocraft only
+serde_json,1.0.151,1.0.151,yes,runtime,runtime,photocraft; photocraft-algo; photocraft-automation; photocraft-cli; photocraft-doc; photocraft-engine; photocraft-format; photocraft-io; photocraft-paint; photocraft-plugins; photocraft-testkit; photocraft-ui-egui; vectorcraft; vectorcraft-brush; vectorcraft-cad; vectorcraft-cli; vectorcraft-color; vectorcraft-doc; vectorcraft-effects; vectorcraft-engine; vectorcraft-format; vectorcraft-geom; vectorcraft-mcp; vectorcraft-pdf; vectorcraft-plugins; vectorcraft-render; vectorcraft-svg; vectorcraft-testkit; vectorcraft-tools; vectorcraft-trace; vectorcraft-ui-egui; xtask,registry,both
+serde_repr,0.1.21,0.1.21,no,,,,registry,both
+serde_spanned,1.1.1,1.1.1,no,,,,registry,both
+sha2,,0.10.9,yes,,runtime,vectorcraft-pdf,registry,vectorcraft only
+shlex,2.0.1,2.0.1,no,,,,registry,both
+signal-hook-registry,1.4.8,1.4.8,no,,,,registry,both
+simd-adler32,0.3.10,0.3.10,no,,,,registry,both
+simd_cesu8,1.2.0,1.2.0,no,,,,registry,both
+simd_helpers,0.1.0,,no,,,,registry,photocraft only
+simdutf8,0.1.5,0.1.5,no,,,,registry,both
+simplecss,0.2.2,0.2.2,no,,,,registry,both
+siphasher,1.0.4,1.0.4,no,,,,registry,both
+skrifa,0.44.0,0.42.1 0.44.0 0.47.0,yes,runtime,runtime,photocraft-text; vectorcraft-pdf; vectorcraft-svg; vectorcraft-text,registry,both / versions differ
+slab,0.4.12,0.4.12,no,,,,registry,both
+slotmap,1.1.1,1.1.1,no,,,,registry,both
+smallvec,1.16.2,1.16.2,yes,,runtime,vectorcraft-pdf,registry,both
+smithay-client-toolkit,0.19.2 0.20.0,0.19.2 0.20.0,no,,,,registry,both
+smithay-clipboard,0.7.3,0.7.3,no,,,,registry,both
+smol_str,0.2.2,0.2.2,no,,,,registry,both
+socket2,0.6.5,0.6.5,yes,,dev/test,vectorcraft-mcp,registry,both
+spin,0.9.9,0.9.9,no,,,,registry,both
+spirv,0.4.0+sdk-1.4.341.0,0.4.0+sdk-1.4.341.0,no,,,,registry,both
+stable_deref_trait,1.2.1,1.2.1,no,,,,registry,both
+static_assertions,1.1.0,1.1.0,no,,,,registry,both
+strict-num,0.1.1,0.1.1,no,,,,registry,both
+string-interner,0.19.0,0.19.0,no,,,,registry,both
+strsim,0.11.1,,no,,,,registry,photocraft only
+subsetter,,0.2.6,yes,,runtime,vectorcraft-text,registry,vectorcraft only
+svgtypes,0.15.3,0.15.3 0.16.1,yes,,runtime,vectorcraft-svg,registry,both / versions differ
+syn,2.0.119 3.0.6,2.0.119 3.0.6,no,,,,registry,both
+synstructure,0.14.0,0.14.0,no,,,,registry,both
+sys-locale,0.3.2,,yes,runtime,,photocraft-ui-egui,registry,photocraft only
+tempfile,3.27.0,3.27.0,no,,,,registry,both
+termcolor,1.4.1,1.4.1,no,,,,registry,both
+thiserror,1.0.69 2.0.21,1.0.69 2.0.21,yes,runtime,runtime,photocraft-automation; photocraft-codecs; photocraft-engine; photocraft-format; photocraft-io; photocraft-plugins; photocraft-psd; vectorcraft-color; vectorcraft-doc; vectorcraft-engine; vectorcraft-format; vectorcraft-geom; vectorcraft-pathops; vectorcraft-pdf; vectorcraft-plugins; vectorcraft-svg; vectorcraft-trace,registry,both
+thiserror-impl,1.0.69 2.0.21,1.0.69 2.0.21,no,,,,registry,both
+thread_local,,1.1.10,no,,,,registry,vectorcraft only
+tiff,0.11.3,0.11.3,yes,runtime,runtime,photocraft-codecs; vectorcraft-doc; vectorcraft-render,registry,both
+tiny-skia,0.11.4,0.11.4,no,,,,registry,both
+tiny-skia-path,0.11.4,0.11.4 0.12.0,no,,,,registry,both / versions differ
+tinystr,0.8.4,0.8.4,no,,,,registry,both
+tinytemplate,1.2.1,,no,,,,registry,photocraft only
+tinyvec,,1.13.3,no,,,,registry,vectorcraft only
+tokio,1.53.1,1.53.1,yes,runtime,,photocraft-automation; photocraft-cli,registry,both
+tokio-macros,2.7.2,,no,,,,registry,photocraft only
+tokio-stream,0.1.19,,no,,,,registry,photocraft only
+tokio-util,0.7.19,,no,,,,registry,photocraft only
+toml,1.1.6+spec-1.1.0,1.1.6+spec-1.1.0,yes,runtime,build,photocraft-ui-egui; vectorcraft-ui-egui; xtask,registry,both
+toml_datetime,1.1.1+spec-1.1.0,1.1.1+spec-1.1.0,no,,,,registry,both
+toml_edit,0.25.15+spec-1.1.0,0.25.15+spec-1.1.0,no,,,,registry,both
+toml_parser,1.1.3+spec-1.1.0,1.1.3+spec-1.1.0,no,,,,registry,both
+toml_writer,1.1.2+spec-1.1.0,1.1.2+spec-1.1.0,no,,,,registry,both
+tracing,0.1.44,0.1.44,no,,,,registry,both
+tracing-attributes,0.1.31,0.1.31,no,,,,registry,both
+tracing-core,0.1.36,0.1.36,no,,,,registry,both
+tree_magic_mini,3.2.2,3.2.2,no,,,,registry,both
+ttf-parser,,0.25.1,no,,,,registry,vectorcraft only
+twox-hash,2.1.4,,no,,,,registry,photocraft only
+type-map,0.5.1,0.5.1,no,,,,registry,both
+typeid,1.0.3,,no,,,,registry,photocraft only
+typenum,,1.20.1,no,,,,registry,vectorcraft only
+uds_windows,1.2.1,1.2.1,no,,,,registry,both
+unarray,0.1.4,0.1.4,no,,,,registry,both
+unicode-bidi,,0.3.18,yes,,runtime,vectorcraft-text,registry,vectorcraft only
+unicode-bidi-mirroring,,0.4.0,no,,,,registry,vectorcraft only
+unicode-ccc,,0.4.0,no,,,,registry,vectorcraft only
+unicode-general-category,1.1.0,1.1.0,yes,,runtime,vectorcraft-text,registry,both
+unicode-ident,1.0.26,1.0.26,no,,,,registry,both
+unicode-properties,,0.1.4,no,,,,registry,vectorcraft only
+unicode-script,,0.5.8,yes,,runtime,vectorcraft-text,registry,vectorcraft only
+unicode-segmentation,1.13.3,1.13.3,no,,,,registry,both
+unicode-vo,,0.1.0,no,,,,registry,vectorcraft only
+unicode-width,0.2.2,0.2.2,no,,,,registry,both
+url,,2.5.8,no,,,,registry,vectorcraft only
+usvg,0.45.1,0.45.1 0.48.1,yes,,runtime,vectorcraft-svg,registry,both / versions differ
+utf8_iter,1.0.4,1.0.4,no,,,,registry,both
+uuid,1.26.1,1.26.1,no,,,,registry,both
+v_frame,0.3.9,,no,,,,registry,photocraft only
+vello_common,0.1.0,0.1.0 0.2.0,yes,,runtime,vectorcraft-render,registry,both / versions differ
+vello_cpu,0.1.0,0.1.0 0.2.0,yes,,runtime,vectorcraft-render,registry,both / versions differ
+version_check,0.9.5,0.9.5,no,,,,registry,both
+wait-timeout,0.2.1,0.2.1,no,,,,registry,both
+walkdir,2.5.0,2.5.0,no,,,,registry,both
+wasi,0.11.1+wasi-snapshot-preview1,,no,,,,registry,photocraft only
+wasip2,1.0.4+wasi-0.2.12,1.0.4+wasi-0.2.12,no,,,,registry,both
+wasm-bindgen,0.2.129,0.2.129,yes,runtime,runtime,photocraft-web; vectorcraft-web,registry,both
+wasm-bindgen-futures,0.4.79,0.4.79,yes,runtime,runtime,photocraft-web; vectorcraft-web,registry,both
+wasm-bindgen-macro,0.2.129,0.2.129,no,,,,registry,both
+wasm-bindgen-macro-support,0.2.129,0.2.129,no,,,,registry,both
+wasm-bindgen-shared,0.2.129,0.2.129,no,,,,registry,both
+wasm-encoder,0.261.0,0.261.0,no,,,,registry,both
+wasmi,2.0.0,2.0.0,yes,runtime,runtime,photocraft-plugins; vectorcraft-plugins,registry,both
+wasmi_collections,2.0.0,2.0.0,no,,,,registry,both
+wasmi_core,2.0.0,2.0.0,no,,,,registry,both
+wasmi_ir,2.0.0,2.0.0,no,,,,registry,both
+wasmparser,0.228.0 0.261.0,0.228.0 0.261.0,no,,,,registry,both
+wast,261.0.0,261.0.0,no,,,,registry,both
+wat,1.261.0,1.261.0,yes,dev/test,dev/test,photocraft-engine; photocraft-plugins; vectorcraft-engine; vectorcraft-plugins; vectorcraft-ui-egui,registry,both
+wayland-backend,0.3.17,0.3.17,no,,,,registry,both
+wayland-client,0.31.15,0.31.15,no,,,,registry,both
+wayland-csd-frame,0.3.0,0.3.0,no,,,,registry,both
+wayland-cursor,0.31.14,0.31.14,no,,,,registry,both
+wayland-protocols,0.32.13,0.32.13,no,,,,registry,both
+wayland-protocols-experimental,20250721.0.1,20250721.0.1,no,,,,registry,both
+wayland-protocols-misc,0.3.12,0.3.12,no,,,,registry,both
+wayland-protocols-plasma,0.3.12,0.3.12,no,,,,registry,both
+wayland-protocols-wlr,0.3.12,0.3.12,no,,,,registry,both
+wayland-scanner,0.31.11,0.31.11,no,,,,registry,both
+wayland-sys,0.31.11,0.31.11,no,,,,registry,both
+web-sys,0.3.106,0.3.106,yes,runtime,runtime,photocraft-web; vectorcraft-web,registry,both
+web-time,1.1.0,1.1.0,no,,,,registry,both
+webbrowser,,1.2.4,yes,,runtime,vectorcraft,registry,vectorcraft only
+weezl,0.1.12,0.1.12,yes,,runtime,vectorcraft-render,registry,both
+wgpu,30.0.1,30.0.1,yes,runtime,,photocraft-gpu,registry,both
+wgpu-core,30.0.1,30.0.1,no,,,,registry,both
+wgpu-core-deps-apple,30.0.1,30.0.1,no,,,,registry,both
+wgpu-core-deps-emscripten,30.0.1,30.0.1,no,,,,registry,both
+wgpu-core-deps-wasm,30.0.1,30.0.1,no,,,,registry,both
+wgpu-core-deps-windows-linux-android,30.0.1,30.0.1,no,,,,registry,both
+wgpu-hal,30.0.1,30.0.1,no,,,,registry,both
+wgpu-naga-bridge,30.0.1,30.0.1,no,,,,registry,both
+wgpu-types,30.0.1,30.0.1,no,,,,registry,both
+winapi-util,0.1.11,0.1.11,no,,,,registry,both
+windows,0.62.2,0.62.2,no,,,,registry,both
+windows-collections,0.3.2,0.3.2,no,,,,registry,both
+windows-core,0.62.2,0.62.2,no,,,,registry,both
+windows-future,0.3.2,0.3.2,no,,,,registry,both
+windows-implement,0.60.2,0.60.2,no,,,,registry,both
+windows-interface,0.59.3,0.59.3,no,,,,registry,both
+windows-link,0.2.1,0.2.1,no,,,,registry,both
+windows-numerics,0.3.1,0.3.1,no,,,,registry,both
+windows-registry,,0.6.1,yes,,runtime,vectorcraft-text,registry,vectorcraft only
+windows-result,0.4.1,0.4.1,no,,,,registry,both
+windows-strings,0.5.1,0.5.1,no,,,,registry,both
+windows-sys,0.52.0 0.59.0 0.60.2 0.61.2,0.52.0 0.59.0 0.60.2 0.61.2,no,,,,registry,both
+windows-targets,0.52.6 0.53.5,0.52.6 0.53.5,no,,,,registry,both
+windows-threading,0.2.1,0.2.1,no,,,,registry,both
+windows_aarch64_gnullvm,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_aarch64_msvc,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_i686_gnu,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_i686_gnullvm,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_i686_msvc,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_x86_64_gnu,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_x86_64_gnullvm,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+windows_x86_64_msvc,0.52.6 0.53.1,0.52.6 0.53.1,no,,,,registry,both
+winit,0.30.13,0.30.13,yes,,runtime,vectorcraft,registry,both
+winnow,1.0.4,1.0.4,no,,,,registry,both
+winresource,0.1.31,0.1.31,yes,build,build,photocraft; vectorcraft,registry,both
+winsafe,0.0.29,,yes,runtime,,photocraft,registry,photocraft only
+winx,0.36.4,,no,,,,registry,photocraft only
+wit-bindgen,0.57.1,0.57.1,no,,,,registry,both
+wl-clipboard-rs,0.9.4,0.9.4,no,,,,registry,both
+write-fonts,,0.48.1,yes,,runtime,vectorcraft-text,registry,vectorcraft only
+writeable,0.6.4,0.6.4,no,,,,registry,both
+x11-dl,2.21.0,2.21.0,no,,,,registry,both
+x11rb,0.13.2,0.13.2,yes,runtime,,photocraft; photocraft-tablet,registry,both
+x11rb-protocol,0.13.2,0.13.2,no,,,,registry,both
+xcursor,0.3.11,0.3.11,no,,,,registry,both
+xkbcommon-dl,0.4.2,0.4.2,no,,,,registry,both
+xkeysym,0.2.1,0.2.1,no,,,,registry,both
+xml-rs,0.8.29,0.8.29,no,,,,registry,both
+xmlwriter,0.1.0,0.1.0,no,,,,registry,both
+xmp-writer,,0.3.3,no,,,,registry,vectorcraft only
+y4m,0.8.0,,no,,,,registry,photocraft only
+yoke,0.8.3,0.8.3,no,,,,registry,both
+yoke-derive,0.8.3,0.8.3,no,,,,registry,both
+zbus,5.19.0,5.19.0,no,,,,registry,both
+zbus-lockstep,0.5.2,0.5.2,no,,,,registry,both
+zbus-lockstep-macros,0.5.2,0.5.2,no,,,,registry,both
+zbus_macros,5.19.0,5.19.0,no,,,,registry,both
+zbus_names,4.3.4,4.3.4,no,,,,registry,both
+zbus_xml,5.2.1,5.2.1,no,,,,registry,both
+zcheapstr,1.1.0,1.1.0,no,,,,registry,both
+zerocopy,0.8.59,0.8.59,no,,,,registry,both
+zerocopy-derive,0.8.59,0.8.59,no,,,,registry,both
+zerofrom,0.1.8,0.1.8,no,,,,registry,both
+zerofrom-derive,0.1.8,0.1.8,no,,,,registry,both
+zerotrie,0.2.5,0.2.5,no,,,,registry,both
+zerovec,0.11.8,0.11.8,no,,,,registry,both
+zerovec-derive,0.11.6,0.11.6,no,,,,registry,both
+zlib-rs,0.6.8,0.6.8,no,,,,registry,both
+zmij,1.0.23,1.0.23,no,,,,registry,both
+zune-core,0.5.3,0.5.3,yes,runtime,,photocraft-codecs,registry,both
+zune-inflate,0.2.54,,no,,,,registry,photocraft only
+zune-jpeg,0.5.15,0.5.15,yes,runtime,runtime,photocraft-codecs; vectorcraft-doc,registry,both
+zvariant,5.15.0,5.15.0,no,,,,registry,both
+zvariant_derive,5.15.0,5.15.0,no,,,,registry,both
+zvariant_utils,4.2.0,4.2.0,no,,,,registry,both

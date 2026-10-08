@@ -1,0 +1,15 @@
+[package]
+name = "astudio-testkit"
+description = "A-Studio: Test helpers and fixtures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-doc = { path = "../doc" }
+
+[lints]
+workspace = true

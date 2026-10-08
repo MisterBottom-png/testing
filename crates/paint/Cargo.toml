@@ -1,0 +1,17 @@
+[package]
+name = "astudio-paint"
+description = "A-Studio: Brush engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-doc = { path = "../doc" }
+
+[lints]
+workspace = true

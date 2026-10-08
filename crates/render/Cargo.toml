@@ -1,0 +1,20 @@
+[package]
+name = "astudio-render"
+description = "A-Studio: vello_cpu renderer; draws vector layers into tiles"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-doc = { path = "../doc" }
+astudio-text = { path = "../text" }
+astudio-effects = { path = "../effects" }
+
+[lints]
+workspace = true

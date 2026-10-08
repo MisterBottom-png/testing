@@ -1,0 +1,15 @@
+[package]
+name = "a-studio"
+description = "A-Studio: Desktop app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-engine = { path = "../../crates/engine" }
+astudio-ui = { path = "../../crates/ui" }
+
+[lints]
+workspace = true

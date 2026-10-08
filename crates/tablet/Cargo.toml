@@ -1,0 +1,23 @@
+[package]
+name = "astudio-tablet"
+description = "A-Studio: Pen tablet input; the only crate allowed `unsafe` (macOS AppKit)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+# Not the workspace lints: this is the one crate allowed `unsafe` (macOS AppKit interop),
+# so `unsafe_code` is deny (overridable per block with a SAFETY comment), not forbid.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+todo = "deny"
+unreachable = "deny"

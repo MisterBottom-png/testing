@@ -1,0 +1,14 @@
+[package]
+name = "astudio-color"
+description = "A-Studio: Colour models, runtime bit depth, ICC colour management, blend modes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+
+[lints]
+workspace = true

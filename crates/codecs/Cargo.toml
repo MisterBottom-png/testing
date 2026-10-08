@@ -1,0 +1,13 @@
+[package]
+name = "astudio-codecs"
+description = "A-Studio: Standalone image codecs (PNG, JPEG, TIFF, WebP, EXR, AVIF, HEIC, raw)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

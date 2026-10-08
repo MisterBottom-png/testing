@@ -1,0 +1,17 @@
+[package]
+name = "astudio-effects"
+description = "A-Studio: Live effects and filters shared by pixel and vector layers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-vdoc = { path = "../vdoc" }
+
+[lints]
+workspace = true

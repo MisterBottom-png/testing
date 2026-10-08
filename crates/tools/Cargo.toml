@@ -1,0 +1,16 @@
+[package]
+name = "astudio-tools"
+description = "A-Studio: Tool gestures that emit commands"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-doc = { path = "../doc" }
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "astudio-compose"
+description = "A-Studio: CPU compositor, the reference oracle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
+astudio-doc = { path = "../doc" }
+astudio-text = { path = "../text" }
+astudio-effects = { path = "../effects" }
+
+[lints]
+workspace = true

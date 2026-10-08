@@ -1,0 +1,21 @@
+A-Studio
+Copyright (c) 2026 the A-Studio contributors.
+Licensed under the MIT License or the Apache License, Version 2.0, at your option
+(LICENSE-MIT, LICENSE-APACHE).
+
+A-Studio is based on PhotoCraft and VectorCraft by the ArtCraft team and contributors:
+  PhotoCraft  - Copyright (c) 2026 ArtCraft Team and the PhotoCraft contributors, MIT OR Apache-2.0
+                https://github.com/storytold/photocraft
+  VectorCraft - Copyright (c) 2026 ArtCraft Team and the VectorCraft contributors, MIT OR Apache-2.0
+                https://github.com/storytold/vectorcraft
+A-Studio is not made, sponsored or endorsed by the ArtCraft team. The ArtCraft name and logos are
+trademarks of the ArtCraft Team and are not used in A-Studio.
+
+Adobe, Photoshop and Illustrator are trademarks or registered trademarks of Adobe Inc. A-Studio is
+not affiliated with Adobe; these names describe compatible workflows only.
+
+Third-party material
+When upstream code and assets are merged in, copy each upstream NOTICE entry here (fonts under the
+SIL OFL 1.1, Lucide icons under ISC, the SCOWL word list, the CC BY 3.0 magnetic lasso glyph, Adobe
+CMap resources under BSD-3-Clause through hayro-cmap, the jpeg-encoder IJG notice, egui default
+fonts). The per-file list is in ASSETS.md.
