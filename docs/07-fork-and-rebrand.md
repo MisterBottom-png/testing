@@ -19,7 +19,9 @@ The code licence (MIT OR Apache-2.0) is unaffected: keep `LICENSE-MIT`, `LICENSE
 
 ## Steps
 
-1. Delete `docs/brand/` from both upstream trees.
+1. Never bring `docs/brand/` from either upstream tree into A-Studio. `upstream/` stays a read-only clone;
+   `scripts/rebrand-scan.sh --shipped` (CI) fails on brand files, upstream icon files and app ids.
+   Name A-Studio fixtures and icons without a `photocraft`/`vectorcraft` prefix, or the scan blocks them.
 2. Replace app icons (`assets/app-icon/` in both): PhotoCraft's kitsune and VectorCraft's dragon are the
    owner's artwork. Their files are MIT OR Apache-2.0, so keeping them is legally possible, but they
    identify the ArtCraft apps; replace them with A-Studio's own icon.
@@ -32,7 +34,7 @@ The code licence (MIT OR Apache-2.0) is unaffected: keep `LICENSE-MIT`, `LICENSE
    | `ai.storyteller.vectorcraft` | same id; there is one app now |
 
    Generate new MSI `UpgradeCode` GUIDs; never reuse upstream ones.
-4. Source files with ArtCraft text or links to change:
+4. Source files with ArtCraft text or links to change when they are ported (P4 for the UI crates):
    - PhotoCraft `crates/ui-egui/src/panels.rs`, `menus.rs`, `links.rs`
    - VectorCraft `crates/ui-egui/src/menus.rs`, `community.rs`, `dialogs/about.rs`, `crates/engine/src/cmd/help.rs`
    - Help menu links (Discord, getartcraft.com) point to A-Studio's own pages instead.
