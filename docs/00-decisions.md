@@ -9,6 +9,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D3 | Text engine | VectorCraft's engine, with four PhotoCraft pieces ported onto it | Recommended, accepted |
 | D4 | Native file | The `.pcraft` bundle layout under a new `.astudio` extension; vector layers stored as `.vectorcraft` v3 subtrees | Recommended, accepted |
 | D5 | Name | A-Studio | Owner |
+| D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
 
 ## D1 Fork
 
@@ -45,3 +46,16 @@ layers. Readers for `.pcraft` and `.vectorcraft` stay. Spec: `docs/05-file-forma
 A-Studio. A quick web search on 8 October 2026 found no graphics editor of that name. That is not a
 trademark clearance: search the EUIPO (TMview) and USPTO registers before the first public build.
 Avoid any Adobe-like naming (Ps, Ai, "Photo-", "-shop").
+
+## D7 Platforms
+
+Decided by the owner on 8 October 2026: A-Studio is a Windows-only desktop app.
+
+- Reason: the owner chose to focus on one desktop platform.
+- Builds, tests, CI, the baseline and packaging target Windows (x64 first). Linux and macOS builds,
+  packages (AppImage, deb, rpm, Flatpak, FreeBSD, `.dmg`, notarization) and their icon formats
+  (`.icns`, hicolor) are dropped.
+- Not changed by this decision: the web build and the rule that L0 to L6 build for
+  `wasm32-unknown-unknown`. They stay until the owner decides otherwise.
+- Developers and agents may still build and test on Linux or macOS; that is a dev convenience, not
+  a supported platform.
