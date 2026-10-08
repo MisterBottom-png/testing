@@ -5,6 +5,9 @@
 //! file has a row in ASSETS.md. More tasks (corpus, bundle, ico, version) are ported from the
 //! upstream xtasks in later phases.
 
+#![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
 mod assets;
 mod table;
 

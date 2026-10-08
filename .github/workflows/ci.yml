@@ -21,8 +21,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - run: cargo run -p xtask -- layers
-      - run: cargo run -p xtask -- assets
+      - run: cargo xtask layers
+      - run: cargo xtask assets
       - name: Web build (L0 to L6)
         run: cargo check --workspace --target wasm32-unknown-unknown --exclude a-studio --exclude a-studio-cli --exclude xtask
       - name: Rebrand scan

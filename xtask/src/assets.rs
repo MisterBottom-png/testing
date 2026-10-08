@@ -54,17 +54,23 @@ pub fn missing(files: &[String], assets_md: &str) -> Vec<String> {
     files.iter().filter(|f| is_asset(f) && !assets_md.contains(&format!("`{f}`"))).cloned().collect()
 }
 
+/// Splits `git ls-files -z` output. `-z` gives raw paths; without it git quotes non-ASCII names
+/// (`"assets/caf\303\251.png"`) and such files would slip past the check.
+fn split_z(out: &[u8]) -> Vec<String> {
+    out.split(|b| *b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect()
+}
+
 /// Files git knows about (tracked, or untracked and not ignored) that still exist on disk.
 fn repo_files(root: &Path) -> Result<Vec<String>, String> {
     let out = Command::new("git")
         .current_dir(root)
-        .args(["ls-files", "--cached", "--others", "--exclude-standard"])
+        .args(["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
         .output()
         .map_err(|e| format!("git ls-files: {e}"))?;
     if !out.status.success() {
         return Err(format!("git ls-files failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
-    Ok(String::from_utf8_lossy(&out.stdout).lines().filter(|l| root.join(l).exists()).map(str::to_owned).collect())
+    Ok(split_z(&out.stdout).into_iter().filter(|l| root.join(l).exists()).collect())
 }
 
 pub fn run(root: &Path) -> Result<usize, String> {
@@ -89,5 +95,11 @@ mod tests {
         assert_eq!(missing(&files, md), vec!["docs/images/b.png".to_string(), "tests/fixture.png".into()]);
         assert!(!is_asset("crates/x/src/lib.rs"));
         assert!(is_asset("assets/fonts/OFL.txt"));
+    }
+
+    #[test]
+    fn non_ascii_paths_are_kept_verbatim() {
+        let out = "assets/caf\u{e9}.png\0docs/a b.svg\0".as_bytes();
+        assert_eq!(split_z(out), vec!["assets/caf\u{e9}.png".to_string(), "docs/a b.svg".into()]);
     }
 }
