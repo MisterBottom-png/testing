@@ -156,3 +156,30 @@ fn a_canvas_beyond_the_limit_is_an_error() {
     assert_eq!(r, Err(RedrawError::TooLarge));
     assert!(layer.fresh_cache().is_none());
 }
+
+/// Edits of objects that straddle the 4096-px chunk edge, on a canvas starting left of 0
+/// (adapted from the P1-02 review probe).
+#[test]
+fn edits_across_a_chunk_edge_equal_a_full_redraw() {
+    let mut layer = VectorLayer::new(synthetic(3000, 4400.0, 600.0), 72.0);
+    let canvas = Rect::new(-100, 0, 9000, 600);
+    let mut tiles = VectorTiles::new();
+    tiles.redraw(&mut layer, canvas, None).expect("full");
+    let target = layer.doc.layers.first().map(|l| l.id);
+    let kids = layer.doc.children(target).cloned().expect("children");
+    let mut n = 0;
+    for node in kids.iter().filter(|k| painted_bounds(k).is_some_and(|b| b.x0 < 4096.0 && b.x1 > 4096.0)).take(3) {
+        let before = painted_bounds(node).expect("bounds");
+        layer.edit().node_mut(node.id).expect("node").transform(Affine::translate((3.3, 250.7)), false);
+        let after = layer.doc.node(node.id).and_then(painted_bounds).expect("bounds");
+        let dirty = dirty_px(&layer, before.union(after));
+        let s = tiles.redraw(&mut layer, canvas, Some(dirty)).expect("partial");
+        assert!(!s.full);
+        let mut fresh = layer.clone();
+        fresh.cache = None;
+        VectorTiles::new().redraw(&mut fresh, canvas, None).expect("full");
+        assert!(layer.cache == fresh.cache, "a partial redraw across the chunk edge differs from a full one");
+        n += 1;
+    }
+    assert!(n > 0, "the test document has objects across x = 4096");
+}
