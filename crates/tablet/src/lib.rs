@@ -1,6 +1,6 @@
 //! # astudio-tablet (L0 standalone)
 //!
-//! Pen tablet input; the only crate allowed `unsafe` (macOS AppKit).
+//! Pen tablet input; the only crate allowed `unsafe` (Windows pen APIs: Wintab / Windows Ink).
 //!
 //! Built from: pc tablet (see `docs/02-architecture.md`).
 //! Status: empty stub. Port the upstream crate here in the roadmap phase that owns it.
