@@ -666,7 +666,9 @@ fn contract_violations_do_not_panic() {
     bad.eval_trilinear(&[0.5, 0.5], &mut out);
     let lab = Transform::new(srgb(), lab(), Intent::RelativeColorimetric, false).unwrap();
     let to_gray = Transform::new(Builtin::CoatedCmyk.profile(), Builtin::GrayGamma22.profile(), Intent::RelativeColorimetric, false).unwrap();
-    assert_eq!(Lut3d::from_transform(&to_gray, 17).size, 2, "a 4-input transform gives an identity LUT");
+    let id = Lut3d::from_transform(&to_gray, 17);
+    assert_eq!(id.size, 17, "a 4-input transform gives an identity LUT of the asked size");
+    assert_eq!((id.data[1], id.data[17 * 17 * 17 - 1]), ([1.0 / 16.0, 0.0, 0.0, 1.0], [1.0; 4]));
     assert_eq!(Lut3d::from_transform(&lab, 0).size, 2);
     assert_eq!(Lut3d::from_transform(&lab, usize::MAX).size, Lut3d::MAX_SIZE);
 }

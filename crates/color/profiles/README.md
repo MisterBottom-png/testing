@@ -11,6 +11,7 @@ photocraft@e5e3e39 `crates/cms/profiles/photocraft-coated-cmyk.icc`.
   profile, and it is not a measured characterisation: use your printer's profile for production print.
 - **Licence:** CC0-1.0 (public domain dedication), as stated by its upstream authors in PhotoCraft's
   `crates/cms/README.md` and in the profile's copyright tag ("No copyright: CC0-1.0 public domain
-  dedication"). Full text: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>.
+  dedication"). Full text beside it: `LICENSE-CC0-1.0.txt` (from
+  <https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt>).
 - **Regenerate:** `ASTUDIO_REGEN_PROFILES=1 cargo test -p astudio-color --release --test regen`.
   Without the variable that test only checks that the generator still matches this file.

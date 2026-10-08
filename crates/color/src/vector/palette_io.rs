@@ -138,9 +138,33 @@ fn css_comment(s: &str) -> String {
     one_line(s).replace("*/", "* /")
 }
 
+/// Names handed out so far: `claim` gives `base`, else `base<sep>2`, `base<sep>3`, ... (the first
+/// one not yet taken), in constant time per name however many repeat.
+#[derive(Default)]
+struct Unique {
+    taken: std::collections::HashSet<String>,
+    next: std::collections::HashMap<String, usize>,
+}
+
+impl Unique {
+    fn claim(&mut self, base: &str, sep: &str) -> String {
+        let mut i = self.next.get(base).copied().unwrap_or(1);
+        let name = loop {
+            let n = if i == 1 { base.to_string() } else { format!("{base}{sep}{i}") };
+            if !self.taken.contains(&n) {
+                break n;
+            }
+            i += 1;
+        };
+        self.next.insert(base.to_string(), i + 1);
+        self.taken.insert(name.clone());
+        name
+    }
+}
+
 fn write_css(lib: &SwatchLibrary, keep: impl Fn(&&Swatch) -> bool) -> String {
     let mut out = format!("/* {} */\n:root {{\n", css_comment(&lib.name));
-    let mut taken: Vec<String> = vec![];
+    let mut taken = Unique::default();
     let mut props = |out: &mut String, list: &[Swatch]| {
         for w in list.iter().filter(&keep) {
             let value = match &w.paint {
@@ -157,8 +181,7 @@ fn write_css(lib: &SwatchLibrary, keep: impl Fn(&&Swatch) -> bool) -> String {
             };
             // Names differing only in case or punctuation map to one property: number the others.
             let base = css_property(&w.name);
-            let name = (1..).map(|i| if i == 1 { base.clone() } else { format!("{base}-{i}") }).find(|n| !taken.contains(n)).unwrap_or(base);
-            taken.push(name.clone());
+            let name = taken.claim(&base, "-");
             let note = if w.spot { " /* spot */" } else { "" };
             out.push_str(&format!("  {name}: {value};{note}\n"));
         }
@@ -204,7 +227,7 @@ pub fn sniff(text: &str) -> bool {
 /// named by their values; repeated names get a number.
 fn read_gpl(text: &str, fallback: &str) -> SwatchLibrary {
     let mut lib = SwatchLibrary { name: fallback.into(), ..Default::default() };
-    let mut names: Vec<String> = vec![];
+    let mut names = Unique::default();
     for line in text.lines().skip(1) {
         let line = line.trim();
         if let Some(g) = line.strip_prefix(GPL_GROUP) {
@@ -221,8 +244,7 @@ fn read_gpl(text: &str, fallback: &str) -> SwatchLibrary {
         let [r, g, b] = rgb[..] else { continue };
         let rest = words[3..].join(" ");
         let base = if rest.is_empty() { format!("R={r} G={g} B={b}") } else { rest };
-        let name = (1..).map(|i| if i == 1 { base.clone() } else { format!("{base} {i}") }).find(|n| !names.contains(n)).unwrap_or(base);
-        names.push(name.clone());
+        let name = names.claim(&base, " ");
         let w = Swatch { name, paint: Paint::solid(Color::rgb8(r, g, b)), global: false, spot: false };
         match lib.groups.last_mut() {
             Some(grp) => grp.swatches.push(w),
@@ -321,5 +343,22 @@ mod tests {
         let text = write(&lib, PaletteFormat::Css);
         assert!(text.contains("--red: #000000;") && text.contains("--red-2: #000000;"));
         assert!(read(&text, "x").is_err(), "CSS is written only");
+    }
+
+    /// GIMP names unnamed colours "Untitled": a big palette full of one name used to take
+    /// quadratic time per colour to number (minutes for a few thousand colours).
+    #[test]
+    fn many_repeated_names_import_quickly_and_stay_unique() {
+        let mut gpl = String::from("GIMP Palette\nName: big\n");
+        for i in 0..20_000 {
+            gpl.push_str(&format!("{} 0 0 Untitled\n", i % 256));
+        }
+        let lib = read(&gpl, "x").unwrap();
+        assert_eq!(lib.swatches.len(), 20_000);
+        let names: std::collections::HashSet<&str> = lib.swatches.iter().map(|w| w.name.as_str()).collect();
+        assert_eq!(names.len(), 20_000);
+        assert_eq!((lib.swatches[0].name.as_str(), lib.swatches[1].name.as_str()), ("Untitled", "Untitled 2"));
+        let css = write(&lib, PaletteFormat::Css);
+        assert!(css.contains("--untitled-20000:") || css.contains("untitled-20000:"), "{}", &css[css.len() - 200..]);
     }
 }

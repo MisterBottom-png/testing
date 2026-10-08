@@ -16,13 +16,15 @@ impl Lut3d {
     pub const MAX_SIZE: usize = 129;
 
     /// Samples a 3-input transform (1-output transforms are replicated to gray), `size` nodes per
-    /// edge (clamped to 2..=[`Lut3d::MAX_SIZE`]). Any other transform gives the 2³ identity LUT.
+    /// edge (clamped to 2..=[`Lut3d::MAX_SIZE`]). Any other transform gives the identity LUT of
+    /// that size (no colour change).
     pub fn from_transform(t: &Transform, size: usize) -> Lut3d {
-        if t.inputs() != 3 || !(t.outputs() == 3 || t.outputs() == 1) {
-            let data = (0..8).map(|i| [(i % 2) as f32, (i / 2 % 2) as f32, (i / 4) as f32, 1.0]).collect();
-            return Lut3d { size: 2, data };
-        }
         let size = size.clamp(2, Self::MAX_SIZE);
+        if t.inputs() != 3 || !(t.outputs() == 3 || t.outputs() == 1) {
+            let s = (size - 1) as f32;
+            let data = (0..size * size * size).map(|i| [(i % size) as f32 / s, (i / size % size) as f32 / s, (i / (size * size)) as f32 / s, 1.0]).collect();
+            return Lut3d { size, data };
+        }
         let mut data = vec![[0.0f32, 0.0, 0.0, 1.0]; size * size * size];
         let s = (size - 1) as f32;
         let mut out = [0.0f32; 16];

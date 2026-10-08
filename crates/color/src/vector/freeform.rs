@@ -572,4 +572,18 @@ mod tests {
         assert!(!s.contains("\"lines\"") && !s.contains("\"mode\""), "{s}");
         assert_eq!(FreeformMode::parse("LINES"), Some(FreeformMode::Lines));
     }
+
+    /// Missing lines, segments or points (a damaged file, a bad command parameter) give `None`.
+    #[test]
+    fn split_line_with_bad_indices_is_none() {
+        let mut f = two(0.0);
+        assert_eq!(f.connect(0, 1), Some(0));
+        let before = f.clone();
+        assert_eq!(f.split_line(99, 0, 0.5), None);
+        assert_eq!(f.split_line(0, 99, 0.5), None);
+        f.lines.push(vec![0, 7]);
+        assert_eq!(f.split_line(1, 0, 0.5), None, "a line naming a missing point");
+        f.lines.pop();
+        assert_eq!(f, before);
+    }
 }

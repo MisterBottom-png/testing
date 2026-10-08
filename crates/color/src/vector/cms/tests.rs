@@ -267,5 +267,7 @@ fn user_cmyk_profile_matches_moxcms_oracle() {
         }
     }
     let mean = sum / n as f32;
-    assert!(mean < 1.0 && worst < 16.0, "mean {mean:.3}, worst {worst:.2} (8-bit steps)");
+    // Measured 8 October 2026: mean 0.74, worst 7.8 (dark saturated colours near the gamut edge,
+    // where the two interpolate their tables differently; see docs/13-colour-engine.md).
+    assert!(mean < 1.0 && worst < 10.0, "mean {mean:.3}, worst {worst:.2} (8-bit steps)");
 }

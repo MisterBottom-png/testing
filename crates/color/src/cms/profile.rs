@@ -561,14 +561,14 @@ fn parse_curve(d: &[u8]) -> Result<(Curve, usize), CmsError> {
     match r.slice(0, 4)? {
         b"curv" => {
             let n = r.u32(8)? as usize;
+            if n > 1 << 20 {
+                return Err(CmsError::Invalid("curve too long".into()));
+            }
             let len = 12 + n * 2;
             match n {
                 0 => Ok((Curve::Identity, len)),
                 1 => Ok((Curve::Gamma(r.u16(12)? as f64 / 256.0), len)),
                 _ => {
-                    if n > 1 << 20 {
-                        return Err(CmsError::Invalid("curve too long".into()));
-                    }
                     let s = r.slice(12, n * 2)?;
                     let t = s.as_chunks::<2>().0.iter().map(|c| u16::from_be_bytes([c[0], c[1]]) as f32 / 65535.0).collect();
                     Ok((Curve::Table(t), len))
@@ -600,7 +600,7 @@ fn parse_curves_at(d: &[u8], off: usize, n: usize) -> Result<Vec<Curve>, CmsErro
         let sub = d.get(o..).ok_or(CmsError::Truncated)?;
         let (c, len) = parse_curve(sub)?;
         out.push(c);
-        o += (len + 3) & !3;
+        o = len.checked_add(3).and_then(|l| o.checked_add(l & !3)).ok_or(CmsError::Truncated)?;
     }
     Ok(out)
 }
@@ -779,5 +779,23 @@ fn parse_text(d: &[u8]) -> String {
             String::from_utf16_lossy(&units).trim_end_matches('\0').trim().to_string()
         }
         _ => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    /// A `curv` count near `u32::MAX` must be rejected before any size arithmetic (on 32-bit
+    /// targets such as the web build, `12 + n * 2` used to overflow first).
+    #[test]
+    fn huge_curve_counts_are_rejected() {
+        for n in [u32::MAX, 0x8000_0000, (1 << 20) + 1] {
+            let mut d = b"curv\0\0\0\0".to_vec();
+            d.extend_from_slice(&n.to_be_bytes());
+            d.extend_from_slice(&[0; 8]);
+            assert!(parse_curve(&d).is_err(), "{n}");
+            assert!(parse_curves_at(&d, 0, 3).is_err());
+        }
     }
 }
