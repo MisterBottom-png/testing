@@ -6,7 +6,7 @@ Coated CMYK** (owner, same day).
 
 ## In short
 
-- **Recommendation:** one A-Studio engine, built on PhotoCraft's `cms` (the most complete and the most
+- **Decided (D8, owner, 8 October 2026):** one A-Studio engine, built on PhotoCraft's `cms` (the most complete and the most
   accurate of the options we can ship), with VectorCraft's colour layer on top (colour model kept per
   value, Lab and Delta E 2000, its Generic CMYK model as a named profile, proof setups, swatches), and
   new fast paths so it is not slower than moxcms where it matters.
