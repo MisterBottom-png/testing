@@ -9,6 +9,9 @@
 //! handle positions. Rendering and algorithms convert to [`kurbo::BezPath`].
 //!
 //! Coordinates are document points (1/72 in), y pointing down.
+//!
+//! Pixel work uses [`pixel`] (integer rects, the 256-px tile grid) and [`warp`] (warp styles and
+//! Bezier warp meshes), both from PhotoCraft's geometry crate.
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
@@ -16,15 +19,18 @@ pub mod arc;
 pub mod bez;
 pub mod hit;
 pub mod path;
+pub mod pixel;
 pub mod projective;
 pub mod recognize;
 pub mod shapes;
 pub mod snap;
+pub mod warp;
 
 pub use arc::ArcPath;
 pub use kurbo;
 pub use kurbo::{Affine, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, Point, Rect, Shape, Size, Vec2};
 pub use path::{Anchor, AnchorKind, FillRule, PathData, SubPath};
+pub use pixel::{Rect as PixelRect, Size as PixelSize, TILE_SIZE, TileCoord};
 pub use projective::Homography;
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
