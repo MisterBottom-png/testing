@@ -15,7 +15,7 @@ Actions `windows-latest`, `.github/workflows/baseline.yml`. Photocraft is built 
 | Release build time | 22 min 13 s (1,333 s) | 28 min 48 s (1,728 s) | 2 CPUs, 8 GB, normal disk (run 37817543646) |
 | Release build time, fast setup | 11 min 20 s (680 s) | 15 min 40 s (940 s) | 4 CPUs, 16 GB, Dev Drive, Defender off (run 37839966772) |
 | `cargo test --workspace` passed / failed | 3,980 / 0 | 3,997 / 0 (3 ignored) | both runs |
-| Test build and run | about 81 min | about 68 min; 27.5 min with the fast setup | |
+| Test build and run | about 81 min; 35.5 min with the fast setup | about 68 min; 27.5 min with the fast setup | |
 | Startup to first frame | not measured | not measured | needs a desktop session (P4) |
 | Open a 24 MP PSD | not measured | | needs a desktop session (P4) |
 | Render 20,000 shapes | | not measured | needs a desktop session (P4) |
@@ -23,7 +23,8 @@ Actions `windows-latest`, `.github/workflows/baseline.yml`. Photocraft is built 
 
 The first run did everything in one job on a 2-CPU machine and took 3 hours 21 minutes. The
 workflow now runs four jobs side by side (each app's release build and each app's tests) on a Dev
-Drive with Defender scanning off; the slowest job takes about half an hour.
+Drive with Defender scanning off; the whole run then takes 37 minutes (PhotoCraft's tests are the
+slowest job).
 
 ## P1 prototype benchmark (task P1-04)
 
