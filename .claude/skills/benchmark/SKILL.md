@@ -6,7 +6,9 @@ argument-hint: "[baseline|prototype|<what to measure>]"
 
 Always measure release builds (`--release`), close to the same machine, three runs, report the median.
 
-- `baseline` (P0-03): run `scripts/baseline.sh`, then fill the table in `docs/baseline.md`: upstream commits,
+- `baseline` (P0-03): on Windows, run the `baseline` workflow (four parallel jobs; artifacts
+  `baseline-windows-<app>-<build|test>`), or locally `scripts/baseline.sh [app] [build|test]`. Note
+  in `docs/baseline.md` that the CI numbers come from a Dev Drive with Defender off. Then fill the table: upstream commits,
   release build time, test counts, startup time, opening a 24 MP PSD, rendering 20,000 shapes
   (`vectorcraft-cli bench`), laying out 10,000 glyphs.
 - `prototype` (P1-04): build a document 6000 x 4000 px (24 MP) with one raster layer and one Vector layer

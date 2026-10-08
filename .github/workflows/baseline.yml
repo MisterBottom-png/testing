@@ -1,8 +1,16 @@
 name: baseline
 # Builds and tests both upstream apps on Windows (task P0-03, D7) and uploads the logs.
-# Four jobs run side by side: each app's release build (timed) and each app's test suite. One job
-# doing all four in a row ran for over three hours on a 2-core runner. There is no build cache on
-# purpose, so the release build times stay true from-scratch numbers.
+# How it is kept fast (Windows runners are slow mostly because of disk and virus scanning):
+# - Four jobs run side by side: each app's release build (timed) and each app's test suite. One job
+#   doing all four in a row ran for over three hours.
+# - The build output goes to a Windows Dev Drive (ReFS, antivirus filter off) when the runner can
+#   make one, else to the D: drive when there is one; Defender real-time scanning is switched off
+#   and the build folders are excluded from it. The runner is thrown away after the job.
+# - Crates are downloaded before the timer starts (scripts/baseline.sh), and incremental
+#   compilation is off (it only slows a from-scratch build).
+# - Test builds keep only line tables as debug info (much faster linking; same tests).
+# - No build cache, on purpose: the release build times stay true from-scratch numbers, and one
+#   app's test build would fill most of the repository's 10 GB cache.
 # Runs when this file, the script or the upstream pins change (and by hand once the workflow is
 # on the repository's default branch).
 concurrency:
@@ -32,6 +40,44 @@ jobs:
         part: [build, test]
     steps:
       - uses: actions/checkout@v4
+      - name: Fast build drive, no virus scanning
+        shell: pwsh
+        run: |
+          Get-Volume | Where-Object DriveLetter | Format-Table DriveLetter, FileSystem, @{n='FreeGB'; e={[math]::Round($_.SizeRemaining / 1GB)}}, @{n='SizeGB'; e={[math]::Round($_.Size / 1GB)}}
+          "workspace: $env:GITHUB_WORKSPACE"
+          $drive = $null
+          try {
+            # Same approach as uv's CI (astral-sh/uv .github/workflows/setup-dev-drive.ps1). The
+            # VHDX is dynamic: it takes only the space the build writes.
+            $vhd = 'C:\astudio_dev_drive.vhdx'
+            $volume = New-VHD -Path $vhd -SizeBytes 60GB -Dynamic | Mount-VHD -Passthru | Initialize-Disk -Passthru |
+              New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -DevDrive -Confirm:$false -Force
+            $drive = "$($volume.DriveLetter):"
+            fsutil devdrv trust $drive
+            if ($LASTEXITCODE) { throw "fsutil devdrv trust failed ($LASTEXITCODE)" }
+            fsutil devdrv enable /disallowAv
+            if ($LASTEXITCODE) { throw "fsutil devdrv enable failed ($LASTEXITCODE)" }
+            Dismount-VHD -Path $vhd
+            Mount-VHD -Path $vhd
+            fsutil devdrv query $drive
+            "build drive: Dev Drive $drive"
+          } catch {
+            "no Dev Drive on this runner: $_"
+            $drive = if (Test-Path 'D:\') { 'D:' } else { 'C:' }
+            "build drive: $drive"
+          }
+          $target = "$drive\cargo-target"
+          $tmp = "$drive\tmp"
+          New-Item -ItemType Directory -Force -Path $target, $tmp | Out-Null
+          try { Set-MpPreference -DisableRealtimeMonitoring $true } catch { "could not switch off real-time scanning: $_" }
+          foreach ($p in @($target, $tmp, $env:GITHUB_WORKSPACE, "$env:USERPROFILE\.cargo", "$env:USERPROFILE\.rustup")) {
+            try { Add-MpPreference -ExclusionPath $p } catch { "could not exclude ${p}: $_" }
+          }
+          "CARGO_TARGET_DIR=$target" >> $env:GITHUB_ENV
+          "TMP=$tmp" >> $env:GITHUB_ENV
+          "TEMP=$tmp" >> $env:GITHUB_ENV
+          # A failed fsutil call above must not fail the step (the fallback drive works).
+          $global:LASTEXITCODE = 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -45,8 +91,7 @@ jobs:
         shell: bash
         run: scripts/bootstrap.sh
       # Note: photocraft is built without its optional `heif` feature (upstream release builds use it).
-      # The test build keeps only line tables as debug info: much faster to link on Windows, and it
-      # does not change which tests run or pass. The release build is upstream's profile, unchanged.
+      # The release build uses upstream's profile unchanged.
       - name: Run scripts/baseline.sh ${{ matrix.app }} ${{ matrix.part }}
         shell: bash
         env:

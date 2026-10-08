@@ -41,6 +41,11 @@ sudo apt-get install -y desktop-file-utils appstream zsync flatpak flatpak-build
 - Visual Studio 2022 Build Tools with "Desktop development with C++" (MSVC and Windows SDK).
 - For the MSI: .NET SDK, then `dotnet tool install --global wix --version 5.0.2`.
 - Targets: `rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc i686-pc-windows-msvc`.
+- Faster builds: Rust builds on Windows are slowed most by the disk and by Defender scanning every
+  file the compiler writes. Put the repository and `CARGO_HOME` on a Dev Drive (Settings › System ›
+  Storage › Disks & volumes › Create dev drive), or add the repository, `%USERPROFILE%\.cargo` and
+  `%USERPROFILE%\.rustup` to Defender's exclusions. The baseline workflow does the same on GitHub's
+  runners (`.github/workflows/baseline.yml`).
 
 ## Optional inputs
 
