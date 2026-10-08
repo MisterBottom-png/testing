@@ -1,25 +1,35 @@
 name: baseline
-# Builds and tests both upstream apps on Windows (task P0-03, D7) and uploads the log.
-# Runs when this file or the upstream pins change (and by hand once the workflow is on the
-# repository's default branch). It uses about an hour of Windows minutes, which count double on
-# private repositories.
+# Builds and tests both upstream apps on Windows (task P0-03, D7) and uploads the logs.
+# Four jobs run side by side: each app's release build (timed) and each app's test suite. One job
+# doing all four in a row ran for over three hours on a 2-core runner. There is no build cache on
+# purpose, so the release build times stay true from-scratch numbers.
+# Runs when this file, the script or the upstream pins change (and by hand once the workflow is
+# on the repository's default branch).
 concurrency:
-  group: baseline
+  group: baseline-split-${{ github.ref }}
   cancel-in-progress: true
 on:
   push:
     paths:
       - .github/workflows/baseline.yml
+      - scripts/baseline.sh
       - upstream.lock
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   baseline:
+    name: ${{ matrix.app }} ${{ matrix.part }}
     runs-on: windows-latest
-    timeout-minutes: 240
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [photocraft, vectorcraft]
+        part: [build, test]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -35,13 +45,19 @@ jobs:
         shell: bash
         run: scripts/bootstrap.sh
       # Note: photocraft is built without its optional `heif` feature (upstream release builds use it).
-      - name: Build and test both upstream apps
+      # The test build keeps only line tables as debug info: much faster to link on Windows, and it
+      # does not change which tests run or pass. The release build is upstream's profile, unchanged.
+      - name: Run scripts/baseline.sh ${{ matrix.app }} ${{ matrix.part }}
         shell: bash
-        run: scripts/baseline.sh 2>&1 | tee baseline-windows.log
+        env:
+          CARGO_PROFILE_DEV_DEBUG: line-tables-only
+          CARGO_PROFILE_TEST_DEBUG: line-tables-only
+        run: scripts/baseline.sh ${{ matrix.app }} ${{ matrix.part }} 2>&1 | tee baseline-windows-${{ matrix.app }}-${{ matrix.part }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: baseline-windows
+          name: baseline-windows-${{ matrix.app }}-${{ matrix.part }}
           path: |
-            baseline-windows.log
+            baseline-windows-*.log
             target/baseline/test-*.log
+          if-no-files-found: ignore

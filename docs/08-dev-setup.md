@@ -14,7 +14,7 @@ cargo install cargo-deny --locked
 cargo install trunk --version 0.21.14 --locked   # web build
 git clone <your a-studio repo> && cd a-studio
 scripts/bootstrap.sh          # upstream clones, optional fonts, toolchain check
-scripts/baseline.sh           # builds and tests both upstream apps once
+scripts/baseline.sh           # builds and tests both upstream apps once (or: baseline.sh photocraft test)
 ```
 
 Rust 1.95 or newer is required (both upstream workspaces declare `rust-version = "1.95"`, edition 2024).
