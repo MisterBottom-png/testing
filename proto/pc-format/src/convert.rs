@@ -39,6 +39,10 @@ pub(crate) fn check_vector_layers(layers: &[Layer]) -> Result<()> {
     for l in layers {
         match &l.content {
             LayerContent::Vector(v) => {
+                // JSON has no NaN or infinity: such a transform would be written as `null`.
+                if !v.transform.m.iter().all(|x| x.is_finite()) {
+                    return Err(FormatError::Unsupported(format!("vector layer \"{}\" has a non-finite transform", l.name)));
+                }
                 let bytes = vectorcraft_format::save_with(&v.doc, &vectorcraft_format::SaveOptions::default())
                     .map_err(|e| FormatError::Unsupported(format!("vector layer \"{}\": {e}", l.name)))?;
                 vectorcraft_format::load(&bytes).map_err(|e| FormatError::Unsupported(format!("vector layer \"{}\" cannot be saved: {e}", l.name)))?;

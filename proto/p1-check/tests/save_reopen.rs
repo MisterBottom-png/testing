@@ -95,3 +95,10 @@ fn stale_pixels_are_not_saved_as_fresh() {
     let LayerContent::Vector(b) = &back.layers[0].content else { panic!("not a vector layer") };
     assert!(b.fresh_cache().is_none(), "the reopened layer is redrawn, not shown with old pixels");
 }
+
+#[test]
+fn non_finite_transform_is_a_save_error() {
+    let mut v = VectorLayer::new(synthetic(3, 200.0, 200.0), 72.0);
+    v.transform.m[4] = f64::NAN;
+    assert!(photocraft_format::save_to_bytes(&doc_with(v), &Default::default()).is_err());
+}
