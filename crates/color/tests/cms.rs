@@ -641,3 +641,32 @@ fn windows_srgb_is_the_builtin_srgb() {
     assert_ne!(p.content_hash(), srgb().content_hash());
     assert!(p.same_colors(srgb()));
 }
+
+/// Wrong strides, malformed tables and odd LUT sizes must not crash the app (AGENTS.md: never
+/// crash). Before P2-02 each call here hit an `assert!`.
+#[test]
+fn contract_violations_do_not_panic() {
+    use astudio_color::cms::{Clut, Lut3d};
+    let t = Transform::new(srgb(), Builtin::DisplayP3.profile(), Intent::RelativeColorimetric, false).unwrap();
+    let mut buf = [0.5f32; 6];
+    t.apply(&mut buf, 2);
+    assert_eq!(buf, [0.5; 6], "a too-small stride converts nothing");
+    let (src, mut dst) = ([10u8; 6], [0u8; 6]);
+    t.convert_u8(&src, 2, &mut dst, 3, false);
+    assert_eq!(dst, [0; 6]);
+    t.convert_u16(&[1u16; 6], 3, &mut [0u16; 6], 1, false);
+    t.convert_f32(&[0.1f32; 6], 1, &mut [0.0f32; 6], 3, false);
+    assert!(Clut::try_new(vec![2, 2], 3, vec![0.0; 5]).is_none());
+    assert!(Clut::try_new(vec![2; 16], 3, vec![]).is_none());
+    assert!(Clut::try_new(vec![usize::MAX, usize::MAX], 3, vec![]).is_none());
+    assert!(Clut::try_new(vec![2, 2], 3, vec![0.0; 12]).is_some());
+    let bad = Clut::new(vec![2, 2], 3, vec![0.0; 5]);
+    let mut out = [9.0f32; 3];
+    bad.eval(&[0.5, 0.5], &mut out);
+    bad.eval_trilinear(&[0.5, 0.5], &mut out);
+    let lab = Transform::new(srgb(), lab(), Intent::RelativeColorimetric, false).unwrap();
+    let to_gray = Transform::new(Builtin::CoatedCmyk.profile(), Builtin::GrayGamma22.profile(), Intent::RelativeColorimetric, false).unwrap();
+    assert_eq!(Lut3d::from_transform(&to_gray, 17).size, 2, "a 4-input transform gives an identity LUT");
+    assert_eq!(Lut3d::from_transform(&lab, 0).size, 2);
+    assert_eq!(Lut3d::from_transform(&lab, usize::MAX).size, Lut3d::MAX_SIZE);
+}

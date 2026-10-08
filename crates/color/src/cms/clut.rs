@@ -20,18 +20,27 @@ pub struct Clut {
 }
 
 impl Clut {
-    /// Builds a table from node data. Panics if `data` has the wrong length.
-    pub fn new(grid: Vec<usize>, outputs: usize, data: Vec<f32>) -> Self {
+    /// Builds a table from node data; `None` when the channel counts are out of range or `data`
+    /// does not hold exactly `outputs` values per grid node.
+    pub fn try_new(grid: Vec<usize>, outputs: usize, data: Vec<f32>) -> Option<Self> {
         let inputs = grid.len();
-        assert!((1..=MAX_CHANNELS).contains(&inputs) && (1..=MAX_CHANNELS).contains(&outputs), "bad CLUT dimensions");
+        if !(1..=MAX_CHANNELS).contains(&inputs) || !(1..=MAX_CHANNELS).contains(&outputs) {
+            return None;
+        }
         let mut strides = vec![0usize; inputs];
         let mut s = outputs;
-        for i in (0..inputs).rev() {
-            strides[i] = s;
-            s *= grid[i].max(1);
+        for (stride, g) in strides.iter_mut().zip(&grid).rev() {
+            *stride = s;
+            s = s.checked_mul((*g).max(1))?;
         }
-        assert_eq!(data.len(), s, "CLUT data length");
-        Clut { inputs, outputs, grid, data, strides }
+        (data.len() == s).then_some(Clut { inputs, outputs, grid, data, strides })
+    }
+
+    /// Builds a table from node data. Data that [`Clut::try_new`] rejects gives a one-input,
+    /// one-output table that maps everything to 0 (never reached by the engine, which builds
+    /// tables from validated sizes; file data goes through `try_new`).
+    pub fn new(grid: Vec<usize>, outputs: usize, data: Vec<f32>) -> Self {
+        Self::try_new(grid, outputs, data).unwrap_or_else(|| Clut { inputs: 1, outputs: 1, grid: vec![2], data: vec![0.0; 2], strides: vec![1] })
     }
 
     /// Number of nodes.
@@ -153,8 +162,8 @@ impl Clut {
     }
 
     /// Trilinear interpolation (3 inputs), kept as a reference for accuracy comparisons.
+    /// (Multilinear for any input count.)
     pub fn eval_trilinear(&self, input: &[f32], out: &mut [f32]) {
-        assert_eq!(self.inputs, 3);
         self.eval_multilinear(input, out);
     }
 

@@ -663,7 +663,7 @@ fn parse_lut(d: &[u8], a2b: bool) -> Result<Lut, CmsError> {
                 stages.push(Stage::matrix3(&m));
             }
             stages.push(Stage::Curves(in_curves));
-            stages.push(Stage::Clut(Clut::new(vec![g; i], o, data)));
+            stages.push(Stage::Clut(Clut::try_new(vec![g; i], o, data).ok_or_else(|| CmsError::Invalid("CLUT size".into()))?));
             stages.push(Stage::Curves(out_curves));
             Ok(Lut { kind: if wide { LutKind::Lut16 } else { LutKind::Lut8 }, inputs: i, outputs: o, stages })
         }
@@ -701,7 +701,7 @@ fn parse_lut(d: &[u8], a2b: bool) -> Result<Lut, CmsError> {
                     2 => r.slice(off + 20, total * 2)?.as_chunks::<2>().0.iter().map(|c| u16::from_be_bytes([c[0], c[1]]) as f32 / 65535.0).collect(),
                     _ => return Err(CmsError::Invalid(format!("CLUT precision {prec}"))),
                 };
-                Ok(Stage::Clut(Clut::new(grid, cout, data)))
+                Ok(Stage::Clut(Clut::try_new(grid, cout, data).ok_or_else(|| CmsError::Invalid("CLUT size".into()))?))
             };
             let mut stages = Vec::new();
             if ty == b"mAB " {

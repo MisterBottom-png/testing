@@ -12,10 +12,17 @@ pub struct Lut3d {
 }
 
 impl Lut3d {
-    /// Samples a 3-input transform (1-output transforms are replicated to gray).
+    /// Largest LUT edge [`Lut3d::from_transform`] samples (129³ nodes, 34 MB of RGBA f32).
+    pub const MAX_SIZE: usize = 129;
+
+    /// Samples a 3-input transform (1-output transforms are replicated to gray), `size` nodes per
+    /// edge (clamped to 2..=[`Lut3d::MAX_SIZE`]). Any other transform gives the 2³ identity LUT.
     pub fn from_transform(t: &Transform, size: usize) -> Lut3d {
-        assert!(t.inputs() == 3 && (t.outputs() == 3 || t.outputs() == 1), "display LUTs need a 3→3 or 3→1 transform");
-        assert!(size >= 2, "LUT size");
+        if t.inputs() != 3 || !(t.outputs() == 3 || t.outputs() == 1) {
+            let data = (0..8).map(|i| [(i % 2) as f32, (i / 2 % 2) as f32, (i / 4) as f32, 1.0]).collect();
+            return Lut3d { size: 2, data };
+        }
+        let size = size.clamp(2, Self::MAX_SIZE);
         let mut data = vec![[0.0f32, 0.0, 0.0, 1.0]; size * size * size];
         let s = (size - 1) as f32;
         let mut out = [0.0f32; 16];

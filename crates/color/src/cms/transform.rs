@@ -271,7 +271,9 @@ impl Transform {
     /// Converts float pixels. `src`/`dst` hold whole pixels of `src_stride`/`dst_stride`
     /// values; colour channels come first. Trailing channels are copied when `copy_extra`.
     pub fn convert_f32(&self, src: &[f32], src_stride: usize, dst: &mut [f32], dst_stride: usize, copy_extra: bool) {
-        self.check(src_stride, dst_stride);
+        if !self.strides_ok(src_stride, dst_stride) {
+            return;
+        }
         let extra = extra_channels(self, src_stride, dst_stride, copy_extra);
         par_rows(src, src_stride, dst, dst_stride, |s, d| self.run_f32(s, src_stride, d, dst_stride, extra));
     }
@@ -292,7 +294,9 @@ impl Transform {
 
     /// In-place float conversion; `stride ≥ max(inputs, outputs)`.
     pub fn apply(&self, buf: &mut [f32], stride: usize) {
-        assert!(stride >= self.inputs.max(self.outputs), "stride too small");
+        if stride < self.inputs.max(self.outputs) {
+            return; // a stride smaller than the channel count: nothing to convert
+        }
         let precise = self.opts.precise_float || matches!(self.core, Core::Exact);
         let body = |chunk: &mut [f32]| {
             let mut out = [0.0f32; 16];
@@ -310,7 +314,9 @@ impl Transform {
 
     /// Converts 8-bit pixels (see [`Transform::convert_f32`] for the layout).
     pub fn convert_u8(&self, src: &[u8], src_stride: usize, dst: &mut [u8], dst_stride: usize, copy_extra: bool) {
-        self.check(src_stride, dst_stride);
+        if !self.strides_ok(src_stride, dst_stride) {
+            return;
+        }
         let extra = extra_channels(self, src_stride, dst_stride, copy_extra);
         par_rows(src, src_stride, dst, dst_stride, |s, d| self.run_u8(s, src_stride, d, dst_stride, extra));
     }
@@ -398,7 +404,9 @@ impl Transform {
 
     /// Converts 16-bit pixels (see [`Transform::convert_f32`] for the layout).
     pub fn convert_u16(&self, src: &[u16], src_stride: usize, dst: &mut [u16], dst_stride: usize, copy_extra: bool) {
-        self.check(src_stride, dst_stride);
+        if !self.strides_ok(src_stride, dst_stride) {
+            return;
+        }
         let extra = extra_channels(self, src_stride, dst_stride, copy_extra);
         par_rows(src, src_stride, dst, dst_stride, |s, d| self.run_u16(s, src_stride, d, dst_stride, extra));
     }
@@ -424,7 +432,9 @@ impl Transform {
     /// all tiles of a surface): far cheaper than one parallel call per small buffer. Each job
     /// is `(src bytes, dst bytes)` holding whole pixels of `src_stride`/`dst_stride` samples.
     pub fn convert_bytes_many(&self, sample: SampleKind, jobs: Vec<(&[u8], &mut [u8])>, src_stride: usize, dst_stride: usize, copy_extra: bool) {
-        self.check(src_stride, dst_stride);
+        if !self.strides_ok(src_stride, dst_stride) {
+            return;
+        }
         let extra = extra_channels(self, src_stride, dst_stride, copy_extra);
         let run = |(s, d): (&[u8], &mut [u8])| match sample {
             SampleKind::U8 => self.run_u8(s, src_stride, d, dst_stride, extra),
@@ -454,8 +464,9 @@ impl Transform {
         jobs.into_iter().for_each(run);
     }
 
-    fn check(&self, ss: usize, ds: usize) {
-        assert!(ss >= self.inputs && ds >= self.outputs, "pixel stride smaller than the channel count");
+    /// Whether the strides hold the channels; conversions with smaller strides do nothing.
+    fn strides_ok(&self, ss: usize, ds: usize) -> bool {
+        ss >= self.inputs && ds >= self.outputs
     }
 }
 
