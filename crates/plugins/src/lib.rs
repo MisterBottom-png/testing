@@ -1,4 +1,4 @@
-//! # astudio-plugins (L4)
+//! # astudio-plugins (L2)
 //!
 //! Sandboxed WebAssembly plug-ins (wasmi).
 //!
@@ -7,8 +7,8 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-/// Layer of this crate in the A-Studio layering table (`xtask/src/layers.rs`).
-pub const LAYER: &str = "L4";
+/// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
+pub const LAYER: &str = "L2";
 
 #[cfg(test)]
 mod tests {

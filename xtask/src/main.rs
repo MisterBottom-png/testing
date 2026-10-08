@@ -152,4 +152,18 @@ mod tests {
     fn workspace_passes() {
         assert!(check_layers(&workspace_root()).is_ok());
     }
+
+    #[test]
+    fn intra_layer_edges_name_known_crates_in_one_layer() {
+        let class = |n: &str| TABLE.iter().find(|(name, _)| *name == n).map(|(_, c)| *c);
+        for (from, to) in INTRA_LAYER {
+            let (f, t) = (class(from), class(to));
+            assert!(f.is_some() && t.is_some(), "unknown crate in INTRA_LAYER: {from} -> {to}");
+            assert_eq!(f, t, "INTRA_LAYER edge crosses layers: {from} -> {to}");
+            assert!(!INTRA_LAYER.contains(&(*to, *from)), "INTRA_LAYER cycle: {from} <-> {to}");
+        }
+        // P2-00: live effects run effect plug-ins; plug-ins sit below effects inside L2.
+        assert_eq!(class("astudio-plugins"), Some(Class::Layer(2)));
+        assert!(INTRA_LAYER.contains(&("astudio-effects", "astudio-plugins")));
+    }
 }

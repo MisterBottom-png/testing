@@ -21,6 +21,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-doc", Class::Layer(1)),
     ("astudio-text", Class::Layer(2)),
     ("astudio-pathops", Class::Layer(2)),
+    ("astudio-plugins", Class::Layer(2)),
     ("astudio-effects", Class::Layer(2)),
     ("astudio-paint", Class::Layer(2)),
     ("astudio-algo", Class::Layer(2)),
@@ -33,7 +34,6 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-pdf", Class::Layer(3)),
     ("astudio-io", Class::Layer(4)),
     ("astudio-tools", Class::Layer(4)),
-    ("astudio-plugins", Class::Layer(4)),
     ("astudio-engine", Class::Layer(5)),
     ("astudio-ui", Class::Layer(6)),
     ("astudio-automation", Class::Layer(6)),
@@ -41,5 +41,11 @@ pub const TABLE: &[(&str, Class)] = &[
 ];
 
 /// Allowed edges inside one layer: (from, to) means `from` may depend on `to`.
-pub const INTRA_LAYER: &[(&str, &str)] =
-    &[("astudio-color", "astudio-geom"), ("astudio-raster", "astudio-geom"), ("astudio-raster", "astudio-color"), ("astudio-doc", "astudio-vdoc")];
+/// Live effects run effect plug-ins, so `astudio-effects` uses `astudio-plugins` (as in VectorCraft).
+pub const INTRA_LAYER: &[(&str, &str)] = &[
+    ("astudio-color", "astudio-geom"),
+    ("astudio-raster", "astudio-geom"),
+    ("astudio-raster", "astudio-color"),
+    ("astudio-doc", "astudio-vdoc"),
+    ("astudio-effects", "astudio-plugins"),
+];

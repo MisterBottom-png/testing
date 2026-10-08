@@ -52,6 +52,7 @@ is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
 
 1. **Layer rules.** VectorCraft's effects code needs its plug-in code, which sits higher in the
    A-Studio layer plan. P2 must move that link (for example behind a trait) before porting.
+   *Resolved in P2-00: `astudio-plugins` moved to L2, below `astudio-effects`, as in VectorCraft.*
 2. **Memory.** A rendered vector layer is a full-size pixel copy (about 94 MB at 24 MP), on top of
    VectorCraft's own data. Many vector layers on big canvases will need the cache to drop tiles that
    are off screen.

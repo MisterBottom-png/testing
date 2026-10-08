@@ -15,13 +15,14 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | L1 | `astudio-vdoc` | vc `doc` | Vector node tree, appearance, symbols, swatches |
 | L1 | `astudio-doc` | pc `doc` + Vector layer | Layer stack; `LayerContent::Vector` holds an `astudio-vdoc` tree (vdoc before doc inside L1) |
 | L2 | `astudio-text` | vc `text` + ports from pc `text` | See `06-text-engine.md` |
-| L2 | `astudio-pathops`, `astudio-trace`, `astudio-effects`, `astudio-vbrush` | vc `pathops`, `trace`, `effects`, `brush` | |
+| L2 | `astudio-plugins` | pc+vc `plugins` | One wasmi host; one plug-in ABI with filter and live-effect entry points. Needs only L0 and L1 crates; sits below `astudio-effects` inside L2 |
+| L2 | `astudio-pathops`, `astudio-trace`, `astudio-effects`, `astudio-vbrush` | vc `pathops`, `trace`, `effects`, `brush` | Inside L2, `effects` may use `plugins`, `pathops` and `text`; `trace` may use `pathops` (VectorCraft's order) |
 | L2 | `astudio-ops`, `astudio-paint`, `astudio-algo`, `astudio-vector` | pc same names | `vector` (pc shape rasterizer) shrinks as vc render takes over |
 | L3 | `astudio-compose`, `astudio-gpu` | pc `compose`, `gpu` | CPU compositor = reference oracle; wgpu compositor = canvas |
 | L3 | `astudio-render` | vc `render` | vello_cpu; draws vector layers into tiles |
 | L3 | `astudio-format` | pc `format` + vc `format` | `.astudio` read/write; `.pcraft` and `.vectorcraft` readers |
 | L3 | `astudio-svg`, `astudio-pdf`, `astudio-eps`, `astudio-cad`, `astudio-metafile` | vc same names | |
-| L4 | `astudio-io`, `astudio-tools`, `astudio-plugins` | pc `io`, vc `tools` (pc tools live in its engine and ui), pc+vc `plugins` | One wasmi host; one plug-in ABI with filter and live-effect entry points |
+| L4 | `astudio-io`, `astudio-tools` | pc `io`, vc `tools` (pc tools live in its engine and ui) | |
 | L5 | `astudio-engine` | pc `engine` + vc `engine` | One command registry, one undo history, one guard |
 | L6 | `astudio-ui` | pc `ui-egui` + vc `ui-egui` | Modes, panels, menus |
 | L6 | `astudio-automation` | pc `automation` + vc `mcp` | Control channel and MCP server |

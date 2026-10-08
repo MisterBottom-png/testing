@@ -7,7 +7,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-/// Layer of this crate in the A-Studio layering table (`xtask/src/layers.rs`).
+/// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "L4";
 
 #[cfg(test)]
