@@ -1,7 +1,7 @@
 id,phase,area,title,depends_on,done_when,status,owner
 P0-01,P0,Setup,Create the a-studio GitHub repo from this kit and enable Actions,,Repo public; CI runs on push,Done,
 P0-02,P0,Setup,Run scripts/bootstrap.sh and pin upstream commits in upstream.lock,P0-01,upstream.lock committed,Done,
-P0-03,P0,Setup,Run scripts/baseline.sh on Windows (GitHub Actions); record build times and test counts,P0-02,docs/baseline.md filled for Windows,Not started,
+P0-03,P0,Setup,Run scripts/baseline.sh on Windows (GitHub Actions); record build times and test counts,P0-02,docs/baseline.md filled for Windows,Done,
 P0-04,P0,Rebrand,Delete docs/brand from both upstream trees,P0-02,rebrand scan shows no brand files,Done,
 P0-05,P0,Rebrand,"Replace app ids ai.storyteller.* with the A-Studio id in packaging, desktop, metainfo, Flatpak, plist, Windows resources",P0-02,grep finds no ai.storyteller in shipped files,Done,
 P0-06,P0,Rebrand,"Change ArtCraft text and links in ui-egui menus, panels, links, community, about, help",P0-02,rebrand scan --shipped clean,Done,
@@ -26,7 +26,7 @@ P2-08,P2,Text,Port text rasterizing into tiles (T4),P2-04,CPU and GPU text match
 P2-09,P2,Text,Port spell check with SCOWL list (T5),P2-04,Check Spelling works,Not started,
 P2-10,P2,Text,"Retire parley; golden paragraphs in Latin, Arabic, Japanese vertical","P2-05,P2-06,P2-07,P2-08,P2-09",parley gone from Cargo.lock,Not started,
 P2-11,P2,Codecs,"Move pc codecs, heif, raw, psd and vc svg, pdf, eps, cad, metafile under astudio names",P2-01,All importer fuzz tests run,Not started,
-P2-12,P2,Core,"Colour engine fast paths: matrix-shaper and fixed-point LUT conversions (docs/13-colour-engine.md)",P2-02,scripts/cms-bench within 2x moxcms speed; accuracy unchanged,Not started,
+P2-12,P2,Core,Colour engine fast paths: matrix-shaper and fixed-point LUT conversions (docs/13-colour-engine.md),P2-02,scripts/cms-bench within 2x moxcms speed; accuracy unchanged,Not started,
 P3-01,P3,Document,"Merge documents: pc layer stack + vector layers + vc artboards, swatches, styles",P2-11,Both apps' document tests pass on the merged model,Not started,
 P3-02,P3,Engine,Merge command registries; prefix clashing ids pixel. and vector.,P3-01,CLI lists all commands; command sweep fuzz passes,Not started,
 P3-03,P3,Engine,One undo history across tiles and node trees,P3-01,Undo/redo property test passes,Not started,

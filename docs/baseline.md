@@ -1,14 +1,29 @@
-# Baseline (fill in during P0)
+# Baseline
+
+## Windows (task P0-03)
+
+**Result: both upstream apps build and pass all their tests on Windows.** PhotoCraft: 3,980 tests
+passed, 0 failed. VectorCraft: 3,997 passed, 0 failed (3 timing tests are skipped by design).
+
+Measured on 8 October 2026 with photocraft@e5e3e39 and vectorcraft@8b036df, rustc 1.99.0, GitHub
+Actions `windows-latest`, `.github/workflows/baseline.yml`. Photocraft is built without its optional
+`heif` feature. Release builds start from scratch (no cache) with upstream's release profile.
 
 | Measure | PhotoCraft | VectorCraft | Machine |
 | --- | --- | --- | --- |
-| Upstream commit | | | |
-| Release build time | | | |
-| `cargo test` passed / failed | | | |
-| Startup to first frame | | | |
-| Open a 24 MP PSD | | | |
-| Render 20,000 shapes | | | |
-| Lay out 10,000 glyphs | | | |
+| Upstream commit | e5e3e39 | 8b036df | |
+| Release build time | 22 min 13 s (1,333 s) | 28 min 48 s (1,728 s) | 2 CPUs, 8 GB, normal disk (run 37817543646) |
+| Release build time, fast setup | 11 min 20 s (680 s) | 15 min 40 s (940 s) | 4 CPUs, 16 GB, Dev Drive, Defender off (run 37839966772) |
+| `cargo test --workspace` passed / failed | 3,980 / 0 | 3,997 / 0 (3 ignored) | both runs |
+| Test build and run | about 81 min | about 68 min; 27.5 min with the fast setup | |
+| Startup to first frame | not measured | not measured | needs a desktop session (P4) |
+| Open a 24 MP PSD | not measured | | needs a desktop session (P4) |
+| Render 20,000 shapes | | not measured | needs a desktop session (P4) |
+| Lay out 10,000 glyphs | not measured | not measured | P2 text work (P2-04) |
+
+The first run did everything in one job on a 2-CPU machine and took 3 hours 21 minutes. The
+workflow now runs four jobs side by side (each app's release build and each app's tests) on a Dev
+Drive with Defender scanning off; the slowest job takes about half an hour.
 
 ## P1 prototype benchmark (task P1-04)
 
