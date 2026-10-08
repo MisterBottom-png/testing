@@ -18,7 +18,7 @@ layer, which is drawn into tiles, saved and reopened unchanged, and on a 24-mega
 | Save and reopen | round trip | identical drawing, position and pixels after reopening (P1-03 test) | yes |
 | PSD + vector path, end to end | works | works (exit test) | yes |
 | Redraw one changed layer, 24 MP, 1,000 paths | under 100 ms | 7.3 ms (dense paths), 5.7 ms (sparse); Linux dev machine | yes |
-| Same on Windows (D7) | under 100 ms | WINDOWS_RESULT | WINDOWS_MET |
+| Same on Windows (D7) | under 100 ms | pending: running on GitHub's Windows machine (`p1-measure` workflow) | to be added |
 
 Other numbers: first full drawing of the 1,000-path layer 0.2 to 0.3 s; the vector layer's tile cache
 is about 94 MB at 24 MP; keeping an undo step for each edit adds about 1 ms.
