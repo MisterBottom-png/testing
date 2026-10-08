@@ -1,8 +1,31 @@
 [package]
 name = "p1-check"
+description = "A-Studio P1 prototype: save/reopen and the P1 exit test end to end"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
+
+[dev-dependencies]
+serde_json = { workspace = true }
+photocraft-doc = { package = "proto-pc-doc", path = "../pc-doc" }
+photocraft-compose = { package = "proto-pc-compose", path = "../pc-compose" }
+photocraft-format = { package = "proto-pc-format", path = "../pc-format" }
+photocraft-geom = { path = "../../upstream/photocraft/crates/geom" }
+photocraft-color = { path = "../../upstream/photocraft/crates/color" }
+photocraft-raster = { path = "../../upstream/photocraft/crates/raster" }
+vlayer = { path = "../vlayer" }
+vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
+vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }
+vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
+vectorcraft-format = { path = "../../upstream/vectorcraft/crates/format" }
+# The exit test opens a PSD with unmodified PhotoCraft and hands it over as a .pcraft file.
+upstream-doc = { package = "photocraft-doc", path = "../../upstream/photocraft/crates/doc" }
+upstream-io = { package = "photocraft-io", path = "../../upstream/photocraft/crates/io" }
+upstream-format = { package = "photocraft-format", path = "../../upstream/photocraft/crates/format" }
+upstream-psd = { package = "photocraft-psd", path = "../../upstream/photocraft/crates/psd" }
