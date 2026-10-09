@@ -27,7 +27,10 @@ clone photocraft  https://github.com/storytold/photocraft  e5e3e39
 clone vectorcraft https://github.com/storytold/vectorcraft 8b036df
 
 if [ "$FONTS" = 1 ]; then
-  [ -d ../craft-fonts ] || git clone --depth 1 https://github.com/storytold/craft-fonts ../craft-fonts
+  # Pinned: the golden paragraphs (crates/text/tests/data/golden_paragraphs.txt) were laid out
+  # with these font files; CI checks out the same commit.
+  [ -d ../craft-fonts ] || git clone --filter=blob:none https://github.com/storytold/craft-fonts ../craft-fonts
+  git -C ../craft-fonts checkout -q 8dcdacd5153e64560d109541a47d806f26f048c0
   echo "fonts: export CRAFT_FONTS_DIR=\"$(cd ../craft-fonts && pwd)\""
 fi
 { echo "photocraft $(git -C upstream/photocraft rev-parse HEAD)"; echo "vectorcraft $(git -C upstream/vectorcraft rev-parse HEAD)"; } > upstream.lock

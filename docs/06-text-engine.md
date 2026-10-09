@@ -1,6 +1,10 @@
 # Text engine plan
 
 Decision D3: keep VectorCraft's text engine, port four PhotoCraft pieces onto it, retire `parley`.
+P2-10: `parley` is not in A-Studio's `Cargo.lock`. Golden paragraphs in Latin, Arabic and Japanese
+vertical type (`crates/text/tests/golden_paragraphs.rs`) lay out exactly as VectorCraft's own engine
+lays them out (generated from vectorcraft@8b036df by `scripts/goldens/paragraphs-vectorcraft`); the
+Arabic and Japanese ones use craft-fonts@8dcdacd (`CRAFT_FONTS_DIR`), which CI checks out.
 
 ## What each side has
 
