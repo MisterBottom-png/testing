@@ -346,10 +346,10 @@ pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
         for line in &l.lines {
             out.lines.push([line.x0 * k, (line.baseline - line.ascent) * k, line.x1 * k, (line.baseline + line.descent) * k]);
         }
-        let styles = std::mem::take(&mut out.styles);
-        decorations(db, &l, &styles, k, &mut out);
-        out.styles = styles;
     }
+    let styles = std::mem::take(&mut out.styles);
+    decorations(db, &l, &styles, k, &mut out);
+    out.styles = styles;
     let b = l.bounds;
     out.ink_and_lines = (b.width() > 0.0 || b.height() > 0.0).then_some([b.x0 * k, b.y0 * k, b.x1 * k, b.y1 * k]);
     out
@@ -376,10 +376,36 @@ fn decorations(db: &FontDb, l: &crate::TextLayout, styles: &[PcStyle], k: f64, o
             && let Some(font) = face.skrifa()
         {
             let stretch = &l.glyphs[i..j];
-            let x0 = stretch.iter().map(|g| g.origin.x.min(g.origin.x + g.advance)).fold(f64::INFINITY, f64::min);
-            let x1 = stretch.iter().map(|g| g.origin.x.max(g.origin.x + g.advance)).fold(f64::NEG_INFINITY, f64::max);
             let size_px = f64::from(st.size_pt) * k;
             let m = font.metrics(Size::new(size_px as f32), face.location());
+            if l.vertical {
+                // PhotoCraft's: the underline right of the column, the strikethrough through its
+                // centre, along the run's stretch of the column (text space is already upright).
+                let centre = line.baseline + (line.descent - line.ascent) / 2.0;
+                let ends: Vec<Point> = stretch
+                    .iter()
+                    .flat_map(|g| {
+                        let s = l.logical_point(g.origin).x;
+                        [l.physical_point(Point::new(s, centre)), l.physical_point(Point::new(s + g.advance, centre))]
+                    })
+                    .collect();
+                let (y0, y1) = ends.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), p| (a.min(p.y), b.max(p.y)));
+                let cx = ends.first().map_or(0.0, |p| p.x) * k;
+                let half = size_px * 0.5;
+                let mut push = |x0: f64, x1: f64| out.decorations.push(Decoration { x0, y0: y0 * k, x1, y1: y1 * k, style: g.run });
+                if st.underline {
+                    let t = m.underline.map_or(0.05 * size_px, |d| f64::from(d.thickness)).max(1.0);
+                    push(cx + half, cx + half + t);
+                }
+                if st.strikethrough {
+                    let t = m.strikeout.map_or(0.05 * size_px, |d| f64::from(d.thickness)).max(1.0);
+                    push(cx - t * 0.5, cx + t * 0.5);
+                }
+                i = j;
+                continue;
+            }
+            let x0 = stretch.iter().map(|g| g.origin.x.min(g.origin.x + g.advance)).fold(f64::INFINITY, f64::min);
+            let x1 = stretch.iter().map(|g| g.origin.x.max(g.origin.x + g.advance)).fold(f64::NEG_INFINITY, f64::max);
             let shift = f64::from(st.baseline_shift_pt) * k;
             let baseline = line.baseline * k;
             let mut push = |offset: f32, thickness: f32| {

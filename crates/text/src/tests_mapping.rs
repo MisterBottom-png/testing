@@ -111,3 +111,23 @@ fn forced_line_breaks_continue_the_paragraph() {
     // "two" starts at the margin, "one" and "three" after the indent.
     assert!(lay.lines[1].x0 < lay.lines[0].x0 - 20.0 && lay.lines[2].x0 > lay.lines[1].x0 + 20.0, "{:?}", lay.lines);
 }
+
+/// Vertical type gets its underline right of the column and its strikethrough through the
+/// column's centre, along the run (PhotoCraft's `layout.rs` decorations; they were dropped).
+#[test]
+fn vertical_type_is_underlined_and_struck_through() {
+    use astudio_doc::text::Orientation;
+    let mut l = styled("abc", CharStyle { size_pt: 40.0, underline: true, strikethrough: true, ..Default::default() });
+    l.orientation = Orientation::Vertical;
+    let lay = layout_layer(db(), &l, 72.0);
+    assert_eq!(lay.decorations.len(), 2, "{:?}", lay.decorations);
+    let ink = lay.glyphs.iter().map(|g| kurbo::Shape::bounding_box(&g.outline)).reduce(|a, b| a.union(b)).unwrap();
+    let (under, strike) = (lay.decorations[0], lay.decorations[1]);
+    for d in [under, strike] {
+        assert!(d.y1 - d.y0 > 3.0 * (d.x1 - d.x0), "runs down the column: {d:?}");
+        assert!(d.y0 < ink.y0 + 5.0 && d.y1 > ink.y1 - 5.0, "{d:?} along {ink:?}");
+    }
+    assert!(under.x0 >= ink.x1 - 1.0, "underline right of the glyphs: {under:?} {ink:?}");
+    let mid = (strike.x0 + strike.x1) / 2.0;
+    assert!(mid > ink.x0 && mid < ink.x1, "strikethrough across the glyphs: {strike:?} {ink:?}");
+}
