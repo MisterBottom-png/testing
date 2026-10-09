@@ -1,6 +1,7 @@
 //! Warp Text matches PhotoCraft (P2-06): for all 15 styles, two bends, with and without
 //! distortion, horizontal and vertical, A-Studio maps a 5 x 3 grid of text-space points to exactly
-//! the numbers PhotoCraft's code gives (`tests/data/warp_photocraft.txt`, from photocraft@e5e3e39).
+//! the numbers PhotoCraft's code gives (`tests/data/warp_photocraft.txt`, from photocraft@e5e3e39 by
+//! `scripts/goldens/warp-photocraft`), within 1e-9 px.
 //! Equal geometry is stronger than the task's "within 1/255"; the pixel comparison of warped text
 //! needs text rendering into tiles and joins P2-08.
 // Test helpers outside #[test] functions (clippy.toml allows these only inside them).
@@ -27,7 +28,9 @@ fn warp_text_matches_photocraft_exactly() {
         };
         let warp = Warp::new(&w, [0.0, -40.0, 200.0, 10.0]).unwrap_or_else(|| panic!("{line}"));
         let (x, y) = warp.apply(num(5), num(6));
-        assert!(x.to_bits() == num(7).to_bits() && y.to_bits() == num(8).to_bits(), "{line}: A-Studio gives {x:?} {y:?}");
+        // The golden was computed on Linux; Windows' sin/cos may differ in the last bit, so
+        // "exactly" is within 1e-9 px (far inside 1/255).
+        assert!((x - num(7)).abs() <= 1e-9 && (y - num(8)).abs() <= 1e-9, "{line}: A-Studio gives {x:?} {y:?}");
         styles.insert(f[0].to_string());
         checked += 1;
     }
