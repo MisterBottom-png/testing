@@ -1,5 +1,5 @@
 //! Optical kerning matches PhotoCraft (P2-07): for every pair of PhotoCraft's 94-pair sample in
-//! A-Studio's six bundled fonts, `astudio_text::optical` gives the adjustment PhotoCraft's own code
+//! six of A-Studio's bundled fonts, `astudio_text::optical` gives the adjustment PhotoCraft's own code
 //! gives (`tests/data/optical_photocraft.txt`, from photocraft@e5e3e39 with its skrifa 0.44 by
 //! `scripts/goldens/optical-photocraft`). A-Studio reads the outlines with skrifa 0.47.
 // Test helpers outside #[test] functions (clippy.toml allows these only inside them).

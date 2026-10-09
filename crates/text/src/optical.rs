@@ -204,6 +204,8 @@ impl Cache {
     fn get(&mut self, fk: u64, font: &skrifa::FontRef<'_>, coords: &[NormalizedCoord], gid: u32) -> Option<Profile> {
         if self.profiles.len() > Self::MAX_PROFILES {
             self.profiles.clear();
+            // One entry per font and variation; cleared with the profiles so it stays bounded too.
+            self.reference.clear();
         }
         self.profiles.entry((fk, gid)).or_insert_with(|| profile(font, coords, gid)).clone()
     }
