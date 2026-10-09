@@ -27,6 +27,11 @@ skip = [
   { crate = "miniz_oxide@0.8.9", reason = "png 0.18 uses miniz_oxide 0.8 directly and 0.9 through flate2" },
   { crate = "quick-error@1.2.3", reason = "proptest's rusty-fork (tests only); image-webp and tiff use quick-error 2" },
   { crate = "syn@2.0.119", reason = "zerocopy-derive (through half and ppv-lite86); serde and thiserror use syn 3" },
+  # Font stack (astudio-text, P2-04), the same pairs as in VectorCraft's own lock file:
+  { crate = "skrifa@0.42.1", reason = "subsetter 0.2 (font subsets for PDF/SVG); A-Studio uses skrifa 0.47" },
+  { crate = "read-fonts@0.39.2", reason = "skrifa 0.42 (subsetter) and write-fonts 0.48" },
+  { crate = "read-fonts@0.43.3", reason = "harfrust 0.13; skrifa 0.47 uses read-fonts 0.44" },
+  { crate = "font-types@0.11.3", reason = "read-fonts 0.39 (subsetter, write-fonts)" },
 ]
 
 [advisories]

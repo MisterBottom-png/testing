@@ -9,10 +9,30 @@ publish = false
 
 [dependencies]
 astudio-geom = { path = "../geom" }
-astudio-color = { path = "../color" }
-astudio-raster = { path = "../raster" }
 astudio-vdoc = { path = "../vdoc" }
-astudio-doc = { path = "../doc" }
+kurbo = { workspace = true }
+skrifa = { workspace = true }
+harfrust = { workspace = true }
+log = { workspace = true }
+# Font subsets for embedding (SVG @font-face, PDF); variable fonts' named instances are instanced.
+subsetter = { version = "0.2", default-features = false, features = ["variable-fonts"] }
+unicode-bidi = "0.3.18"
+unicode-general-category = "1"
+unicode-script = "0.5"
+# Builds a small variable font for tests (`test_fonts`; no font file is committed).
+write-fonts = { version = "0.48", optional = true }
+
+[features]
+# `astudio_text::test_fonts` for other crates' tests (dev-dependencies only).
+test-fonts = ["dep:write-fonts"]
+
+[dev-dependencies]
+write-fonts = "0.48"
+
+# Fonts registered with Windows outside its font folders ("install as shortcut", installers): a
+# safe wrapper of the registry API from the windows-rs project.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
 
 [lints]
 workspace = true

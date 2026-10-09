@@ -19,7 +19,7 @@ P2-01,P2,Core,Create astudio-geom from vc geom (kurbo) + pc geom pixel types and
 P2-02,P2,Core,"Create astudio-color: merge pc color, pc cms, vc color",P1-05,Colour tests of both repos pass,Done,
 P2-03,P2,Core,"Unify the 17 crates with different versions (harfrust, skrifa, usvg, vello_cpu, ...)",P1-05,One Cargo.lock; cargo tree -d shows no avoidable duplicates,Done,
 P2-13,P2,Core,"Adopt vc doc as astudio-vdoc (vector node tree, appearance, symbols, swatches; needed by astudio-text)",P2-02,vc doc tests pass in the merged workspace,Done,
-P2-04,P2,Text,Adopt vc text as astudio-text,"P2-02,P2-13",vc text tests pass in the merged workspace,Not started,
+P2-04,P2,Text,Adopt vc text as astudio-text,"P2-02,P2-13",vc text tests pass in the merged workspace,Done,
 P2-05,P2,Text,Port PSD EngineData read/write (T1),P2-04,PSD text corpus round-trips at PhotoCraft's rate,Not started,
 P2-06,P2,Text,Port Warp Text (T2),P2-04,15 warp styles match within 1/255,Not started,
 P2-07,P2,Text,Port optical kerning (T3),P2-04,Pair adjustments match PhotoCraft,Not started,

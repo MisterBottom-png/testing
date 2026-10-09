@@ -15,7 +15,14 @@ Adobe, Photoshop and Illustrator are trademarks or registered trademarks of Adob
 not affiliated with Adobe; these names describe compatible workflows only.
 
 Third-party material
-When upstream code and assets are merged in, copy each upstream NOTICE entry here (fonts under the
-SIL OFL 1.1, Lucide icons under ISC, the SCOWL word list, the CC BY 3.0 magnetic lasso glyph, Adobe
-CMap resources under BSD-3-Clause through hayro-cmap, the jpeg-encoder IJG notice, egui default
-fonts). The per-file list is in ASSETS.md.
+- Source Sans 3 and Source Serif 4 (assets/fonts/Source*) - SIL Open Font License 1.1. See
+  assets/fonts/OFL-SourceSans3.txt, OFL-SourceSerif4.txt.
+- Inter (assets/fonts/Inter-*.ttf) - SIL Open Font License 1.1. See assets/fonts/OFL-Inter.txt.
+- JetBrains Mono (assets/fonts/JetBrainsMono-*.ttf) - SIL Open Font License 1.1. See
+  assets/fonts/OFL-JetBrainsMono.txt.
+- The synthetic coated CMYK profile (crates/color/profiles/photocraft-coated-cmyk.icc) - CC0-1.0.
+  See crates/color/profiles/LICENSE-CC0-1.0.txt.
+When more upstream code and assets are merged in, copy each upstream NOTICE entry here (Lucide
+icons under ISC, the SCOWL word list, the CC BY 3.0 magnetic lasso glyph, Adobe CMap resources
+under BSD-3-Clause through hayro-cmap, the jpeg-encoder IJG notice, egui default fonts, the
+craft-fonts OFL faces of release builds). The per-file list is in ASSETS.md.
