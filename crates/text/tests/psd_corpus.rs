@@ -2,7 +2,8 @@
 //! `scripts/fetch-corpus.sh psd`; a missing corpus fails). Ported from PhotoCraft's
 //! `io/tests/text_corpus.rs`: the same strict model round trip (P2-05 done_when). PhotoCraft's
 //! second part, re-rendering each layer against Photoshop's cached pixels, needs text rendering
-//! into tiles (P2-08) and joins there.
+//! into tiles (P2-08) and joins there; its `corpus_tysh_lossless` and the PSD-file half of
+//! `created_text_layer_roundtrips_through_psd` need PSD import and export (P5-03).
 #![cfg(feature = "corpus")]
 // Test helpers outside #[test] functions (clippy.toml allows these only inside them).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -35,9 +36,6 @@ fn dpi(file: &PsdFile) -> f32 {
         .and_then(|r| ResolutionInfo::from_bytes(&r.data).ok())
         .map_or(72.0, |ri| (ri.h_res() * if ri.h_res_unit == 2 { 2.54 } else { 1.0 }) as f32)
 }
-
-/// Text layers that round-trip exactly with PhotoCraft's own code (measured, see docs/baseline.md).
-const EXACT_FLOOR: usize = 21;
 
 #[test]
 fn corpus_text_layers_round_trip() {
@@ -104,5 +102,6 @@ fn corpus_text_layers_round_trip() {
     }
     println!("text layers: {n} in {files_with_text} files, {exact} round-trip exactly");
     assert!(n > 0, "the corpus has text layers");
-    assert!(exact >= EXACT_FLOOR, "{exact} of {n} text layers round-trip exactly; PhotoCraft's rate is {EXACT_FLOOR}");
+    // PhotoCraft's rate: every text layer (21 of 21 on its pinned corpus, docs/baseline.md).
+    assert_eq!(exact, n, "every text layer round-trips exactly, as in PhotoCraft");
 }

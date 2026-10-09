@@ -92,4 +92,7 @@ Both read each layer's `TySh`, keep it as `psd_raw` (as PSD import does) and wri
 `build_tysh`. Without `psd_raw`, 10 layers (all in psd-tools `layer_effects.psd`) lose the
 "no automatic kerning" mode of their last character, which EngineData has no slot for; PhotoCraft's
 `psd_round_trips_manual_kerning` test documents the same limit. PhotoCraft's geometry check
-(re-rendering against Photoshop's pixels) joins A-Studio with text rendering in P2-08.
+(re-rendering against Photoshop's pixels) joins A-Studio with text rendering in P2-08; its
+`corpus_tysh_lossless` (TySh written back byte for byte) and the file half of
+`created_text_layer_roundtrips_through_psd` need PSD import and export and join in P5-03. The model
+half of the latter runs now (`created_text_layer_round_trips_through_tysh`).

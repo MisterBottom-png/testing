@@ -35,8 +35,8 @@ fetch_set() { # <set>
     got=$((got + 1))
   done < "$manifest"
   # Licences of the sources, next to their files.
-  curl -fsSL -o "corpus/$set/psd-tools/LICENSE" "https://raw.githubusercontent.com/psd-tools/psd-tools/$PSD_TOOLS_COMMIT/LICENSE"
-  curl -fsSL -o "corpus/$set/ag-psd/LICENSE" "https://raw.githubusercontent.com/Agamnentzar/ag-psd/$AG_PSD_COMMIT/LICENSE"
+  [ -f "corpus/$set/psd-tools/LICENSE" ] || curl -fsSL -o "corpus/$set/psd-tools/LICENSE" "https://raw.githubusercontent.com/psd-tools/psd-tools/$PSD_TOOLS_COMMIT/LICENSE"
+  [ -f "corpus/$set/ag-psd/LICENSE" ] || curl -fsSL -o "corpus/$set/ag-psd/LICENSE" "https://raw.githubusercontent.com/Agamnentzar/ag-psd/$AG_PSD_COMMIT/LICENSE"
   echo "corpus/$set: $n files ($got downloaded)"
 }
 

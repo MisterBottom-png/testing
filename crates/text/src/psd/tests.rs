@@ -174,3 +174,42 @@ fn psd_tysh_round_trips_orientation_and_writing_direction() {
     let back = crate::psd::text_layer_from_tysh(&crate::psd::write_tysh(&parsed), 72.0).unwrap();
     assert_eq!(back.orientation, Orientation::Vertical);
 }
+
+/// The model half of PhotoCraft's `io/tests/text_corpus.rs` `created_text_layer_roundtrips_through_psd`
+/// (P2-05): a layer made in the app (two runs, two paragraphs, a box, a transform, 144 dpi)
+/// survives our TySh writer and reader. The PSD-file half needs PSD export (P5-03).
+#[test]
+fn created_text_layer_round_trips_through_tysh() {
+    use astudio_color::Color;
+    use astudio_doc::text::{ParagraphRun, ParagraphStyle, TextAlign, TextShape};
+    let dpi = 144.0;
+    let a = CharStyle { font_family: "Inter".into(), size_pt: 10.0, color: Color::rgb(0.2, 0.4, 0.6), ..Default::default() };
+    let b = CharStyle { faux_bold: true, underline: true, tracking: 50.0, leading_pt: Some(14.0), ..a.clone() };
+    let mut t = TextLayer {
+        text: "Größe\nzwei".into(),
+        runs: vec![TextRun { len: 3, style: a }, TextRun { len: 9, style: b }],
+        paragraphs: vec![
+            ParagraphRun { len: 7, style: ParagraphStyle { align: TextAlign::Center, space_after_pt: 3.0, ..Default::default() } },
+            ParagraphRun { len: 5, style: ParagraphStyle { align: TextAlign::JustifyAll, ..Default::default() } },
+        ],
+        shape: TextShape::Box { x: 0.0, y: 0.0, width: 100.0, height: 60.0 },
+        transform: astudio_geom::pixel::Affine::translate(8.0, 6.0),
+        ..Default::default()
+    };
+    t.sync_summary();
+    let bt = crate::psd::text_layer_from_tysh(&crate::psd::build_tysh(&t, dpi, None), dpi).unwrap();
+    let strip = |v: Vec<TextRun>| {
+        v.into_iter()
+            .map(|mut r| {
+                r.style.postscript_name = None;
+                r.style.color.c = r.style.color.c.map(|c| (c * 1000.0).round() / 1000.0);
+                r
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(bt.text, t.text);
+    assert_eq!(strip(bt.char_runs()), strip(t.char_runs()));
+    assert_eq!(bt.paragraph_runs(), t.paragraph_runs());
+    assert_eq!(bt.shape, t.shape);
+    assert_eq!(bt.transform, t.transform);
+}

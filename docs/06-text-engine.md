@@ -25,7 +25,7 @@ Decision D3: keep VectorCraft's text engine, port four PhotoCraft pieces onto it
 
 | # | Piece | From | Into | Done when |
 | --- | --- | --- | --- | --- |
-| T1 | PSD EngineData read/write | pc `engine_data.rs`, `psd.rs`, `psd_styles.rs` | `astudio-text::psd` | PSD text corpus round-trips at PhotoCraft's current rate |
+| T1 | PSD EngineData read/write | pc `engine_data.rs`, `psd.rs`, `psd_styles.rs` | `astudio-text::psd` | PSD text corpus round-trips at PhotoCraft's current rate. Done (P2-05): 21 of 21, as PhotoCraft (`docs/baseline.md`) |
 | T2 | Warp Text | pc `warp.rs` | `astudio-text::warp` | The 15 Photoshop warp styles render; matches PhotoCraft output within 1/255 |
 | T3 | Optical kerning | pc `optical.rs` | `astudio-text::optical` | Same pair adjustments as PhotoCraft on the test strings |
 | T4 | Rasterize into tiles | pc `raster.rs`, `render.rs` | `astudio-text::raster` | Text layers composite identically on CPU and GPU |

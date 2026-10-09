@@ -687,7 +687,9 @@ pub fn build_engine_data(layer: &TextLayer, template: Option<E>, dpi: f32) -> E 
     let mut plens = Vec::new();
     let mut at = 0usize;
     for (i, p) in paras.iter().enumerate() {
-        let piece = &text[at..at + p.len];
+        // Paragraph runs are fitted to char boundaries (`paragraph_runs`); `get` keeps a run that
+        // is not from crashing the writer.
+        let piece = text.get(at..at.saturating_add(p.len)).unwrap_or("");
         at += p.len;
         let mut n = utf16_len(piece);
         if i + 1 == paras.len() {
