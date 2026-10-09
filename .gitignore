@@ -10,3 +10,4 @@
 /crates/*/fuzz/corpus
 /crates/*/fuzz/coverage
 /corpus
+/scripts/goldens/*/target

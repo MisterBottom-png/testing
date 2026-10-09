@@ -161,9 +161,10 @@ pub struct StyleWarp {
 
 impl StyleWarp {
     /// Prepares `style` with bend / distortions in percent (-100..100) for `[x0, y0, x1, y1]`.
-    /// `None` for non-presets, an all-zero warp or an empty box.
+    /// `None` for non-presets, an all-zero warp, an empty box or a box with infinite or NaN edges.
     pub fn new(style: WarpStyle, bend: f64, h_distort: f64, v_distort: f64, vertical: bool, bounds: [f64; 4]) -> Option<StyleWarp> {
-        if !style.is_preset() {
+        // Infinite edges passed the size check and made every mapped point NaN (P2-06 review).
+        if !style.is_preset() || !bounds.iter().all(|v| v.is_finite()) {
             return None;
         }
         let [x0, y0, x1, y1] = bounds;
@@ -672,6 +673,16 @@ impl Warp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// P2-06 review: text bounds with an infinite edge made every warped point NaN.
+    #[test]
+    fn style_warp_refuses_non_finite_bounds() {
+        let arc = WarpStyle::parse("warpArc").unwrap();
+        for b in [[0.0, 0.0, f64::INFINITY, 10.0], [f64::NEG_INFINITY, 0.0, f64::INFINITY, 10.0], [0.0, f64::NAN, 10.0, 10.0]] {
+            assert!(StyleWarp::new(arc, 50.0, 0.0, 0.0, false, b).is_none(), "{b:?}");
+        }
+        assert!(StyleWarp::new(arc, 50.0, 0.0, 0.0, false, [0.0, 0.0, 10.0, 10.0]).is_some());
+    }
 
     const B: [f64; 4] = [10.0, 20.0, 110.0, 70.0];
 
