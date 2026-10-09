@@ -3,7 +3,7 @@
 # Owner decision (8 Oct 2026): prove the vector layer here; port for real in P2/P3 only if GO.
 [workspace]
 resolver = "3"
-members = ["pc-doc", "pc-vector", "pc-compose", "pc-format", "vlayer", "p1-check"]
+members = ["pc-doc", "pc-vector", "pc-compose", "pc-format", "vlayer", "p1-check", "colorbooks"]
 
 [workspace.package]
 version = "0.5.0"

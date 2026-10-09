@@ -1,0 +1,18 @@
+[package]
+name = "colorbooks"
+description = "A-Studio prototype: colour books (CSV, ASE) as VectorCraft spot swatch libraries"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+vectorcraft-color = { path = "../../upstream/vectorcraft/crates/color" }
+vectorcraft-doc = { path = "../../upstream/vectorcraft/crates/doc" }
+
+[dev-dependencies]
+vectorcraft-pdf = { path = "../../upstream/vectorcraft/crates/pdf" }
+vectorcraft-geom = { path = "../../upstream/vectorcraft/crates/geom" }

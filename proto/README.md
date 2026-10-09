@@ -13,6 +13,12 @@ workspace, and to port code for real in P2/P3 only if the P1 result is GO.
 - `vlayer`: renders a Vector layer into 256-px tiles with VectorCraft's renderer, one band of tiles
   per renderer call, and redraws only the tiles an edit touches (P1-02).
 - `p1-check` (placeholder until P1-03/P1-04): the P1 exit test end to end and the benchmark.
+- `colorbooks` (owner's choice, 8 October 2026, see `docs/research/pantone-spot-colours.md`):
+  colour books of named spot inks for inserts and swing tags. Reads CSV and ASE books, writes ASE,
+  turns them into VectorCraft spot swatch libraries defined in Lab, adds an ink to a document without
+  a duplicate plate, and bundles the MIT `pantoner` lists (`colorbooks/data/README.md`). Its exit test
+  exports a swing tag with two book inks as PDF/X-1a and PDF/X-4 with unmodified VectorCraft and
+  reads both inks back as named separations.
 - `clippy.toml` and `rustfmt.toml` are upstream PhotoCraft's, so the copied code is checked the same way.
 
 ```sh
