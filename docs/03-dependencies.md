@@ -201,7 +201,9 @@ What this means as crates are ported:
 - **Listed in `deny.toml` today:** `getrandom` 0.3/0.4 and `r-efi` 5/6 (proptest, tests only);
   `miniz_oxide` 0.8/0.9 (png 0.18 itself), `quick-error` 1/2 (proptest's rusty-fork vs image-webp and
   tiff) and `syn` 2/3 (zerocopy-derive through `half`), all from image decoding (P2-13) and present in
-  both upstream lock files.
+  both upstream lock files; the font stack of `astudio-text` (P2-04): `skrifa` 0.42 and `read-fonts`
+  0.39 (`subsetter` 0.2, `write-fonts` 0.48), `read-fonts` 0.43 (`harfrust` 0.13), `font-types` 0.11,
+  as in VectorCraft's lock file.
 
 Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 

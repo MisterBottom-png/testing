@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof that both upstream apps build against A-Studio's merged crates (P2-01 geometry, P2-02 colour,
-# P2-13 vector document).
+# P2-13 vector document, P2-04 text).
 #
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
@@ -61,6 +61,9 @@ shim vectorcraft geom geom 'pub use astudio_geom::*;'
 # VectorCraft's color = astudio_color::vector; its doc = astudio-vdoc.
 shim vectorcraft color color 'pub use astudio_color::vector::*;'
 shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
+# VectorCraft's text = astudio-text; its `test-fonts` feature passes through.
+shim vectorcraft text text 'pub use astudio_text::*;'
+printf '\n[features]\ntest-fonts = ["astudio-text/test-fonts"]\n' >> "$out/vectorcraft/src-copy/crates/text/Cargo.toml"
 
 status=0
 for app in photocraft vectorcraft; do
