@@ -26,6 +26,7 @@ mod shape;
 #[cfg(any(test, feature = "test-fonts"))]
 pub mod test_fonts;
 pub mod thread;
+pub mod warp;
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "L2";
