@@ -20,7 +20,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      # craft-fonts (OFL, never in this repo) at the commit the golden paragraphs were made with:
+      # the tests of Japanese, Chinese and Arabic text run with it (P2-10).
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
       - run: cargo test --workspace
+      # Only the text crate with the fonts embedded: every test binary of the workspace would
+      # carry them (about 40 MB each).
+      - run: cargo test -p astudio-text
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
       - run: cargo xtask layers
       - run: cargo xtask assets
       - name: Web build (L0 to L6)

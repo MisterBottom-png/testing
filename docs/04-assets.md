@@ -83,5 +83,5 @@ None of these exist yet. Each must be original work (or CC0, OFL or MIT/Apache) 
 ## Fonts
 
 - Bundled UI fonts that stay: Inter (both apps), JetBrains Mono (both), Source Sans 3 and Source Serif 4 (VectorCraft). All SIL OFL 1.1.
-- Optional CJK and Arabic fonts come from `storytold/craft-fonts` through `CRAFT_FONTS_DIR`. They are OFL, so a fork may use them; keep them out of the repo, as upstream does.
+- Optional CJK and Arabic fonts come from `storytold/craft-fonts` through `CRAFT_FONTS_DIR`. They are OFL, so a fork may use them; keep them out of the repo, as upstream does. `scripts/bootstrap.sh --fonts` and CI check out craft-fonts@8dcdacd, the files the golden paragraphs were laid out with (P2-10).
 - Never commit a font file without its OFL text next to it and a row in `ASSETS.md`.

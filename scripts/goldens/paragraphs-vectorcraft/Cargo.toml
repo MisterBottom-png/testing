@@ -1,0 +1,13 @@
+[package]
+name = "paragraphs-vectorcraft"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+# VectorCraft's own crates at the pinned upstream commit, at the versions of its Cargo.lock (copied).
+[dependencies]
+vectorcraft-text = { path = "../../../upstream/vectorcraft/crates/text" }
+vectorcraft-doc = { path = "../../../upstream/vectorcraft/crates/doc" }
+vectorcraft-geom = { path = "../../../upstream/vectorcraft/crates/geom" }

@@ -11,3 +11,5 @@
 /crates/*/fuzz/coverage
 /corpus
 /scripts/goldens/*/target
+# CI checks craft-fonts out here; its fonts never go in this repo.
+/craft-fonts

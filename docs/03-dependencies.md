@@ -229,7 +229,7 @@ What this means as crates are ported:
   build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`, and `rav1e`
   (the optional AVIF encoder) directly.
 
-Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
+Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision (P2-10: never in A-Studio's `Cargo.lock`; only the standalone golden generator `scripts/goldens/warp-render-photocraft`, which compiles PhotoCraft's own code, uses it), and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 
 ## 4. Data and inputs that are not crates
 
