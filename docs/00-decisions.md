@@ -89,3 +89,9 @@ Decided by the owner on 8 October 2026, from the study in `docs/13-colour-engine
 - Speed: new matrix-shaper and fixed-point paths in safe code (task P2-12), target within 2 times
   moxcms's speed with accuracy unchanged. If that target is missed, using a second engine for the
   screen only is a new decision for the owner.
+- Speed, revised by the owner on 9 October 2026 after P2-12: the fast paths are accepted as they are,
+  accuracy unchanged. Measured against moxcms (1 thread, 4 threads): RGB to CMYK 1.3 and 1.7 times
+  (within the target), CMYK to RGB 3.0 and 2.5 times, RGB to RGB 4.2 and 4.1 times
+  (`docs/13-colour-engine.md`). Reason: the screen conversion runs on the GPU, and a 24-megapixel
+  export or mode change now takes 0.05 to 0.26 s on 4 threads; the rest of the gap needs vector code
+  or less exact tables. No second engine. More speed is later work, after 1.0.
