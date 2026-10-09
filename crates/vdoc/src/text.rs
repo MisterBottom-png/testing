@@ -38,6 +38,10 @@ pub struct CharStyle {
     /// Kerning: None = Auto (metrics), Some(v) = manual in 1/1000 em.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kerning: Option<f64>,
+    /// Optical kerning: with `kerning` None (Auto), pairs are spaced from their outlines instead of
+    /// the font's kerning table (PhotoCraft's Kerning › Optical, P2-17).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub optical_kerning: bool,
     #[serde(default)]
     pub baseline_shift: f64,
     #[serde(default = "hundred")]
@@ -176,6 +180,7 @@ impl Default for CharStyle {
             leading: None,
             tracking: 0.0,
             kerning: None,
+            optical_kerning: false,
             baseline_shift: 0.0,
             h_scale: 100.0,
             v_scale: 100.0,
@@ -858,6 +863,19 @@ impl TextObject {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Optical kerning stored on a vector text style survives the native format (an absent field is
+    /// off, as in VectorCraft files).
+    #[test]
+    fn optical_kerning_round_trips_in_styles() {
+        let st = CharStyle { optical_kerning: true, ..Default::default() };
+        let json = serde_json::to_string(&st).unwrap();
+        assert!(json.contains("optical_kerning"));
+        assert_eq!(serde_json::from_str::<CharStyle>(&json).unwrap(), st);
+        let plain = serde_json::to_string(&CharStyle::default()).unwrap();
+        assert!(!plain.contains("optical_kerning"));
+        assert!(!serde_json::from_str::<CharStyle>(&plain).unwrap().optical_kerning);
+    }
 
     #[test]
     fn point_text_basics() {
