@@ -8,12 +8,16 @@
 # benchmark) and builds the desktop app. A compile error means an A-Studio crate lost something an
 # app uses.
 #
-# Usage: scripts/upstream-compat.sh [--test]   (--test also runs both upstream test suites; slow)
+# Usage: scripts/upstream-compat.sh [--test] [photocraft|vectorcraft]
+#   --test also runs the upstream test suites (slow); naming one app checks only that app (each
+#   build needs about 11 GB of disk).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root=$(pwd)
 TEST=0
-for a in "$@"; do case "$a" in --test) TEST=1;; *) echo "unknown option $a"; exit 2;; esac; done
+apps=""
+for a in "$@"; do case "$a" in --test) TEST=1;; photocraft|vectorcraft) apps="$apps $a";; *) echo "unknown option $a"; exit 2;; esac; done
+apps=${apps:-photocraft vectorcraft}
 [ -d upstream/photocraft/.git ] && [ -d upstream/vectorcraft/.git ] || { echo "run scripts/bootstrap.sh first"; exit 1; }
 
 out=target/upstream-compat
@@ -66,7 +70,7 @@ shim vectorcraft text text 'pub use astudio_text::*;'
 printf '\n[features]\ntest-fonts = ["astudio-text/test-fonts"]\n' >> "$out/vectorcraft/src-copy/crates/text/Cargo.toml"
 
 status=0
-for app in photocraft vectorcraft; do
+for app in $apps; do
   dir="$out/$app"
   echo "== $app $(git -C "upstream/$app" rev-parse --short HEAD) against the A-Studio crates"
   # The upstream Cargo.lock is kept, so every other dependency stays at its pinned version.
