@@ -51,6 +51,10 @@ thiserror = "2"
 proptest = "1"
 rayon = "1"
 moxcms = "0.8"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
+jpeg-encoder = { version = "0.6", default-features = false, features = ["std"] }
+tiff = "0.11"
+zune-jpeg = "0.5"
 # P2-03: one version of each crate the two upstream apps pinned differently (docs/03-dependencies.md
 # "Version conflicts"). Ported crates take these; a second version only with a reason in deny.toml.
 base64 = "0.22"
