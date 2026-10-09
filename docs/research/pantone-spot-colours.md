@@ -1,6 +1,6 @@
 # Research: Pantone colours for inserts and swing tags
 
-**Date:** 8 October 2026 · **Status:** research done, owner answered the first round of questions,
+**Date:** 9 October 2026 · **Status:** research done, owner decided, prototype built and passing;
 nothing built yet · **Decision needed:** how to ship the colour data (question 1 at the end).
 
 ## The ask
@@ -125,14 +125,41 @@ Then the A-Studio tasks (added to `docs/data/backlog.csv` once the prototype pas
 into `astudio-color` (P2-02), the book fields and library category into the merged document
 (P3-01), the "Get colour books" command in `astudio-engine`, and the freieFarbe asset with its row.
 
-## Questions for the owner
+### Prototype results (9 October 2026)
 
-1. **Where should the Pantone lists live?** (a) A separate download the app fetches on request, so
-   no PANTONE name ships inside A-Studio (recommended); (b) bundled inside the app as an MIT asset,
-   accepting the trademark exposure; (c) both: bundled now, moved out if Pantone objects.
-2. **Is a pre-2019 book acceptable?** The free data has 1,341 codes per book plus metallics and
-   pastels; the 224 colours Pantone added since 2019 and the 2023 additions are not in any free list.
-3. **Start the prototype now?** It touches only the upstream checkout and a throwaway branch.
+Built in `proto/colorbooks` against unmodified VectorCraft `8b036df` (`cd proto && cargo test -p
+colorbooks`; 11 tests, clippy clean).
+
+| Step | Result |
+| --- | --- |
+| 1 CSV and ASE readers, ASE writer | Done. Size caps, no panics; damaged and truncated ASE files are refused. The four bundled lists load as 3,193 Lab spot swatches |
+| 2 `book` and `code` on `Swatch` | Not possible without editing upstream; the prototype encodes them in the swatch name (`PANTONE 186 C`) and the library name. The real port adds the fields |
+| 3 hex → Lab | Done through VectorCraft's colour settings; `#c8102e` gives a Lab red in the expected range |
+| 4 No duplicate plates | Done: picking `PANTONE 186 C` twice gives one swatch and one plate; a process swatch that already carries the name is not hijacked |
+| 5 Library panel category | Not in the prototype (UI); the libraries load through the existing `swatch.library.load` path |
+| 6 PDF end to end | **Passes.** A CMYK swing tag with `186 C` at 100 % and 40 % and `186 U` at 100 % exports as PDF/X-1a, PDF/X-4 and plain PDF; every file carries `/Separation /PANTONE 186 C` and `/PANTONE 186 U`, and reading the file back gives two spot swatches linked at the right tints |
+| 7 Speed | All 3,193 swatches load in about 80 ms on the Linux dev machine |
+
+One finding to carry into the port: **Lab alternates only reach plain PDF.** In PDF/X-1a the
+alternate is DeviceCMYK (by design). In PDF/X-4 VectorCraft writes the alternate as a reference to
+the embedded ICC CMYK profile, and its Lab rewrite (`crates/pdf/src/lab_spot.rs`) only matches
+`/DeviceCMYK`, so the Lab definition is dropped there too. The ink name is still correct, which is
+what the printer uses; a fix in the port would teach the rewrite about ICC alternates.
+
+## Owner's decisions (8 October 2026)
+
+1. **Where the Pantone lists live:** bundled inside the app, as an MIT asset, accepting the
+   trademark exposure (the alternative was a separate download fetched on request).
+2. **Pre-2019 books are enough:** 1,341 codes per book plus metallics and pastels.
+3. **Prototype first:** done, see above.
+
+## Next steps
+
+- Port for real after P2-02 and P3-01: readers into `astudio-color`, `book` and `code` fields on
+  `Swatch`, a "Colour Books" library category, the data under `assets/colorbooks/` with its
+  `ASSETS.md` row and a `brand-ok` exemption for the `cargo xtask brands` deny list.
+- Teach the Lab rewrite about PDF/X-4 ICC alternates, or write Lab alternates directly in krilla.
+- Optional: swing tag and insert artboard presets with bleed and a non-printing `Dieline` spot.
 
 ## Sources
 

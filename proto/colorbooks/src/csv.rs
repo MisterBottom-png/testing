@@ -5,7 +5,8 @@
 //! - `l`, `a`, `b`: CIE Lab D50, L 0..100 (preferred when present);
 //! - `name`: a display name that replaces the code in the swatch name (optional).
 //!
-//! Lines that do not parse are skipped. Sizes are capped so a bad file cannot exhaust memory.
+//! Lines that do not parse are skipped (a line may start with `#rrggbb`, so `#` is not a comment
+//! marker). Sizes are capped so a bad file cannot exhaust memory.
 
 /// Longest line and most rows a book may have.
 pub const MAX_LINE: usize = 1024;
@@ -54,7 +55,7 @@ pub fn read(text: &str) -> Result<Vec<Row>, String> {
         if rows.len() >= MAX_ROWS {
             break;
         }
-        if line.len() > MAX_LINE || line.trim().is_empty() || line.starts_with('#') {
+        if line.len() > MAX_LINE || line.trim().is_empty() {
             continue;
         }
         let c = cells(line);
@@ -83,7 +84,7 @@ mod tests {
 
     #[test]
     fn reads_hex_and_lab_columns_in_any_order() {
-        let text = "\u{feff}hex,pantone\n#f6eb61,100-c\n#c8102e,186-c\nbad,187-c\n,\n";
+        let text = "\u{feff}hex,pantone\n#f6eb61,100-c\n#c8102e,186-c\nnope,187-c\n,\n";
         assert!(sniff(text));
         let rows = read(text).unwrap();
         assert_eq!(rows.len(), 2);

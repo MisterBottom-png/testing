@@ -58,17 +58,22 @@ fn swing_tag() -> Document {
 #[test]
 fn two_book_inks_survive_pdf_x1a_and_x4_as_named_separations() {
     let d = swing_tag();
-    for standard in [Standard::PdfX1a, Standard::PdfX4] {
+    for standard in [Standard::PdfX1a, Standard::PdfX4, Standard::default()] {
         let r = export_with_report(&d, &opts(standard)).unwrap_or_else(|e| panic!("{standard:?}: {e}"));
         let text = String::from_utf8_lossy(&r.bytes).into_owned();
         // The ink names are in the file as separation colour spaces.
         for name in ["/Separation/PANTONE#20186#20C", "/Separation/PANTONE#20186#20U"] {
             assert!(text.contains(name), "{standard:?}: {name} missing");
         }
-        assert!(text.contains("/S/GTS_PDFX"), "{standard:?}: output intent");
-        // PDF/X-1a keeps CMYK alternates; PDF/X-4 carries the Lab definition.
-        let lab_alt = text.contains("[/Lab");
-        assert_eq!(lab_alt, standard == Standard::PdfX4, "{standard:?}: Lab alternate {lab_alt}");
+        // What the alternate colour space is (what a printer sees if spots are converted):
+        // PDF/X-1a: DeviceCMYK; PDF/X-4: the output intent's ICC CMYK profile (an indirect
+        // object, so VectorCraft's Lab rewrite does not apply); plain PDF: the Lab definition.
+        let alt = |space: &str| text.contains(&format!("/Separation/PANTONE#20186#20C{space}"));
+        match standard {
+            Standard::PdfX1a => assert!(alt("/DeviceCMYK<<") && text.contains("/S/GTS_PDFX"), "{standard:?}"),
+            Standard::PdfX4 => assert!(alt(" 2 0 R<<") && text.contains("/S/GTS_PDFX") && !text.contains("[/Lab"), "{standard:?}"),
+            _ => assert!(alt("[/Lab<<") && text.contains("/C1["), "{standard:?}: Lab alternate"),
+        }
         // Read back: both inks are spot swatches, the art links to them at its tint.
         let back = import_with_report(&r.bytes, &ImportOptions::default()).unwrap().document;
         let f = fills(&back);
@@ -81,8 +86,11 @@ fn two_book_inks_survive_pdf_x1a_and_x4_as_named_separations() {
             assert!(sw.spot && sw.global, "{standard:?}: {name} is a spot swatch");
         }
         assert_eq!(back.swatches.iter().filter(|s| s.spot).count(), 2, "{standard:?}: two plates");
-        if standard == Standard::PdfX4 {
-            assert!(matches!(back.swatch("PANTONE 186 C").unwrap().paint.color(), Some(Color::Lab { .. })), "X-4 keeps Lab");
+        let kept = back.swatch("PANTONE 186 C").unwrap().paint.color();
+        if standard == Standard::default() {
+            assert!(matches!(kept, Some(Color::Lab { .. })), "plain PDF keeps the Lab definition: {kept:?}");
+        } else {
+            assert!(matches!(kept, Some(Color::Cmyk { .. })), "{standard:?} comes back with a CMYK alternate: {kept:?}");
         }
     }
 }

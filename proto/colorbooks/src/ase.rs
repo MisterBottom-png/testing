@@ -99,7 +99,7 @@ impl<'a> Cursor<'a> {
             return Err(format!("name longer than {MAX_NAME} characters"));
         }
         let raw = self.take(units * 2)?;
-        let u: Vec<u16> = raw.chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect();
+        let u: Vec<u16> = raw.as_chunks::<2>().0.iter().map(|c| u16::from_be_bytes(*c)).collect();
         let text: String = char::decode_utf16(u.iter().copied()).map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER)).collect();
         Ok(text.trim_end_matches('\0').to_string())
     }
