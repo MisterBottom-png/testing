@@ -3,7 +3,7 @@
 //! Built with `CRAFT_FONTS_DIR=<craft-fonts checkout>`, [`CRAFT_FONTS`] holds every font in its
 //! manifest (today the Japanese UI and document fonts); built without it, it is empty and Japanese
 //! text falls back to the installed system fonts. Release builds always set it. See `build.rs`
-//! and craftrules `standards/fonts.md`.
+//! and `docs/04-assets.md` (Fonts).
 
 /// A font from the optional craft-fonts build input (empty unless built with `CRAFT_FONTS_DIR`).
 pub struct CraftFont {

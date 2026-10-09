@@ -1,5 +1,5 @@
 //! The optional craft-fonts build input (https://github.com/storytold/craft-fonts,
-//! `docs/integration.md`): with `CRAFT_FONTS_DIR=<checkout>` set, every font in its
+//! see `docs/04-assets.md`): with `CRAFT_FONTS_DIR=<checkout>` set, every font in its
 //! `fonts/manifest.txt` is embedded as `CRAFT_FONTS`; unset, `CRAFT_FONTS` is empty and the app
 //! uses its own and the installed fonts. `CRAFT_FONTS_REQUIRED=1` turns a bad checkout into a build
 //! error (release builds). Nothing is fetched: the build reads only the local checkout.

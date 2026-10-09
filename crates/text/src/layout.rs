@@ -414,6 +414,10 @@ fn finish_bounds(out: &mut TextLayout) {
 }
 
 /// One cell of a flattened area-type frame (the whole frame, or one row/column of it).
+/// Most rows or columns of area type (the Area Type Options command allows 100; files are capped
+/// here too).
+pub const MAX_AREA_GRID: usize = 100;
+
 struct Region {
     /// The cell (frame bounds, or a grid cell of them).
     cell: Rect,
@@ -515,7 +519,8 @@ impl Region {
             let area: f64 = polys[0].iter().zip(polys[0].iter().cycle().skip(1)).map(|(a, b)| a.x * b.y - b.x * a.y).sum::<f64>().abs() * 0.5;
             (area - bbox.area()).abs() <= bbox.area() * 1e-6 + 1e-9
         };
-        let (rows, cols) = (opts.rows.max(1), opts.columns.max(1));
+        // Rows and columns come from the file: capped like the Area Type Options command.
+        let (rows, cols) = (opts.rows.clamp(1, MAX_AREA_GRID), opts.columns.clamp(1, MAX_AREA_GRID));
         let gutter = opts.gutter.max(0.0);
         let cw = ((bbox.width() - gutter * (cols - 1) as f64) / cols as f64).max(0.0);
         let rh = ((bbox.height() - gutter * (rows - 1) as f64) / rows as f64).max(0.0);
@@ -568,7 +573,10 @@ impl Region {
             return (self.cell.width() > 0.0).then_some((self.cell.x0, self.cell.x1)).and_then(clip).into_iter().collect();
         }
         let fb = if plain { self.cell } else { self.polys.iter().flatten().fold(Rect::new(f64::MAX, f64::MAX, f64::MIN, f64::MIN), |r, p| r.union_pt(*p)) };
-        let clamp = |y: f64| if plain { y } else { y.clamp(fb.y0 + 1e-4, fb.y1 - 1e-4) };
+        // `f64::clamp` panics when min > max or a bound is NaN (a frame flatter than 2e-4 pt).
+        let (lo, hi) = (fb.y0 + 1e-4, fb.y1 - 1e-4);
+        let ok = lo <= hi; // false also for NaN
+        let clamp = |y: f64| if plain || !ok { y } else { y.clamp(lo, hi) };
         // Sample the band densely enough for curved frames (circles, blobs).
         let samples = 5;
         let mut rows: Vec<Vec<(f64, f64)>> = (0..samples).map(|k| self.intervals(clamp(top + (bottom - top) * k as f64 / (samples - 1) as f64))).collect();

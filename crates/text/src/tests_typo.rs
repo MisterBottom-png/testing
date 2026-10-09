@@ -358,6 +358,16 @@ fn rows_and_columns_flow_in_order() {
     }
 }
 
+/// Area-type rows and columns come from the file: a damaged one asking for a million of each used
+/// to make layout allocate about 100 TB and abort the app (P2-04 review). They are capped at the
+/// Area Type Options command's 100.
+#[test]
+fn huge_row_and_column_counts_are_capped() {
+    let t = area("Hello", style(12.0), Rect::new(0.0, 0.0, 100.0, 100.0), Justify::Left);
+    let l = layout_with(db(), &t, &LayoutOptions { rows: 1 << 20, columns: usize::MAX, gutter: 0.0, ..Default::default() });
+    assert_eq!(l.frames.len(), crate::layout::MAX_AREA_GRID * crate::layout::MAX_AREA_GRID);
+}
+
 // ---------- OpenType ----------
 
 #[test]
