@@ -181,3 +181,58 @@ fn rotated_render_ink_is_taller_than_wide() {
     // It runs down from the anchor, centred on x = 100.
     assert!(v.rect.y0 >= 49 && v.rect.x0 < 100 && v.rect.x1 > 100, "{:?}", v.rect);
 }
+
+/// P2-08 review: faux italic re-fetched each glyph's outline from the font, so tabs, soft hyphens
+/// and control characters (which the engine draws as nothing) came back as boxes and hyphens.
+#[test]
+fn faux_italic_draws_nothing_for_invisible_characters() {
+    let text = "a\tb\u{00AD}c\u{0003}d";
+    let inked = |italic: bool| {
+        let l = crate::layer::layout_layer(db(), &styled(text, CharStyle { size_pt: 20.0, faux_italic: italic, ..Default::default() }), 72.0);
+        l.glyphs.iter().filter(|g| !g.outline.elements().is_empty()).count()
+    };
+    assert_eq!(inked(true), inked(false));
+    assert_eq!(inked(false), 4, "a, b, c, d");
+}
+
+/// P2-08 review: a layer far to the left put the ink rectangle at `i32::MIN`, and `-rect.x0`
+/// overflowed (a panic in debug builds; release wrapped and lost the text).
+#[test]
+fn ink_at_the_far_left_edge_does_not_overflow() {
+    let mut e = E;
+    let t = TextLayer { transform: Affine::translate(f64::from(i32::MIN), 50.0), ..point("Ink", 12.0) };
+    let (_, r) = e.render(&t, 72.0, PixelFormat::RGBA8);
+    assert_eq!(r.rect.x0, i32::MIN);
+    assert!(alpha_sum(&r.surface, r.rect) > 0.0);
+}
+
+/// PhotoCraft's `vertical_tests.rs` hostile_vertical_input_does_not_panic, through the
+/// TextObject mapping and the engine (NaN and huge boxes, negative and zero sizes, control and
+/// non-characters, CR LF).
+#[test]
+fn hostile_vertical_input_does_not_panic() {
+    use astudio_doc::text::TextShape;
+    let mut e = E;
+    for text in ["", "\n\n", "\u{200F}א\u{0301}", "「」ー。、\r\n\u{FFFF}", "a\u{0000}b"] {
+        for shape in
+            [TextShape::Point, TextShape::Box { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }, TextShape::Box { x: f32::NAN, y: 1e30, width: -5.0, height: 1.0 }]
+        {
+            for orientation in [Orientation::Vertical, Orientation::Horizontal] {
+                let t = TextLayer { shape, orientation, ..vertical(text, "Inter", 12.0) };
+                let (l, _) = e.render(&t, 72.0, PixelFormat::RGBA8);
+                let _ = l.bounds();
+            }
+        }
+    }
+}
+
+/// PhotoCraft's empty_text_and_empty_lines, its render half: empty text draws nothing.
+#[test]
+fn empty_text_renders_nothing() {
+    let mut e = E;
+    let (l, r) = e.render(&point("", 12.0), 72.0, PixelFormat::RGBA8);
+    assert!(l.glyphs.is_empty());
+    assert_eq!(r.rect.width(), 0);
+    let (l, _) = e.render(&point("a\n\nb", 12.0), 72.0, PixelFormat::RGBA8);
+    assert_eq!(l.lines.len(), 3, "an empty line is a line");
+}

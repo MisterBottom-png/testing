@@ -657,6 +657,13 @@ struct Pen<'r> {
     next_top: Option<f64>,
 }
 
+/// The next baseline to try in a frame, one line spacing lower; `None` when that does not move it
+/// (a frame placed so far out, around 1e30, that a line spacing is lost to rounding).
+fn step(baseline: f64, est: Metrics) -> Option<f64> {
+    let next = baseline + est.lead.max(1.0);
+    (next > baseline).then_some(next)
+}
+
 impl Pen<'_> {
     /// Baseline and horizontal span for a line with estimated metrics `est` and indents; `None` =
     /// the frame is full (overflow).
@@ -678,20 +685,31 @@ impl Pen<'_> {
                 Some(b) => self.next_baseline(b, est),
             };
             loop {
-                if baseline + est.desc > r.bottom() + 0.01 {
+                // `!(… <= …)` also ends the frame for a NaN bottom or baseline (a damaged frame;
+                // the line loop never ended, P2-08 review).
+                let inside = baseline + est.desc <= r.bottom() + 0.01; // false also for NaN
+                if !inside {
                     break;
                 }
                 let fits = |&(a, b): &(f64, f64)| b - a - ind_l - ind_r > est.asc.max(1.0);
                 if r.wraps.is_empty() {
                     match r.span(baseline - est.asc, baseline + est.desc) {
                         Some(s) if fits(&s) => return Some((baseline, s.0, s.1, false)),
-                        _ => baseline += est.lead.max(1.0),
+                        _ => {
+                            baseline = match step(baseline, est) {
+                                Some(b) => b,
+                                None => break,
+                            }
+                        }
                     }
                 } else {
                     // Wrap objects can split a line: fill every span, left to right.
                     let mut spans: Vec<(f64, f64)> = r.spans(baseline - est.asc, baseline + est.desc).into_iter().filter(fits).collect();
                     if spans.is_empty() {
-                        baseline += est.lead.max(1.0);
+                        baseline = match step(baseline, est) {
+                            Some(b) => b,
+                            None => break,
+                        };
                         continue;
                     }
                     let (a, b) = spans.remove(0);

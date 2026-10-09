@@ -155,7 +155,8 @@ pub fn rasterize_warped(layout: &LayerLayout, transform: &Affine, format: PixelF
     let stride = n + 1;
     // Premultiplied accumulation.
     let mut acc = vec![0.0f32; w * h * stride];
-    let xf = Xform([1.0, 0.0, 0.0, 1.0, -rect.x0 as f64, -rect.y0 as f64]).mul(&Xform(transform.m));
+    // Negated as f64: `-rect.x0` overflows for an ink rectangle at `i32::MIN` (P2-08 review).
+    let xf = Xform([1.0, 0.0, 0.0, 1.0, -f64::from(rect.x0), -f64::from(rect.y0)]).mul(&Xform(transform.m));
     let mut colors: Vec<Color> = Vec::new();
     for st in &layout.styles {
         if !colors.contains(&st.color) {

@@ -225,7 +225,9 @@ pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
     let mut out = LayerLayout { styles, px_per_pt: k, vertical: l.vertical, ..LayerLayout::default() };
     for g in &l.glyphs {
         let Some(st) = out.styles.get(g.run) else { continue };
-        let outline = if st.faux_italic {
+        // Tabs, soft hyphens and control characters have an empty outline: keep it so (re-reading
+        // the font would draw a box or a hyphen, P2-08 review).
+        let outline = if st.faux_italic && !g.outline.elements().is_empty() {
             // Slant in the glyph's own frame (font units, y down), before it is placed: what
             // PhotoCraft's glyph transform did, also for rotated and vertical glyphs.
             let Some(face) = db.face_by_id(g.font_id) else { continue };
@@ -244,7 +246,9 @@ pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
         for line in &l.lines {
             out.lines.push([line.x0 * k, (line.baseline - line.ascent) * k, line.x1 * k, (line.baseline + line.descent) * k]);
         }
-        decorations(db, &l, &out.styles.clone(), k, &mut out);
+        let styles = std::mem::take(&mut out.styles);
+        decorations(db, &l, &styles, k, &mut out);
+        out.styles = styles;
     }
     let b = l.bounds;
     out.ink_and_lines = (b.width() > 0.0 || b.height() > 0.0).then_some([b.x0 * k, b.y0 * k, b.x1 * k, b.y1 * k]);

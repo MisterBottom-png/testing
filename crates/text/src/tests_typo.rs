@@ -440,3 +440,22 @@ fn layout_10k_area_text_is_fast() {
     let budget = if cfg!(debug_assertions) { 400.0 } else { 10.0 };
     assert!(per < budget, "{per} ms");
 }
+
+/// P2-08 review: area frames with NaN edges or placed around 1e30 (damaged files) made the line
+/// placement loop forever: a NaN bottom is never passed, and at 1e30 a line spacing does not move
+/// the baseline. They now overflow like a full frame.
+#[test]
+fn damaged_area_frames_finish() {
+    for frame in [
+        Rect::new(f64::NAN, 0.0, f64::NAN, 1.0),
+        Rect::new(f64::NAN, 1e30, f64::NAN, 1e30 + 1.0),
+        Rect::new(0.0, f64::NAN, 100.0, f64::NAN),
+        Rect::new(0.0, 1e30, 100.0, 1e30 + 50.0),
+        Rect::new(0.0, -1e30, 100.0, 1e30),
+    ] {
+        for text in ["", "Hello wrapped words", "a\nb\nc"] {
+            let t = area(text, style(12.0), frame, Justify::Left);
+            let _ = layout_with(db(), &t, &LayoutOptions::default());
+        }
+    }
+}
