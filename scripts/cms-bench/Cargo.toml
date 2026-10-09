@@ -1,4 +1,4 @@
-# Colour engine study (docs/13-colour-engine.md): PhotoCraft cms vs moxcms, speed and accuracy.
+# Colour engine study (docs/13-colour-engine.md): A-Studio's engine, PhotoCraft cms and moxcms, speed and accuracy.
 # Its own workspace, not part of A-Studio. Run: cd scripts/cms-bench && cargo run --release
 [package]
 name = "cmsbench"
@@ -9,6 +9,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 photocraft-cms = { path = "../../upstream/photocraft/crates/cms" }
+# A-Studio's engine (P2-12 fast paths) against PhotoCraft's original and moxcms.
+astudio-color = { path = "../../crates/color" }
 moxcms = "=0.8.1"
 rayon = "1"
 

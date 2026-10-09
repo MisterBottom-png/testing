@@ -76,6 +76,88 @@ impl Post {
     }
 }
 
+/// Exact 8-bit output encoding through an output curve, without interpolation (P2-12).
+///
+/// Indexed by the bits of the (non-negative) f32 value shifted by [`ENC_SHIFT`]: log-spaced
+/// buckets, fine near black where gamma curves are steep. Each bucket holds its 8-bit code and
+/// where inside the bucket (the low bits) the code steps up by one; output curves step at most
+/// once per bucket, so the result is the exactly rounded curve, what the exact pipeline gives.
+/// One `u32` per bucket (code << 17 | step offset; offset 1 << 16: no step): 64 KB per channel.
+#[derive(Debug)]
+struct Enc8 {
+    tables: Vec<Box<[u32; ENC_SIZE]>>,
+}
+
+/// Table size: a power of two above [`ENC_LEN`], so a masked index needs no range check (entries
+/// past `ENC_LEN` repeat the last one).
+const ENC_SIZE: usize = 1 << 14;
+
+/// Bits dropped from an f32 to index [`Enc8`] (7 mantissa bits kept: buckets 1/128 wide relative).
+const ENC_SHIFT: u32 = 16;
+/// Buckets up to and including the one starting at 1.0.
+const ENC_LEN: usize = (0x3F80_0000 >> ENC_SHIFT) as usize + 1;
+const ENC_LOW: u32 = (1 << ENC_SHIFT) - 1;
+const ENC_NO_STEP: u32 = 1 << ENC_SHIFT;
+
+impl Enc8 {
+    /// Tables for `curves` (one inverse curve per output), or `None` if a curve is not monotonic
+    /// enough to step by at most one 8-bit code per bucket.
+    fn new(curves: &[Curve]) -> Option<Enc8> {
+        let mut tables = Vec::with_capacity(curves.len());
+        for c in curves {
+            let code = |bits: u32| (c.eval_inverse64(f64::from(f32::from_bits(bits))).clamp(0.0, 1.0) * 255.0).round() as i32;
+            let mut t = Vec::with_capacity(ENC_SIZE);
+            for i in 0..ENC_LEN {
+                let lo = (i as u32) << ENC_SHIFT;
+                if i == ENC_LEN - 1 {
+                    // 1.0 and above.
+                    t.push(((code(0x3F80_0000).clamp(0, 255) as u32) << 17) | ENC_NO_STEP);
+                    continue;
+                }
+                let hi = lo + ENC_LOW;
+                let (c0, c1) = (code(lo), code(hi));
+                let entry = match c1 - c0 {
+                    0 => ((c0 as u32) << 17) | ENC_NO_STEP,
+                    1 => {
+                        // Smallest value in the bucket that rounds to c1.
+                        let (mut a, mut b) = (lo, hi);
+                        while a < b {
+                            let m = a + (b - a) / 2;
+                            if code(m) >= c1 { b = m } else { a = m + 1 }
+                        }
+                        // The step must be the only change inside the bucket (monotonic there).
+                        if (a > lo && code(a - 1) != c0) || code(a) != c1 {
+                            return None;
+                        }
+                        ((c0 as u32) << 17) | (a - lo)
+                    }
+                    _ => return None,
+                };
+                t.push(entry);
+            }
+            let last = t.last().copied().unwrap_or(0);
+            t.resize(ENC_SIZE, last);
+            tables.push(t.into_boxed_slice().try_into().ok()?);
+        }
+        Some(Enc8 { tables })
+    }
+
+    #[inline(always)]
+    fn q_in(t: &[u32; ENC_SIZE], v: f32) -> u8 {
+        // Into [0, 1] (NaN to 0, as the general path rounds it; `clamp` would keep NaN): the index
+        // is at most ENC_LEN - 1.
+        #[allow(clippy::manual_clamp)]
+        let bits = v.max(0.0).min(1.0).to_bits();
+        let e = t[(bits >> ENC_SHIFT) as usize & (ENC_SIZE - 1)];
+        ((e >> 17) + u32::from(bits & ENC_LOW >= (e & 0x1_FFFF))) as u8
+    }
+
+    #[inline]
+    fn q(&self, c: usize, v: f32) -> u8 {
+        self.tables.get(c).map_or(0, |t| Self::q_in(t, v))
+    }
+}
+
 /// A colour transform from one profile's device space to another's.
 ///
 /// Build once (it precomputes lookup tables) and apply to any number of buffers from any
@@ -91,6 +173,8 @@ pub struct Transform {
     post: Option<Post>,
     /// Pre-located grid coordinates per 8-bit code: (offset contribution, fraction) per input.
     grid8: Vec<[(u32, f32); 256]>,
+    /// Exact 8-bit encoding through the output curves, when there are output curves.
+    enc8: Option<Enc8>,
 }
 
 impl Transform {
@@ -127,9 +211,11 @@ impl Transform {
         // Split trailing inverse curves into accurate output tables.
         let mut head = pipeline.stages.clone();
         let mut post = None;
+        let mut enc8 = None;
         if let Some(Stage::InvCurves(cs)) = head.last()
             && cs.len() == outputs
         {
+            enc8 = Enc8::new(cs);
             let tables = cs
                 .iter()
                 .map(|c| {
@@ -179,7 +265,7 @@ impl Transform {
                 .collect(),
             _ => Vec::new(),
         };
-        Transform { inputs, outputs, opts, pipeline, core, post, grid8 }
+        Transform { inputs, outputs, opts, pipeline, core, post, grid8, enc8 }
     }
 
     /// White preservation: the device-link node at the source's device white gets exactly the
@@ -256,6 +342,25 @@ impl Transform {
         self.finish(&mid, out);
     }
 
+    /// Writes the 8-bit outputs for core values `mid`: through the exact encoder when there is
+    /// one, else through the output tables and `q`.
+    #[inline]
+    fn encode8(&self, mid: &[f32; 16], out: &mut [f32; 16], dp: &mut [u8], q: impl Fn(f32) -> u8) {
+        match &self.enc8 {
+            Some(e) => {
+                for (k, d) in dp.iter_mut().enumerate().take(self.outputs) {
+                    *d = e.q(k, mid[k]);
+                }
+            }
+            None => {
+                self.finish(mid, out);
+                for (d, o) in dp.iter_mut().zip(&out[..self.outputs]) {
+                    *d = q(*o);
+                }
+            }
+        }
+    }
+
     #[inline]
     fn finish(&self, mid: &[f32], out: &mut [f32]) {
         match &self.post {
@@ -326,6 +431,44 @@ impl Transform {
         let mut mid = [0.0f32; 16];
         let mut out = [0.0f32; 16];
         match &self.core {
+            // RGB to CMYK (3 → 4) and CMYK to RGB (4 → 3), the common device links: fixed-size
+            // corners and outputs (P2-12 fast paths). Same arithmetic as the general arms below.
+            Core::Grid(c) if c.inputs == 3 && c.outputs == 4 && self.outputs == 4 && self.post.is_none() => {
+                let [g0, g1, g2, ..] = self.grid8.as_slice() else { return };
+                let s1 = c.outputs * c.grid[2];
+                let s0 = s1 * c.grid[1];
+                for (sp, dp) in s.chunks_exact(ss).zip(d.chunks_exact_mut(ds)) {
+                    let ([x, y, z, ..], [d0, d1, d2, d3, ..]) = (sp, &mut *dp) else { continue };
+                    let (a, b, cc) = (g0[*x as usize], g1[*y as usize], g2[*z as usize]);
+                    let v = c.tetra_n::<4>((a.0 + b.0 + cc.0) as usize, [s0, s1, 4], [a.1, b.1, cc.1]);
+                    (*d0, *d1, *d2, *d3) = (q(v[0]), q(v[1]), q(v[2]), q(v[3]));
+                    for e in 0..extra {
+                        if let (Some(o), Some(i)) = (dp.get_mut(4 + e), sp.get(3 + e)) {
+                            *o = *i;
+                        }
+                    }
+                }
+            }
+            Core::Grid(c) if c.inputs == 4 && c.outputs == 3 && self.outputs == 3 && self.enc8.is_some() => {
+                let ([g0, g1, g2, g3, ..], Some(e)) = (self.grid8.as_slice(), &self.enc8) else { return };
+                let [t0, t1, t2, ..] = e.tables.as_slice() else { return };
+                let s3 = 3;
+                let s2 = s3 * c.grid[3];
+                let s1 = s2 * c.grid[2];
+                let s0 = s1 * c.grid[1];
+                for (sp, dp) in s.chunks_exact(ss).zip(d.chunks_exact_mut(ds)) {
+                    let ([cy, ma, ye, kk, ..], [d0, d1, d2, ..]) = (sp, &mut *dp) else { continue };
+                    let (a, b, cc, k4) = (g0[*cy as usize], g1[*ma as usize], g2[*ye as usize], g3[*kk as usize]);
+                    let base = (a.0 + b.0 + cc.0 + k4.0) as usize;
+                    let v = c.tetra2_n::<3>(base, s0, [s1, s2, s3], a.1, [b.1, cc.1, k4.1]);
+                    (*d0, *d1, *d2) = (Enc8::q_in(t0, v[0]), Enc8::q_in(t1, v[1]), Enc8::q_in(t2, v[2]));
+                    for e in 0..extra {
+                        if let (Some(o), Some(i)) = (dp.get_mut(3 + e), sp.get(4 + e)) {
+                            *o = *i;
+                        }
+                    }
+                }
+            }
             Core::Grid(c) if c.inputs == 3 => {
                 let (g0, g1, g2) = (&self.grid8[0], &self.grid8[1], &self.grid8[2]);
                 let s1 = c.outputs * c.grid[2];
@@ -333,10 +476,7 @@ impl Transform {
                 for (sp, dp) in s.chunks_exact(ss).zip(d.chunks_exact_mut(ds)) {
                     let (a, b, cc) = (g0[sp[0] as usize], g1[sp[1] as usize], g2[sp[2] as usize]);
                     c.tetra_pub((a.0 + b.0 + cc.0) as usize, [s0, s1, c.outputs], [a.1, b.1, cc.1], &mut mid);
-                    self.finish(&mid, &mut out);
-                    for k in 0..self.outputs {
-                        dp[k] = q(out[k]);
-                    }
+                    self.encode8(&mid, &mut out, dp, q);
                     for e in 0..extra {
                         dp[self.outputs + e] = sp[self.inputs + e];
                     }
@@ -359,12 +499,31 @@ impl Transform {
                             mid[k] += (hi[k] - mid[k]) * a.1;
                         }
                     }
-                    self.finish(&mid, &mut out);
-                    for k in 0..self.outputs {
-                        dp[k] = q(out[k]);
-                    }
+                    self.encode8(&mid, &mut out, dp, q);
                     for e in 0..extra {
                         dp[self.outputs + e] = sp[self.inputs + e];
+                    }
+                }
+            }
+            // RGB/gray-to-RGB shapers (matrix profiles), 3 → 3 with output curves: one fixed loop
+            // (P2-12 fast path).
+            Core::Shaper { curves8, matrix: Some((3, 3, m, off)), .. }
+                if self.inputs == 3 && self.outputs == 3 && curves8.len() == 3 && m.len() == 9 && off.len() == 3 && self.enc8.is_some() =>
+            {
+                let Some(e) = &self.enc8 else { return };
+                let ([t0, t1, t2, ..], [c0, c1, c2]) = (e.tables.as_slice(), curves8.as_slice()) else { return };
+                let mm: [f32; 9] = std::array::from_fn(|k| m[k]);
+                let o = [off[0], off[1], off[2]];
+                for (sp, dp) in s.chunks_exact(ss).zip(d.chunks_exact_mut(ds)) {
+                    let ([a, b, c, ..], [d0, d1, d2, ..]) = (sp, &mut *dp) else { continue };
+                    let (r, g, bl) = (c0[*a as usize], c1[*b as usize], c2[*c as usize]);
+                    *d0 = Enc8::q_in(t0, o[0] + mm[0] * r + mm[1] * g + mm[2] * bl);
+                    *d1 = Enc8::q_in(t1, o[1] + mm[3] * r + mm[4] * g + mm[5] * bl);
+                    *d2 = Enc8::q_in(t2, o[2] + mm[6] * r + mm[7] * g + mm[8] * bl);
+                    for e in 0..extra {
+                        if let (Some(x), Some(y)) = (dp.get_mut(3 + e), sp.get(3 + e)) {
+                            *x = *y;
+                        }
                     }
                 }
             }
@@ -375,10 +534,7 @@ impl Transform {
                         v[k] = if curves8.is_empty() { sp[k] as f32 / 255.0 } else { curves8[k][sp[k] as usize] };
                     }
                     apply_matrix(matrix, &v, &mut mid, self.inputs);
-                    self.finish(&mid, &mut out);
-                    for k in 0..self.outputs {
-                        dp[k] = q(out[k]);
-                    }
+                    self.encode8(&mid, &mut out, dp, q);
                     for e in 0..extra {
                         dp[self.outputs + e] = sp[self.inputs + e];
                     }
@@ -727,6 +883,35 @@ impl Clut {
             let v2 = d[base + p2 + k];
             let v3 = d[base + p3 + k];
             out[k] = v0 + (v1 - v0) * w1 + (v2 - v1) * w2 + (v3 - v2) * w3;
+        }
+    }
+}
+
+#[cfg(test)]
+mod enc8_tests {
+    use super::*;
+
+    /// The 8-bit encoder (P2-12) rounds exactly like the output curve: for sRGB's, pure gammas and
+    /// a linear curve, a million values across [0, 1] (log-spaced towards black) and the edges.
+    #[test]
+    fn encoder_rounds_exactly_like_the_curve() {
+        let srgb = Curve::Parametric { kind: 3, p: [2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045, 0.0, 0.0] };
+        for c in [srgb, Curve::Gamma(2.2), Curve::Gamma(1.8), Curve::Identity] {
+            let e = Enc8::new(std::slice::from_ref(&c)).expect("monotonic curve");
+            let exact = |v: f32| (c.eval_inverse64(f64::from(v)).clamp(0.0, 1.0) * 255.0).round() as u8;
+            let mut x = 0x2545_f491_u32;
+            for i in 0..1_000_000u32 {
+                x ^= x << 13;
+                x ^= x >> 17;
+                x ^= x << 5;
+                let u = x as f32 / u32::MAX as f32;
+                let v = if i % 2 == 0 { u } else { u.powi(6) };
+                assert_eq!(e.q(0, v), exact(v), "{c:?} at {v:e}");
+            }
+            for v in [0.0, -0.0, -1.0, 1.0, 1.5, f32::MIN_POSITIVE, 1e-30, f32::NAN, f32::INFINITY] {
+                let want = if v.is_nan() { exact(0.0) } else { exact(v.clamp(0.0, 1.0)) };
+                assert_eq!(e.q(0, v), want, "{c:?} at {v:e}");
+            }
         }
     }
 }
