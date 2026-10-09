@@ -1,6 +1,6 @@
 [package]
 name = "astudio-pdf"
-description = "A-Studio: PDF and PDF-compatible .ai import and export"
+description = "A-Studio: PDF export and import (and PDF-compatible .ai)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,9 +9,34 @@ publish = false
 
 [dependencies]
 astudio-geom = { path = "../geom" }
-astudio-color = { path = "../color" }
 astudio-vdoc = { path = "../vdoc" }
+astudio-effects = { path = "../effects" }
+astudio-vbrush = { path = "../vbrush" }
+astudio-color = { path = "../color" }
 astudio-text = { path = "../text" }
+skrifa = { workspace = true }
+kurbo = { workspace = true }
+thiserror = { workspace = true }
+flate2 = { workspace = true }
+image = { workspace = true }
+# CMYK JPEGs (the image crate writes RGB and grey ones only).
+jpeg-encoder = { workspace = true }
+krilla = { workspace = true }
+hayro-syntax = "0.7.2"
+hayro-interpret = { version = "0.7.0", default-features = false, features = ["embed-fonts", "embed-cmaps"] }
+log = { workspace = true }
+smallvec = "1"
+serde = { workspace = true }
+# PDF security (encrypt.rs): pure Rust, MIT OR Apache-2.0, builds for wasm.
+aes = "0.8"
+md-5 = { version = "0.10", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+astudio-testkit = { path = "../testkit" }
+# A variable font built in code (no font file is committed).
+astudio-text = { path = "../text", features = ["test-fonts"] }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

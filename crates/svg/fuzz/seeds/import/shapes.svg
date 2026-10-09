@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="90" viewBox="0 0 120 90">
+  <defs>
+    <clipPath id="clip-path-1">
+      <path d="M0 15 C0 6.716 6.716 0 15 0 C23.284 0 30 6.716 30 15 C30 23.284 23.284 30 15 30 C6.716 30 0 23.284 0 15 Z"/>
+    </clipPath>
+  </defs>
+  <title>Untitled-1</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path d="M10 10 L60 10 L60 50 L10 50 Z" fill="#c82828"/>
+    <path d="M40 50 C40 33.431 55.67 20 75 20 C94.33 20 110 33.431 110 50 C110 66.569 94.33 80 75 80 C55.67 80 40 66.569 40 50 Z" fill="#145ac8" stroke="#000000" stroke-width="2" stroke-miterlimit="10" opacity="0.7"/>
+    <g clip-path="url(#clip-path-1)">
+      <path d="M0 0 L30 0 L30 30 L0 30 Z" fill="#0aa03c"/>
+    </g>
+  </g>
+</svg>

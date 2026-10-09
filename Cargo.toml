@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz", "crates/plugins/example"]
+exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz", "crates/plugins/example", "crates/svg/fuzz", "crates/pdf/fuzz", "crates/eps/fuzz", "crates/cad/fuzz", "crates/metafile/fuzz"]
 resolver = "3"
 members = [
     "crates/geom",
@@ -25,6 +25,9 @@ members = [
     "crates/format",
     "crates/svg",
     "crates/pdf",
+    "crates/eps",
+    "crates/cad",
+    "crates/metafile",
     "crates/io",
     "crates/tools",
     "crates/plugins",
@@ -71,6 +74,7 @@ harfrust = "0.13"
 skrifa = "0.47"
 svgtypes = "0.16"
 usvg = "0.48"
+krilla = "0.8"
 vello_common = { version = "0.2", default-features = false }
 vello_cpu = "0.2"
 muda = { version = "=0.21.1", default-features = false }

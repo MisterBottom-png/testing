@@ -1,0 +1,21 @@
+[package]
+name = "astudio-metafile"
+description = "A-Studio: Windows metafiles: EMF and WMF writers and readers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-effects = { path = "../effects" }
+astudio-vbrush = { path = "../vbrush" }
+astudio-text = { path = "../text" }
+kurbo = { workspace = true }
+image = { workspace = true }
+
+[lints]
+workspace = true

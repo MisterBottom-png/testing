@@ -12,6 +12,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D6 | Full merge after the P1 prototype | GO: one app | Owner, 8 October 2026 |
 | D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
 | D8 | Colour engine | One A-Studio engine: PhotoCraft `cms` at the core, VectorCraft's colour layer on top, new safe fast paths; default CMYK PhotoCraft Coated | Owner, 8 October 2026 |
+| D9 | Third-party data the PDF reader builds in | Allowed: Adobe's published CMap tables (BSD-3-Clause) and the Foxit/PDFium fallback fonts (BSD) | Owner, 9 October 2026 |
 
 ## D1 Fork
 
@@ -95,3 +96,18 @@ Decided by the owner on 8 October 2026, from the study in `docs/13-colour-engine
   (`docs/13-colour-engine.md`). Reason: the screen conversion runs on the GPU, and a 24-megapixel
   export or mode change now takes 0.05 to 0.26 s on 4 threads; the rest of the gap needs vector code
   or less exact tables. No second engine. More speed is later work, after 1.0.
+
+## D9 PDF reader data
+
+Decided by the owner on 9 October 2026, during P2-15 (the VectorCraft importers).
+
+- The PDF reader (`hayro-interpret`, through `astudio-pdf`) compiles in Adobe's published CMap
+  resources (https://github.com/adobe-type-tools/cmap-resources, BSD-3-Clause, through
+  `hayro-cmap`), which decode Japanese, Chinese and Korean text, and the Foxit fonts from PDFium
+  (BSD), which draw the fourteen standard PDF fonts when a file doesn't embed them. Both are
+  allowed; their notices are in `NOTICE`.
+- Reason: they are published under free licences for redistribution and are not taken from an
+  Adobe product; without them, CJK text and unembedded standard fonts in PDFs import wrongly.
+- Not changed: the clean-room rule stays as it is for everything else (no code, icons, presets,
+  profiles, shaders or screenshots from Adobe products), and the bundled UI fonts stay the four in
+  `assets/fonts`.
