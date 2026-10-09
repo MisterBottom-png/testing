@@ -10,8 +10,14 @@ publish = false
 [dependencies]
 astudio-geom = { path = "../geom" }
 astudio-color = { path = "../color" }
-astudio-raster = { path = "../raster" }
 astudio-vdoc = { path = "../vdoc" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+wasmi = { workspace = true }
+
+[dev-dependencies]
+wat = "1.228"
 
 [lints]
 workspace = true

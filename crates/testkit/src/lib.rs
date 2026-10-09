@@ -8,6 +8,8 @@
 //!
 //! - [`geom`]: geometry assertions (approximate equality, curve sampling, Hausdorff distance).
 //! - [`strategies`]: proptest strategies for geometry.
+//! - [`fixtures`]: vector documents built directly (vc `fixtures`, P2-14; engine sessions: P3-02).
+//! - [`raster`]: rendering a vector document and comparing images (vc `raster`, P2-14).
 //!
 //! This crate may only be used as a dev-dependency (enforced by `cargo xtask layers`).
 // Test support only: a failed setup or assertion must panic, like `assert!`, so the shipped-code
@@ -16,11 +18,20 @@
 #![deny(clippy::todo, clippy::unimplemented)]
 #![forbid(unsafe_code)]
 
+pub mod fixtures;
 pub mod geom;
+pub mod raster;
 pub mod strategies;
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "testkit";
+
+/// A fresh temporary folder for one test run (VectorCraft's `temp_dir`).
+pub fn temp_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("astudio-testkit-{tag}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    dir
+}
 
 #[cfg(test)]
 mod tests {

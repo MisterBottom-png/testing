@@ -9,9 +9,15 @@ publish = false
 
 [dependencies]
 astudio-geom = { path = "../geom" }
-astudio-color = { path = "../color" }
-astudio-raster = { path = "../raster" }
 astudio-vdoc = { path = "../vdoc" }
+astudio-pathops = { path = "../pathops" }
+astudio-text = { path = "../text" }
+astudio-plugins = { path = "../plugins" }
+kurbo = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+astudio-color = { path = "../color" }
 
 [lints]
 workspace = true

@@ -10,6 +10,11 @@ publish = false
 [dependencies]
 astudio-geom = { path = "../geom" }
 astudio-doc = { path = "../doc" }
+astudio-color = { path = "../color" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-render = { path = "../render" }
+image = { workspace = true }
+serde_json = { workspace = true }
 kurbo = { workspace = true }
 proptest = { workspace = true }
 

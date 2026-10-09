@@ -203,7 +203,8 @@ What this means as crates are ported:
   tiff) and `syn` 2/3 (zerocopy-derive through `half`), all from image decoding (P2-13) and present in
   both upstream lock files; the font stack of `astudio-text` (P2-04): `skrifa` 0.42 and `read-fonts`
   0.39 (`subsetter` 0.2, `write-fonts` 0.48), `read-fonts` 0.43 (`harfrust` 0.13), `font-types` 0.11,
-  as in VectorCraft's lock file.
+  as in VectorCraft's lock file; the vector renderer (P2-14): `skrifa` 0.44 and `read-fonts` 0.41
+  through `vello_cpu` 0.2, also as in VectorCraft's lock file.
 - **What `cargo deny` looks at (P2-11):** the platforms A-Studio ships, `x86_64-pc-windows-msvc` and
   `wasm32-unknown-unknown` (D7), with every feature on. Dependencies only other platforms or cfgs
   build are left out: `r-efi` (UEFI) and `libfuzzer-sys` (NCSA licence), which rav1e, the optional
