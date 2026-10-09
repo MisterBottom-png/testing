@@ -1,9 +1,12 @@
 [workspace]
+exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz"]
 resolver = "3"
 members = [
     "crates/geom",
     "crates/color",
     "crates/raster",
+    "crates/heif",
+    "crates/raw",
     "crates/psd",
     "crates/codecs",
     "crates/tablet",
@@ -51,6 +54,7 @@ thiserror = "2"
 proptest = "1"
 log = "0.4"
 rayon = "1"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 moxcms = "0.8"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
 jpeg-encoder = { version = "0.6", default-features = false, features = ["std"] }

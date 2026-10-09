@@ -15,7 +15,10 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-color", Class::Layer(0)),
     ("astudio-raster", Class::Layer(0)),
     ("astudio-psd", Class::Standalone),
-    ("astudio-codecs", Class::Standalone),
+    ("astudio-raw", Class::Standalone),
+    // codecs uses heif behind its `heif` feature, so both are plain L0 crates rather than standalone.
+    ("astudio-heif", Class::Layer(0)),
+    ("astudio-codecs", Class::Layer(0)),
     ("astudio-tablet", Class::Standalone),
     ("astudio-vdoc", Class::Layer(1)),
     ("astudio-doc", Class::Layer(1)),
@@ -43,6 +46,7 @@ pub const TABLE: &[(&str, Class)] = &[
 /// Allowed edges inside one layer: (from, to) means `from` may depend on `to`.
 /// Live effects run effect plug-ins, so `astudio-effects` uses `astudio-plugins` (as in VectorCraft).
 pub const INTRA_LAYER: &[(&str, &str)] = &[
+    ("astudio-codecs", "astudio-heif"),
     ("astudio-color", "astudio-geom"),
     ("astudio-raster", "astudio-geom"),
     ("astudio-raster", "astudio-color"),

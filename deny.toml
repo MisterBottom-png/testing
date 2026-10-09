@@ -1,6 +1,10 @@
 # cargo deny check  (https://github.com/EmbarkStudios/cargo-deny)
 [graph]
 all-features = true
+# The platforms A-Studio ships (D7: Windows x64; the web build stays). Dependencies behind other
+# cfgs are never built into A-Studio: e.g. rav1e (AVIF encode) needs libfuzzer-sys (NCSA) only
+# under cfg(fuzzing), when rav1e itself is being fuzzed.
+targets = ["x86_64-pc-windows-msvc", "wasm32-unknown-unknown"]
 
 [licenses]
 # Licences that appear in the two upstream dependency trees (see their NOTICE files) and are
@@ -22,7 +26,6 @@ allow-wildcard-paths = true
 skip = [
   # Test-only: proptest's rand 0.9 uses getrandom 0.3, its tempfile uses getrandom 0.4.
   { crate = "getrandom@0.3.4", reason = "proptest (rand_core 0.9), tests only" },
-  { crate = "r-efi@5", reason = "getrandom 0.3 (proptest), tests only" },
   # Image decoding (astudio-vdoc, P2-13), both upstream apps have the same pair:
   { crate = "miniz_oxide@0.8.9", reason = "png 0.18 uses miniz_oxide 0.8 directly and 0.9 through flate2" },
   { crate = "quick-error@1.2.3", reason = "proptest's rusty-fork (tests only); image-webp and tiff use quick-error 2" },
@@ -36,6 +39,11 @@ skip = [
 
 [advisories]
 yanked = "deny"
+ignore = [
+  # paste is unmaintained (no known vulnerability): a build-time macro inside pulp, which exr (EXR
+  # images in astudio-codecs, P2-11) uses. Drop when exr moves off it.
+  { id = "RUSTSEC-2024-0436", reason = "unmaintained build-time macro via exr -> pulp; no vulnerability" },
+]
 
 [sources]
 unknown-registry = "deny"

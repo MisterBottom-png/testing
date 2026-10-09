@@ -1,0 +1,28 @@
+[package]
+name = "astudio-raw"
+description = "A-Studio: Camera raw decoding and development (DNG, CR2, NEF, ARW and others)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+# Synthetic raw-file generators (DNG / CR2 / TIFF-EP writers and a lossless-JPEG
+# encoder) for tests and fuzz seeds.
+testgen = []
+
+[dependencies]
+
+# Parallel bands on native; wasm builds stay single-threaded.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = { workspace = true }
+
+[dev-dependencies]
+astudio-raw = { path = ".", features = ["testgen"] }
+# Writes sRGB PNG previews in the `rawinfo` example.
+png = "0.18"
+
+[lints]
+workspace = true
