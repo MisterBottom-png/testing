@@ -95,3 +95,25 @@ fn absolute_colorimetric_equals_relative_for_d50_white_profiles() {
         }
     }
 }
+
+/// Alpha and other extra channels: pixels one value wider than the colour channels (RGBA, CMYKA)
+/// give the same colour bytes as tight pixels, and the extra value is copied through (the fixed
+/// loops copy it themselves).
+#[test]
+fn extra_channels_are_copied_and_colours_unchanged() {
+    for (s, d) in [(Builtin::Srgb, Builtin::DisplayP3), (Builtin::Srgb, Builtin::CoatedCmyk), (Builtin::CoatedCmyk, Builtin::Srgb)] {
+        let t = Transform::new(s.profile(), d.profile(), Intent::RelativeColorimetric, false).unwrap();
+        let (i, o, n) = (t.inputs(), t.outputs(), 50_000);
+        let tight_in = noise(n * i, 0x1234_5678);
+        let mut tight_out = vec![0u8; n * o];
+        t.convert_u8(&tight_in, i, &mut tight_out, o, false);
+        let alpha = noise(n, 0x0bad_f00d);
+        let wide_in: Vec<u8> = tight_in.chunks_exact(i).zip(&alpha).flat_map(|(p, a)| p.iter().copied().chain([*a])).collect();
+        let mut wide_out = vec![0u8; n * (o + 1)];
+        t.convert_u8(&wide_in, i + 1, &mut wide_out, o + 1, true);
+        for (k, (w, (t, a))) in wide_out.chunks_exact(o + 1).zip(tight_out.chunks_exact(o).zip(&alpha)).enumerate() {
+            assert_eq!(&w[..o], t, "{s:?} -> {d:?} pixel {k}: colour");
+            assert_eq!(w[o], *a, "{s:?} -> {d:?} pixel {k}: alpha");
+        }
+    }
+}

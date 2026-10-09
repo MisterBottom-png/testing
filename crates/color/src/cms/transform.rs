@@ -105,6 +105,10 @@ impl Enc8 {
     fn new(curves: &[Curve]) -> Option<Enc8> {
         let mut tables = Vec::with_capacity(curves.len());
         for c in curves {
+            // A non-monotonic curve's inverse is not a function the buckets can hold.
+            if !c.is_monotonic() {
+                return None;
+            }
             let code = |bits: u32| (c.eval_inverse64(f64::from(f32::from_bits(bits))).clamp(0.0, 1.0) * 255.0).round() as i32;
             let mut t = Vec::with_capacity(ENC_SIZE);
             for i in 0..ENC_LEN {
@@ -145,7 +149,7 @@ impl Enc8 {
     #[inline(always)]
     fn q_in(t: &[u32; ENC_SIZE], v: f32) -> u8 {
         // Into [0, 1] (NaN to 0, as the general path rounds it; `clamp` would keep NaN): the index
-        // is at most ENC_LEN - 1.
+        // is at most ENC_LEN - 1. (-0.0 has the sign bit set; the mask puts it in bucket 0.)
         #[allow(clippy::manual_clamp)]
         let bits = v.max(0.0).min(1.0).to_bits();
         let e = t[(bits >> ENC_SHIFT) as usize & (ENC_SIZE - 1)];
@@ -505,7 +509,7 @@ impl Transform {
                     }
                 }
             }
-            // RGB/gray-to-RGB shapers (matrix profiles), 3 → 3 with output curves: one fixed loop
+            // RGB-to-RGB shapers (matrix profiles), 3 → 3 with output curves: one fixed loop
             // (P2-12 fast path).
             Core::Shaper { curves8, matrix: Some((3, 3, m, off)), .. }
                 if self.inputs == 3 && self.outputs == 3 && curves8.len() == 3 && m.len() == 9 && off.len() == 3 && self.enc8.is_some() =>
@@ -913,5 +917,22 @@ mod enc8_tests {
                 assert_eq!(e.q(0, v), want, "{c:?} at {v:e}");
             }
         }
+    }
+
+    /// Sampled (table) curves work the same; decreasing or non-monotonic curves get no encoder
+    /// (the transform keeps its interpolated output tables).
+    #[test]
+    fn encoder_takes_tables_and_refuses_non_monotonic_curves() {
+        let table = Curve::Table(Curve::Gamma(2.2).sample(1024));
+        let e = Enc8::new(std::slice::from_ref(&table)).expect("monotonic table");
+        for i in 0..=10_000u32 {
+            let v = (i as f32 / 10_000.0).powi(3);
+            let exact = (table.eval_inverse64(f64::from(v)).clamp(0.0, 1.0) * 255.0).round() as u8;
+            assert_eq!(e.q(0, v), exact, "table at {v:e}");
+        }
+        let decreasing = Curve::Table((0..256).map(|i| 1.0 - i as f32 / 255.0).collect());
+        assert!(Enc8::new(&[decreasing]).is_none());
+        let bump = Curve::Table(vec![0.0, 0.6, 0.4, 1.0]);
+        assert!(Enc8::new(&[bump]).is_none());
     }
 }

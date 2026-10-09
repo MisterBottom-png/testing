@@ -90,7 +90,7 @@ One engine, `astudio-color` (L0), in this order:
 
 What is dropped: nothing a user sees. moxcms leaves the shipped app (it stays as a test oracle).
 
-## Fast paths so far (P2-12, in progress)
+## Fast paths (P2-12)
 
 Measured 9 October 2026 with `scripts/cms-bench` (now also running A-Studio's engine; fastest of seven
 runs, same machine as above, 24 MP of random 8-bit pixels):
@@ -108,8 +108,11 @@ What changed, all in safe code in `astudio-color` (`cms/transform.rs`, `cms/clut
   (log-spaced, fine near black) holds each bucket's 8-bit code and where in the bucket it steps up,
   so the result is the exactly rounded curve. Tests: every value of a million, for sRGB, gamma 2.2,
   gamma 1.8 and linear curves.
-- **Fixed loops** for the common cases: RGB/gray matrix-shaper to RGB (3 to 3), RGB to CMYK (3 to 4)
+- **Fixed loops** for the common cases: RGB matrix-shaper to RGB (3 to 3), RGB to CMYK (3 to 4)
   and CMYK to RGB (4 to 3), with whole grid nodes read at once and no general-size loops.
+- 8-bit output through output curves is now exactly rounded, so it can differ by one step from the
+  16-bit and float-preview paths, which still interpolate the curves (8-bit is the more exact one).
+  Curves that are not monotonic keep the interpolated tables.
 - Tests (`tests/fast_paths.rs`): RGB to CMYK is bit-identical to the general path; RGB to RGB and
   CMYK to RGB are never further from the exact pipeline than before (at most one value in 100,000
   more often one step off); absolute colorimetric equals relative colorimetric between the built-in
@@ -131,9 +134,7 @@ Where the rest of the gap is:
 
 ## Open points
 
-- If the fast paths miss the target, moxcms could run display-only conversions. That would bring
-  back a second engine, with small colour differences between screen and export, so it needs the
-  owner's decision then.
+- Decided (D8, revised 9 October 2026): the fast paths stay as measured below; no second engine.
 - `tintbox` (a new pure-Rust port of LittleCMS's pipeline, seen in pdf_oxide issue 749) claims
   bit-identical output to LittleCMS. Not used: too new, licence and maintenance unverified. Look again
   at the next upstream sync.
