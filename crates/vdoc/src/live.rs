@@ -581,11 +581,19 @@ fn even_steps(n: u32) -> Vec<f64> {
 }
 
 impl GradientMesh {
+    /// Most mesh rows or columns a valid mesh has (the Mesh commands allow 50; files are capped
+    /// here so a damaged one cannot ask for gigabytes).
+    pub const MAX_LINES: u32 = MAX_GRID_LINES;
+    /// Most quads [`GradientMesh::quads`] makes: big meshes get fewer quads per patch.
+    pub const MAX_QUADS: usize = 1 << 20;
+
     pub fn idx(&self, r: usize, c: usize) -> usize {
         r * (self.cols as usize + 1) + c
     }
     pub fn is_valid(&self) -> bool {
-        self.rows >= 1 && self.cols >= 1 && self.points.len() == (self.rows as usize + 1) * (self.cols as usize + 1)
+        (1..=Self::MAX_LINES).contains(&self.rows)
+            && (1..=Self::MAX_LINES).contains(&self.cols)
+            && self.points.len() as u64 == (u64::from(self.rows) + 1) * (u64::from(self.cols) + 1)
     }
 
     /// A 1×1 mesh from its four corners (bottom-left, top-left, top-right, bottom-right in u/v
@@ -744,8 +752,12 @@ impl GradientMesh {
         if !self.is_valid() {
             return vec![];
         }
-        let n = n.clamp(1, 64);
-        let mut out = Vec::with_capacity(self.rows as usize * self.cols as usize * n * n);
+        let patches = self.rows as usize * self.cols as usize; // at most MAX_LINES², valid mesh
+        let mut n = n.clamp(1, 64);
+        while n > 1 && patches * n * n > Self::MAX_QUADS {
+            n -= 1;
+        }
+        let mut out = Vec::with_capacity((patches * n * n).min(Self::MAX_QUADS));
         let mut grid = vec![Point::ZERO; (n + 1) * (n + 1)];
         for r in 0..self.rows as usize {
             for c in 0..self.cols as usize {
@@ -997,7 +1009,7 @@ impl GradientMesh {
 
     /// Mesh tool Alt-click: delete the mesh lines through point `index` (interior lines only).
     pub fn remove_point_lines(&mut self, index: usize) -> bool {
-        if index >= self.points.len() {
+        if index >= self.points.len() || !self.is_valid() {
             return false;
         }
         let w = self.cols as usize + 1;
@@ -1049,8 +1061,12 @@ pub fn nodes_bounds(nodes: &[Arc<Node>]) -> Option<Rect> {
     nodes.iter().fold(None, |acc, c| astudio_geom::union_opt(acc, c.geometric_bounds()))
 }
 
-/// A `(rows+1)×(cols+1)` grid over `r` (row-major).
+/// Most rows or columns of an envelope or mesh grid (the commands allow 50).
+pub const MAX_GRID_LINES: u32 = 1024;
+
+/// A `(rows+1)×(cols+1)` grid over `r` (row-major); rows and cols are capped at [`MAX_GRID_LINES`].
 pub fn grid_points(r: Rect, rows: u32, cols: u32) -> Vec<Point> {
+    let (rows, cols) = (rows.min(MAX_GRID_LINES), cols.min(MAX_GRID_LINES));
     let mut v = Vec::with_capacity(((rows + 1) * (cols + 1)) as usize);
     for i in 0..=rows {
         for j in 0..=cols {

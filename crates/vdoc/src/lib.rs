@@ -698,7 +698,8 @@ impl Document {
     /// Allocate a fresh node id.
     pub fn alloc_id(&mut self) -> NodeId {
         let id = NodeId(self.next_id);
-        self.next_id += 1;
+        // A file can claim any counter; past u64::MAX ids repeat rather than crash.
+        self.next_id = self.next_id.saturating_add(1);
         id
     }
     pub fn peek_next_id(&self) -> u64 {
@@ -1068,14 +1069,16 @@ impl Document {
     }
     /// An id no graphic style has.
     pub fn next_graphic_style_id(&self) -> u32 {
-        self.graphic_styles.iter().map(|g| g.id).max().unwrap_or(0) + 1
+        self.graphic_styles.iter().map(|g| g.id).max().unwrap_or(0).saturating_add(1)
     }
-    /// The id of graphic style `index`, assigning one if it has none yet.
+    /// The id of graphic style `index`, assigning one if it has none yet (0: no such style).
     pub fn graphic_style_id(&mut self, index: usize) -> u32 {
-        if self.graphic_styles[index].id == 0 {
-            self.graphic_styles[index].id = self.next_graphic_style_id();
+        let next = self.next_graphic_style_id();
+        let Some(g) = self.graphic_styles.get_mut(index) else { return 0 };
+        if g.id == 0 {
+            g.id = next;
         }
-        self.graphic_styles[index].id
+        g.id
     }
     /// The default name of a new graphic style: the first free "Graphic Style N", N counting on
     /// from the number of styles.
@@ -1263,6 +1266,8 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod tests_robust;
 #[cfg(test)]
 mod tests_slices;
 #[cfg(test)]

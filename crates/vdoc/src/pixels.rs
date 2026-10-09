@@ -6,6 +6,24 @@ use std::sync::Arc;
 
 use crate::ImageBlob;
 
+/// Largest width or height of an embedded image decoded for drawing or recolouring.
+pub const MAX_IMAGE_SIDE: u32 = 32_768;
+/// Most memory one decode may use (the `image` crate's own default, stated here so it cannot
+/// change with an update).
+pub const MAX_DECODE_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Decodes embedded image bytes within [`MAX_IMAGE_SIDE`] and [`MAX_DECODE_BYTES`]; `None` for
+/// anything bigger, damaged or unknown.
+pub(crate) fn decode(bytes: &[u8]) -> Option<image::DynamicImage> {
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_SIDE);
+    limits.max_image_height = Some(MAX_IMAGE_SIDE);
+    limits.max_alloc = Some(MAX_DECODE_BYTES);
+    let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format().ok()?;
+    reader.limits(limits);
+    reader.decode().ok()
+}
+
 impl ImageBlob {
     /// A PNG blob of `png` bytes.
     pub fn png(png: Vec<u8>) -> Self {
@@ -21,7 +39,7 @@ impl ImageBlob {
     /// pixels left alone, re-encoded as PNG. `f` runs once per distinct colour. `None` when the
     /// image can't be decoded or no pixel changed.
     pub fn map_rgb(&self, mut f: impl FnMut([u8; 3]) -> [u8; 3]) -> Option<ImageBlob> {
-        let mut img = image::load_from_memory(&self.bytes).ok()?.to_rgba8();
+        let mut img = decode(&self.bytes)?.to_rgba8();
         let mut memo: HashMap<[u8; 3], [u8; 3]> = HashMap::new();
         let mut changed = false;
         for px in img.pixels_mut().filter(|p| p.0[3] > 0) {
@@ -67,7 +85,7 @@ impl ImageBlob {
         LAST.with_borrow_mut(|last| match last {
             Some((k, img)) if *k == key => Some(img.clone()),
             _ => {
-                let img = Arc::new(image::load_from_memory(&self.bytes).ok()?.to_rgba8());
+                let img = Arc::new(decode(&self.bytes)?.to_rgba8());
                 *last = Some((key, img.clone()));
                 Some(img)
             }

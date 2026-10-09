@@ -106,7 +106,7 @@ fn proxy_png(bytes: &[u8]) -> Option<Vec<u8>> {
     if w.max(h) <= PROXY_SIZE {
         return None;
     }
-    let small = image::load_from_memory(bytes).ok()?.thumbnail(PROXY_SIZE, PROXY_SIZE);
+    let small = crate::pixels::decode(bytes)?.thumbnail(PROXY_SIZE, PROXY_SIZE);
     let mut png = Vec::new();
     small.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).ok()?;
     Some(png)
