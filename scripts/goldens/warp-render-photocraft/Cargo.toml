@@ -1,0 +1,16 @@
+[package]
+name = "warp-render-photocraft"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+# PhotoCraft's own crates at the pinned upstream commit, at the versions of its Cargo.lock (copied).
+[dependencies]
+photocraft-text = { path = "../../../upstream/photocraft/crates/text" }
+photocraft-doc = { path = "../../../upstream/photocraft/crates/doc" }
+photocraft-geom = { path = "../../../upstream/photocraft/crates/geom" }
+photocraft-color = { path = "../../../upstream/photocraft/crates/color" }
+parley = { version = "0.11", default-features = false, features = ["std"] }
+skrifa = "0.44"

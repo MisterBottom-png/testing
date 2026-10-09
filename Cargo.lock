@@ -353,6 +353,7 @@ dependencies = [
  "astudio-doc",
  "astudio-geom",
  "astudio-psd",
+ "astudio-raster",
  "astudio-vdoc",
  "harfrust",
  "kurbo",

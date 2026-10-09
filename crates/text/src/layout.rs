@@ -965,6 +965,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], para: &ParaStyle, regions: Opt
         next_top: None,
     };
     'paras: for (pi, pr) in paras.iter().enumerate() {
+        let para = cx.opts.paragraphs.get(pi).unwrap_or(para);
         let text = cx.text;
         let bidi = para_bidi(text.get(pr.clone()).unwrap_or_default(), para.direction);
         let rtl = is_rtl(bidi.as_ref());
