@@ -15,6 +15,8 @@ astudio-doc = { path = "../doc" }
 astudio-psd = { path = "../psd" }
 astudio-color = { path = "../color" }
 astudio-raster = { path = "../raster" }
+# The gzip-compressed SCOWL word list of the spell checker (`spell`).
+flate2 = { workspace = true }
 kurbo = { workspace = true }
 skrifa = { workspace = true }
 harfrust = { workspace = true }

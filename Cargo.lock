@@ -355,6 +355,7 @@ dependencies = [
  "astudio-psd",
  "astudio-raster",
  "astudio-vdoc",
+ "flate2",
  "harfrust",
  "kurbo",
  "log",
