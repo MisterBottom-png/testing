@@ -100,6 +100,10 @@ fn rank(c: Class) -> u8 {
 /// Checks one dependency edge `name` (class `from`) -> `dep` (class `to`) listed in `section`.
 fn edge_error(name: &str, from: Class, section: &str, dep: &str, to: Class) -> Option<String> {
     let dev = section.contains("dev-dependencies");
+    // A crate naming itself as a dev-dependency (to switch on its own test features) is no edge.
+    if dev && dep == name {
+        return None;
+    }
     if from == Class::Standalone {
         return Some(format!("{name} -> {dep}: standalone crates have no workspace dependencies"));
     }
@@ -167,6 +171,8 @@ mod tests {
         assert!(edge_error("astudio-geom", geom, "dependencies", "astudio-testkit", kit).is_some());
         // Standalone crates have no workspace dependencies at all, the testkit included.
         assert!(edge_error("astudio-psd", Class::Standalone, "dev-dependencies", "astudio-testkit", kit).is_some());
+        // ...but may name themselves to switch on their own test features (`testgen`).
+        assert_eq!(edge_error("astudio-psd", Class::Standalone, "dev-dependencies", "astudio-psd", Class::Standalone), None);
         // Upward dev-dependencies on real crates stay forbidden.
         assert!(edge_error("astudio-geom", geom, "dev-dependencies", "astudio-doc", Class::Layer(1)).is_some());
         assert!(edge_error("astudio-effects", Class::Layer(2), "dependencies", "astudio-plugins", Class::Layer(2)).is_none());

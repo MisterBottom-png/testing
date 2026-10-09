@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof that both upstream apps build against A-Studio's merged crates (P2-01 geometry, P2-02 colour,
-# P2-13 vector document, P2-04 text).
+# P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw).
 #
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
@@ -58,6 +58,15 @@ pub use astudio_geom::warp;'
 # PhotoCraft's cms = astudio_color::cms; its color = astudio-color's root.
 shim photocraft cms color 'pub use astudio_color::cms::*;'
 shim photocraft color color 'pub use astudio_color::{BlendMode, Color, ColorMode, PixelFormat, SampleType, blend, convert, dither_noise, read_sample, write_sample};'
+# PhotoCraft's psd, codecs, heif and raw = the A-Studio crates of the same names (P2-11); their
+# features pass through.
+shim photocraft psd psd 'pub use astudio_psd::*;'
+printf '\n[features]\ncorpus = ["astudio-psd/corpus"]\nserde = ["astudio-psd/serde"]\ntestgen = ["astudio-psd/testgen"]\n' >> "$out/photocraft/src-copy/crates/psd/Cargo.toml"
+shim photocraft codecs codecs 'pub use astudio_codecs::*;'
+printf '\n[features]\ncorpus = ["astudio-codecs/corpus"]\navif = ["astudio-codecs/avif"]\nheif = ["astudio-codecs/heif"]\n' >> "$out/photocraft/src-copy/crates/codecs/Cargo.toml"
+shim photocraft heif heif 'pub use astudio_heif::*;'
+shim photocraft raw raw 'pub use astudio_raw::*;'
+printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
 
 copy vectorcraft
 # VectorCraft's geom root = astudio_geom's root (kurbo names, paths, shapes, ...).

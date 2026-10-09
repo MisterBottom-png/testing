@@ -24,7 +24,23 @@ Third-party material
   Authors; SIL Open Font License 1.1. See assets/fonts/OFL-JetBrainsMono.txt.
 - The synthetic coated CMYK profile (crates/color/profiles/photocraft-coated-cmyk.icc) - CC0-1.0.
   See crates/color/profiles/LICENSE-CC0-1.0.txt.
+
+Rust libraries compiled into A-Studio are listed in Cargo.lock under their own licences; release
+packages carry each one's full licence text (task P7-08). Notices those licences ask for:
+- This software is based in part on the work of the Independent JPEG Group (jpeg-encoder, JPEG
+  export in astudio-codecs; IJG licence).
+- exr (OpenEXR images in astudio-codecs) - Copyright (c) Contributors to the OpenEXR Project;
+  lebe - Copyright (c) 2022 Contributors to the lebe Project. BSD 3-Clause License. exr is not
+  affiliated with the OpenEXR project or the Academy Software Foundation.
+- AVIF export (the optional `avif` feature of astudio-codecs, off by default): rav1e - Copyright
+  (c) 2017-2023 the rav1e contributors, BSD 2-Clause License with the Alliance for Open Media
+  Patent License 1.0; ravif - Copyright (c) 2020 Kornel, BSD 3-Clause License; avif-serialize,
+  av1-grain and v_frame under BSD licences.
+- HEIC photos (the `heif` feature of astudio-codecs) are decoded by heic-rs (MIT OR Apache-2.0),
+  written from the ISO/IEC 23008-12 and ITU-T H.265 specifications. It grants no HEVC patent
+  licence; whether release builds enable it is a release decision (task P7-08).
+
 When more upstream code and assets are merged in, copy each upstream NOTICE entry here (Lucide
 icons under ISC, the SCOWL word list, the CC BY 3.0 magnetic lasso glyph, Adobe CMap resources
-under BSD-3-Clause through hayro-cmap, the jpeg-encoder IJG notice, egui default fonts, the
-craft-fonts OFL faces of release builds). The per-file list is in ASSETS.md.
+under BSD-3-Clause through hayro-cmap, egui default fonts, the craft-fonts OFL faces of release
+builds). The per-file list is in ASSETS.md.

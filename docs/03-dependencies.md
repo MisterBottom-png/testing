@@ -196,14 +196,30 @@ What this means as crates are ported:
   `skip` list with their reason when the crate that brings them is ported:
   egui 0.36 / `epaint` (harfrust 0.12, skrifa 0.44, vello 0.1; L6 UI only), the PDF stack
   (skrifa 0.42 and its font crates), `resvg` 0.45 (usvg/svgtypes 0.45/0.15; VectorCraft's `svg`
-  names resvg 0.45 next to usvg 0.48: check at the P2-11 port whether resvg 0.48 can replace it).
+  names resvg 0.45 next to usvg 0.48: check at the P2-15 port whether resvg 0.48 can replace it).
   Look again at each upstream sync: newer egui, krilla and resvg releases may remove them.
-- **Listed in `deny.toml` today:** `getrandom` 0.3/0.4 and `r-efi` 5/6 (proptest, tests only);
+- **Listed in `deny.toml` today:** `getrandom` 0.3/0.4 (proptest, tests only);
   `miniz_oxide` 0.8/0.9 (png 0.18 itself), `quick-error` 1/2 (proptest's rusty-fork vs image-webp and
   tiff) and `syn` 2/3 (zerocopy-derive through `half`), all from image decoding (P2-13) and present in
   both upstream lock files; the font stack of `astudio-text` (P2-04): `skrifa` 0.42 and `read-fonts`
   0.39 (`subsetter` 0.2, `write-fonts` 0.48), `read-fonts` 0.43 (`harfrust` 0.13), `font-types` 0.11,
   as in VectorCraft's lock file.
+- **What `cargo deny` looks at (P2-11):** the platforms A-Studio ships, `x86_64-pc-windows-msvc` and
+  `wasm32-unknown-unknown` (D7), with every feature on. Dependencies only other platforms or cfgs
+  build are left out: `r-efi` (UEFI) and `libfuzzer-sys` (NCSA licence), which rav1e, the optional
+  AVIF encoder of `astudio-codecs`, needs only under `cfg(fuzzing)`. The fuzz crates under
+  `crates/*/fuzz` (cargo-fuzz, libfuzzer-sys) are developer tools outside the workspace; nothing
+  ships from them. Their libfuzzer-sys licence (NCSA, with MIT OR Apache-2.0) was approved by the
+  owner on 9 October 2026 for these tools only.
+- **`heic-rs` 0.1.1 panics on some damaged files** (a box smaller than its own header,
+  `boxes.rs:130`; PhotoCraft hit it too, and the `decode_heif` fuzz target finds it within
+  seconds). `astudio-heif` calls heic-rs only under `catch_unwind`, so on Windows such a file is a
+  "the HEIF decoder failed" error (tests in `crates/heif/src/lib.rs`). The web build cannot catch
+  panics (wasm32 aborts), so it must not enable the `heif` feature until heic-rs is fixed. No
+  A-Studio app enables `heif` yet; that choice is task P7-08.
+- **Advisory exception:** `paste` is unmaintained (RUSTSEC-2024-0436, no vulnerability); it is a
+  build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`, and `rav1e`
+  (the optional AVIF encoder) directly.
 
 Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 

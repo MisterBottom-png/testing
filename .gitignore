@@ -5,3 +5,7 @@
 *.swp
 .DS_Store
 /scripts/cms-bench/target
+/crates/*/fuzz/target
+/crates/*/fuzz/artifacts
+/crates/*/fuzz/corpus
+/crates/*/fuzz/coverage
