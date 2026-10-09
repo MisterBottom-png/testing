@@ -20,6 +20,10 @@ use kurbo::{Affine, BezPath, Point, Rect, Shape};
 use crate::psd::fonts::DEFAULT_FAMILY;
 use crate::{FontDb, LayoutOptions, layout_with};
 
+/// A line break inside a paragraph (Shift+Return), stored as U+0003 in PSD type (PhotoCraft's
+/// `FORCED_LINE_BREAK`).
+pub const FORCED_LINE_BREAK: char = '\u{3}';
+
 /// PhotoCraft's auto leading factor (`ParagraphStyle::auto_leading`) that VectorCraft's engine
 /// also uses when a style has no leading.
 const ENGINE_AUTO_LEADING: f32 = 1.2;
@@ -139,7 +143,8 @@ pub fn engine_runs(layer: &TextLayer) -> Vec<(std::ops::Range<usize>, PcStyle)> 
             let text = layer.text.get(at..end).unwrap_or("");
             for (i, c) in text.char_indices() {
                 let next = at + i + c.len_utf8();
-                let last = c != '\n' && layer.text.get(next..).is_none_or(|t| t.is_empty() || t.starts_with('\n'));
+                let end_of_line = |t: &str| t.is_empty() || t.starts_with('\n') || t.starts_with(FORCED_LINE_BREAK);
+                let last = c != '\n' && c != FORCED_LINE_BREAK && layer.text.get(next..).is_none_or(end_of_line);
                 if last {
                     let first = crate::shape::cluster_start(&layer.text, next).max(start);
                     if first > start {
@@ -192,7 +197,7 @@ pub fn text_object_with(layer: &TextLayer, dpi: f32, faces: &[Option<(String, St
     };
     let mut runs = Vec::new();
     for (i, (range, style)) in engine_runs(layer).into_iter().enumerate() {
-        let text = layer.text.get(range.clone()).unwrap_or("").to_string();
+        let text = layer.text.get(range.clone()).unwrap_or("").replace(FORCED_LINE_BREAK, "\n");
         let auto = para_at(range.start).map_or(ENGINE_AUTO_LEADING, |p| p.auto_leading);
         let mut st = char_style(&style, auto);
         if let Some(Some((family, face))) = faces.get(i) {
@@ -201,12 +206,26 @@ pub fn text_object_with(layer: &TextLayer, dpi: f32, faces: &[Option<(String, St
         }
         runs.push(TextRun { text, style: st });
     }
-    // One style per paragraph of the engine's split (at '\n').
+    // One style per paragraph of the engine's split (at '\n', and at forced line breaks, which the
+    // engine sees as '\n': a line that continues its paragraph has no first-line indent or space
+    // between, as in PhotoCraft).
     let mut paragraphs = Vec::new();
     let mut start = 0usize;
-    for line in layer.text.split('\n') {
-        paragraphs.push(para_at(start).map(para_style).unwrap_or_default());
-        start += line.len() + 1;
+    let mut continues = false;
+    for piece in layer.text.split(['\n', FORCED_LINE_BREAK]) {
+        let end = start + piece.len();
+        let forced_after = layer.text.get(end..).is_some_and(|t| t.starts_with(FORCED_LINE_BREAK));
+        let mut p = para_at(start).map(para_style).unwrap_or_default();
+        if continues {
+            p.first_line_indent = 0.0;
+            p.space_before = 0.0;
+        }
+        if forced_after {
+            p.space_after = 0.0;
+        }
+        paragraphs.push(p);
+        continues = forced_after;
+        start = end + 1;
     }
     let kind = match layer.shape {
         TextShape::Point => TextKind::Point,

@@ -90,3 +90,24 @@ fn missing_bold_and_italic_faces_are_synthesised() {
     let asks_italic = CharStyle { italic: true, ..Default::default() };
     assert_eq!(crate::layer::synthesis(&asks_italic, &italic_face), (false, 0.0), "a real italic is not slanted again");
 }
+
+/// A forced line break (U+0003, Shift+Return) starts a new line in the same paragraph: no
+/// first-line indent or space before it, the paragraph's alignment kept (PhotoCraft maps it to a
+/// newline for its line breaker the same way).
+#[test]
+fn forced_line_breaks_continue_the_paragraph() {
+    use astudio_doc::text::{ParagraphRun, ParagraphStyle, TextAlign};
+    let mut l = styled("one\u{3}two\nthree", CharStyle { size_pt: 20.0, ..Default::default() });
+    let p = ParagraphStyle { align: TextAlign::Left, first_line_indent_pt: 30.0, space_before_pt: 12.0, ..Default::default() };
+    l.paragraphs = vec![ParagraphRun { len: 8, style: p.clone() }, ParagraphRun { len: 5, style: p }];
+    let (t, opts) = crate::layer::text_object(&l, 72.0);
+    assert_eq!(t.plain_text(), "one\ntwo\nthree", "the break has the same length, so offsets don't move");
+    let firsts: Vec<f64> = opts.paragraphs.iter().map(|p| p.first_line_indent).collect();
+    assert_eq!(firsts, [30.0, 0.0, 30.0]);
+    let before: Vec<f64> = opts.paragraphs.iter().map(|p| p.space_before).collect();
+    assert_eq!(before, [12.0, 0.0, 12.0]);
+    let lay = crate::layout_with(db(), &t, &opts);
+    assert_eq!(lay.lines.len(), 3);
+    // "two" starts at the margin, "one" and "three" after the indent.
+    assert!(lay.lines[1].x0 < lay.lines[0].x0 - 20.0 && lay.lines[2].x0 > lay.lines[1].x0 + 20.0, "{:?}", lay.lines);
+}
