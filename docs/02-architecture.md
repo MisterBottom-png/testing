@@ -18,8 +18,8 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | L2 | `astudio-text` | vc `text` + ports from pc `text` | See `06-text-engine.md` |
 | L2 | `astudio-plugins` | pc+vc `plugins` | One wasmi host; one plug-in ABI with filter and live-effect entry points. Needs only L0 and L1 crates; sits below `astudio-effects` inside L2 |
 | L2 | `astudio-pathops`, `astudio-trace`, `astudio-effects`, `astudio-vbrush` | vc `pathops`, `trace`, `effects`, `brush` | P2-14 (pathops, effects, vbrush). Inside L2, `effects` may use `plugins`, `pathops` and `text`; `trace` may use `pathops` (VectorCraft's order) |
-| L2 | `astudio-ops`, `astudio-paint`, `astudio-algo`, `astudio-vector` | pc same names | `vector` (pc shape rasterizer) shrinks as vc render takes over |
-| L3 | `astudio-compose`, `astudio-gpu` | pc `compose`, `gpu` | CPU compositor = reference oracle; wgpu compositor = canvas |
+| L2 | `astudio-ops`, `astudio-paint`, `astudio-algo`, `astudio-vector` | pc same names | `vector` (pc shape rasterizer, P2-19) shrinks as vc render takes over; `ops`, `paint`, `algo`: P2-20 |
+| L3 | `astudio-compose`, `astudio-gpu` | pc `compose`, `gpu` | P2-19. CPU compositor = reference oracle; wgpu compositor = canvas. `gpu` uses `compose` (shared effect maps and blend rules, CPU fallback), a same-layer edge |
 | L3 | `astudio-render` | vc `render` | P2-14. vello_cpu; draws vector layers into tiles |
 | L3 | `astudio-format` | pc `format` + vc `format` | `.astudio` read/write; `.pcraft` and `.vectorcraft` readers |
 | L3 | `astudio-svg`, `astudio-pdf`, `astudio-eps`, `astudio-cad`, `astudio-metafile` | vc same names | P2-15. Inside L3, `eps` uses `render` (TIFF previews) and `metafile` (metafile previews), VectorCraft's order; each has a cargo-fuzz target |

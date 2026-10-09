@@ -1,6 +1,6 @@
 [package]
-name = "astudio-compose"
-description = "A-Studio: CPU compositor, the reference oracle"
+name = "astudio-vector"
+description = "A-Studio: PhotoCraft's shape and vector-mask rasterizer (shrinks as astudio-render takes over)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,13 +12,9 @@ astudio-geom = { path = "../geom" }
 astudio-color = { path = "../color" }
 astudio-raster = { path = "../raster" }
 astudio-doc = { path = "../doc" }
-astudio-vector = { path = "../vector" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = { workspace = true }
-
-[dev-dependencies]
-proptest = { workspace = true }
 
 [lints]
 workspace = true

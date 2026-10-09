@@ -47,6 +47,8 @@ packages carry each one's full licence text (task P7-08). Notices those licences
   dependency is under the Apache License 2.0 with the LLVM exception.
 - Vector layers are drawn by the Linebender crates vello_cpu, vello_common, peniko, color,
   fearless_simd and glifo (Apache-2.0 OR MIT).
+- The canvas compositor runs on the GPU through wgpu and its shader compiler naga (MIT OR
+  Apache-2.0).
 
 When more upstream code and assets are merged in, copy each upstream NOTICE entry here (Lucide
 icons under ISC, the CC BY 3.0 magnetic lasso glyph, egui default fonts, the craft-fonts OFL faces

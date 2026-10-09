@@ -28,6 +28,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-plugins", Class::Layer(2)),
     ("astudio-effects", Class::Layer(2)),
     ("astudio-paint", Class::Layer(2)),
+    ("astudio-vector", Class::Layer(2)),
     ("astudio-algo", Class::Layer(2)),
     ("astudio-trace", Class::Layer(2)),
     ("astudio-compose", Class::Layer(3)),
@@ -63,4 +64,7 @@ pub const INTRA_LAYER: &[(&str, &str)] = &[
     // (VectorCraft's order, P2-15).
     ("astudio-eps", "astudio-render"),
     ("astudio-eps", "astudio-metafile"),
+    // The GPU compositor shares the CPU compositor's effect maps, curves and blend rules and falls
+    // back to it for what it can't draw (PhotoCraft's order, P2-19).
+    ("astudio-gpu", "astudio-compose"),
 ];

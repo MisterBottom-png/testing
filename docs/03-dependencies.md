@@ -209,6 +209,9 @@ What this means as crates are ported:
   in VectorCraft's lock file (0.3.1 brings a second `fearless_simd` and `hayro-ccitt`): don't let
   `cargo update` move it (`cargo update -p hayro-jbig2 --precise 0.3.0` puts it back) until the
   hayro crates line up again.
+  The GPU compositor (P2-19): wgpu 30's shader compiler `naga` brings `bit-set` 0.10, `bit-vec` 0.9
+  and `rustc-hash` 1 (proptest and the hayro crates use the other versions), and its DirectX 12
+  allocator `gpu-allocator` brings `hashbrown` 0.16; the same pairs are in PhotoCraft's lock file.
 - **Unmaintained, no vulnerability (P2-15):** `rustybuzz` and `ttf-parser` (RUSTSEC-2026-0206 and
   -0192) through krilla 0.8, the PDF writer; ignored in `deny.toml` with that reason until a krilla
   release moves off them.
@@ -229,7 +232,7 @@ What this means as crates are ported:
   build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`, and `rav1e`
   (the optional AVIF encoder) directly.
 
-Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision (P2-10: never in A-Studio's `Cargo.lock`; only the standalone golden generator `scripts/goldens/warp-render-photocraft`, which compiles PhotoCraft's own code, uses it), and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
+Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision (P2-10: never in A-Studio's `Cargo.lock`; only the standalone golden generator `scripts/goldens/warp-render-photocraft`, which compiles PhotoCraft's own code, uses it), and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor (`astudio-gpu`, P2-19: wgpu with only its `wgsl` front end; it draws on the device of the app's window, so the graphics backends come from the UI's eframe, as in PhotoCraft); PhotoCraft's CPU compositor (`astudio-compose`) stays as the reference it is tested against.
 
 ## 4. Data and inputs that are not crates
 

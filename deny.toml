@@ -44,6 +44,11 @@ skip = [
   { crate = "base64@0.22.1", reason = "krilla 0.8 (PDF export); usvg 0.48 uses base64 0.23" },
   { crate = "harfrust@0.12.0", reason = "usvg 0.48 (SVG import); astudio-text uses harfrust 0.13" },
   { crate = "imagesize@0.14.0", reason = "krilla 0.8 (PDF export); usvg 0.48 uses imagesize 0.15" },
+  # The GPU compositor (astudio-gpu, P2-19): wgpu 30's own crates, pairs also in PhotoCraft's lock file.
+  { crate = "bit-set@0.8.0", reason = "proptest (tests only); naga 30 (wgpu's shader compiler) uses bit-set 0.10" },
+  { crate = "bit-vec@0.8.0", reason = "bit-set 0.8 (proptest, tests only); bit-set 0.10 (naga) uses bit-vec 0.9" },
+  { crate = "hashbrown@0.16.1", reason = "gpu-allocator 0.28 (wgpu's DirectX 12 backend); indexmap uses hashbrown 0.17" },
+  { crate = "rustc-hash@1.1.0", reason = "naga 30 (wgpu's shader compiler); the hayro PDF crates use rustc-hash 2" },
 ]
 
 [advisories]

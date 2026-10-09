@@ -71,6 +71,7 @@ shim photocraft raster raster 'pub use astudio_raster::*;'
 shim photocraft doc doc 'pub use astudio_doc::*;'
 shim photocraft raw raw 'pub use astudio_raw::*;'
 printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
+for c in vector compose gpu; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
 
 copy vectorcraft
 # VectorCraft's geom root = astudio_geom's root (kurbo names, paths, shapes, ...).
