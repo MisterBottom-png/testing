@@ -1,54 +1,47 @@
 # Status
 
-**Date:** 8 October 2026 · **Phase:** P1 finished (decision GO); P2 is next. One P0 task still waits for numbers.
+**Date:** 9 October 2026 · **Phase:** P2 (shared core) under way: P2-00, P2-01 and P2-02 done.
 
 ## Start of the next session
 
-1. Unpack the newest handoff zip (or check out branch `a-studio` of `MisterBottom-png/testing`, which
-   holds the same history), then run `scripts/bootstrap.sh`. The zip leaves out `upstream/`; bootstrap
-   downloads both upstream apps again at the pinned commits in about 10 seconds.
+1. Check out branch `ccr-bdfb1782-6gges2` of `MisterBottom-png/testing` (it holds all of this work on
+   top of `a-studio`), or `a-studio` once the owner has merged it there. Then run `scripts/bootstrap.sh`.
 2. Check that `/next-task` and the agents (`rule-reviewer`, `upstream-scout`, `clean-room-auditor`) are
-   listed. In the first session they were not, because the files arrived after the session started.
-3. Finish P0-03 (below), then start P2 with the owner's go-ahead.
+   listed.
+3. Next task: see the end of this file.
 
 ## Where the work lives
 
-- Git: branch `a-studio` of github.com/MisterBottom-png/testing (public). Local `main` = that branch.
-  CI (`.github/workflows/ci.yml`) runs on Windows on every push and is green.
-- Task branches were merged into `main` with `--no-ff`; none is left unfinished.
-- The stray remote branch `a-studio-p0-10` (pushed by mistake) can be deleted on GitHub.
+- Git: this session worked on branch `ccr-bdfb1782-6gges2` (the session's branch), which started from
+  `a-studio` and carries every merge below. `a-studio` itself has not moved yet: merge
+  `ccr-bdfb1782-6gges2` into it (a fast-forward) when the owner agrees.
+- Task branches were merged into the session branch with `--no-ff`; none is left unfinished.
+- CI (`.github/workflows/ci.yml`) runs on Windows on every push.
 
 ## Done this session
 
 | Task | One line |
 | --- | --- |
-| P0-01 | Hosted on branch `a-studio` of the owner's testing repo (now public); CI runs on every push |
-| P0-02 | Upstream pinned: photocraft@e5e3e39, vectorcraft@8b036df (`upstream.lock`) |
-| P0-04/05/06 | Owner chose: upstream stays read-only, branding is removed as code is ported; the CI rebrand scan also blocks brand files, upstream icons, app ids and the upstream MSI GUIDs |
-| P0-07/08 | Placeholder icon (owner approved as placeholder) and Windows, document and web icon sets |
-| P0-09 | `cargo xtask assets` checks every asset has an `ASSETS.md` row (ported from VectorCraft) |
-| P0-10 | All CI gates green on Windows; `cargo deny` passes |
-| D7 | Owner decided: Windows-only app. CI, roadmap and docs updated; the web build is unchanged |
-| Tablet rule | Owner decided: `unsafe` is allowed in `astudio-tablet` on Windows (was macOS) |
-| P1-01 to P1-04 | Prototype in `proto/` (owner chose a throwaway prototype): Vector layer in the PhotoCraft document, drawn into tiles, saved and reopened, PSD exit test; a one-path edit on 24 MP takes 7.3 ms (target under 100 ms) |
-| P1-05 | Report `docs/p1-report.md`; owner decided **GO**, recorded as D6 |
+| P0-03 | Windows baseline recorded (`docs/baseline.md`): both upstream apps build and pass all their tests (PhotoCraft 3,980, VectorCraft 3,997). The baseline workflow now runs four jobs in parallel on a Dev Drive with Defender off: 37 minutes instead of 3 h 21 |
+| P2-00 | Layer-rule conflict from the P1 report fixed: `astudio-plugins` moved to L2 below `astudio-effects` |
+| P2-01 | `astudio-geom`: VectorCraft's geometry plus PhotoCraft's pixel types and warp; crash fixes from review |
+| Colour study | `docs/13-colour-engine.md`: five engines compared, PhotoCraft's and moxcms measured; owner chose one engine, recorded as **D8** (default CMYK: PhotoCraft Coated) |
+| P2-02 | `astudio-color`: PhotoCraft's colour types and engine plus VectorCraft's colour layer, all on one engine; moxcms only a test oracle; crash and hang fixes from review |
+| Proof | `scripts/upstream-compat.sh` builds both upstream apps with their geometry and colour crates replaced by the A-Studio ones: both build |
 
 ## In progress
 
-- **P0-03, Windows baseline:** `.github/workflows/baseline.yml` builds and tests both upstream apps on
-  windows-latest. Run 37817543646 was still running at the end of the session (over 1.5 hours). When
-  it finishes, take the numbers from its log (artifact `baseline-windows`), fill the table in
-  `docs/baseline.md`, and mark P0-03 done.
-- P1-04 on Windows is done: 7.2 ms for a one-path edit on GitHub's Windows machine (in `docs/baseline.md`
-  and `docs/p1-report.md`); all prototype tests pass on Windows.
+- Nothing half-done.
 
 ## Questions for the owner
 
-- None blocking. Open choices for later: the final app icon and the app id (placeholder
-  `io.github.a-studio.astudio`); whether the web build stays (D7 left it unchanged).
+- Merge `ccr-bdfb1782-6gges2` into `a-studio`?
+- Decided: renaming upstream names in colour profile names waits for the P3 rebrand (task P3-06).
+- Open for later: the final app icon and the app id (placeholder `io.github.a-studio.astudio`);
+  whether the web build stays (D7 left it unchanged).
 
 ## Next task
 
-P0-03 (record the Windows baseline), then **P2-01**: create `astudio-geom` from VectorCraft's `geom`
-plus PhotoCraft's pixel types and warp (`/port-crate`). The layer-rule conflict the P1 report found is
-fixed (P2-00).
+**P2-03**: unify the 17 crates whose versions differ between the two upstream apps (harfrust,
+skrifa, usvg, vello_cpu, ...), then P2-04 (VectorCraft's text engine as `astudio-text`). P2-12 (the
+colour engine's fast paths) can run alongside.
