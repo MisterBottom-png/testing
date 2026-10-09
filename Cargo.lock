@@ -349,7 +349,10 @@ dependencies = [
 name = "astudio-text"
 version = "0.0.1"
 dependencies = [
+ "astudio-color",
+ "astudio-doc",
  "astudio-geom",
+ "astudio-psd",
  "astudio-vdoc",
  "harfrust",
  "kurbo",
