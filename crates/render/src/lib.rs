@@ -1512,8 +1512,8 @@ pub fn default_threads() -> u16 {
         if o >= 0 {
             return o.min(64) as u16;
         }
-        if std::env::var_os("VECTORCRAFT_RENDER_THREADS").is_some() {
-            return std::env::var("VECTORCRAFT_RENDER_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+        if std::env::var_os("ASTUDIO_RENDER_THREADS").is_some() {
+            return std::env::var("ASTUDIO_RENDER_THREADS").ok().and_then(|v| v.parse().ok()).map(|n: u16| n.min(64)).unwrap_or(0);
         }
         std::thread::available_parallelism().map(|n| (n.get().saturating_sub(1)).min(4) as u16).unwrap_or(0)
     }

@@ -69,7 +69,7 @@ pub fn seg_cubic(sp: &SubPath, i: usize) -> CubicBez {
     if sp.segment_is_line(i) { CubicBez::new(c.p0, c.p0.lerp(c.p3, 1.0 / 3.0), c.p0.lerp(c.p3, 2.0 / 3.0), c.p3) } else { c }
 }
 
-/// Non-linear path mapping (shared with live envelopes in `astudio-doc`).
+/// Non-linear path mapping (shared with live envelopes in `astudio-vdoc`).
 pub use astudio_vdoc::live::map_nonlinear;
 
 /// Smooth subpath through `pts` (Catmull-Rom tangents).
