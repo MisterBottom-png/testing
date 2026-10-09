@@ -209,7 +209,8 @@ What this means as crates are ported:
   build are left out: `r-efi` (UEFI) and `libfuzzer-sys` (NCSA licence), which rav1e, the optional
   AVIF encoder of `astudio-codecs`, needs only under `cfg(fuzzing)`. The fuzz crates under
   `crates/*/fuzz` (cargo-fuzz, libfuzzer-sys) are developer tools outside the workspace; nothing
-  ships from them.
+  ships from them. Their libfuzzer-sys licence (NCSA, with MIT OR Apache-2.0) was approved by the
+  owner on 9 October 2026 for these tools only.
 - **`heic-rs` 0.1.1 panics on some damaged files** (a box smaller than its own header,
   `boxes.rs:130`; PhotoCraft hit it too, and the `decode_heif` fuzz target finds it within
   seconds). `astudio-heif` calls heic-rs only under `catch_unwind`, so on Windows such a file is a
