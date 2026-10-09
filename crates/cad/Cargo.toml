@@ -1,0 +1,25 @@
+[package]
+name = "astudio-cad"
+description = "A-Studio: CAD interchange: ASCII DXF writer (R12 to 2018) and reader"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-effects = { path = "../effects" }
+astudio-vbrush = { path = "../vbrush" }
+astudio-pathops = { path = "../pathops" }
+astudio-text = { path = "../text" }
+kurbo = { workspace = true }
+image = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

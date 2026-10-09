@@ -39,6 +39,10 @@ skip = [
   # VectorCraft's lock file.
   { crate = "skrifa@0.44.0", reason = "vello_cpu 0.2 through glifo 0.3; A-Studio uses skrifa 0.47" },
   { crate = "read-fonts@0.41.0", reason = "skrifa 0.44 (glifo 0.3, vello_cpu 0.2)" },
+  # The importers (P2-15), pairs also in VectorCraft's lock file:
+  { crate = "base64@0.22.1", reason = "krilla 0.8 (PDF export); usvg 0.48 uses base64 0.23" },
+  { crate = "harfrust@0.12.0", reason = "usvg 0.48 (SVG import); astudio-text uses harfrust 0.13" },
+  { crate = "imagesize@0.14.0", reason = "krilla 0.8 (PDF export); usvg 0.48 uses imagesize 0.15" },
 ]
 
 [advisories]
@@ -48,6 +52,11 @@ ignore = [
   # images in astudio-codecs, P2-11) uses, and inside rav1e (the optional AVIF encoder). Drop when
   # both move off it.
   { id = "RUSTSEC-2024-0436", reason = "unmaintained build-time macro via exr -> pulp and rav1e; no vulnerability" },
+  # rustybuzz and ttf-parser are unmaintained (no known vulnerability): krilla 0.8, the PDF writer of
+  # astudio-pdf (P2-15), shapes and reads fonts with them, as in VectorCraft. No krilla release
+  # moves off them yet; drop when one does.
+  { id = "RUSTSEC-2026-0206", reason = "rustybuzz unmaintained, via krilla 0.8 (PDF export); no vulnerability" },
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained, via rustybuzz (krilla 0.8); no vulnerability" },
 ]
 
 [sources]

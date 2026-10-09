@@ -36,6 +36,9 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-format", Class::Layer(3)),
     ("astudio-svg", Class::Layer(3)),
     ("astudio-pdf", Class::Layer(3)),
+    ("astudio-eps", Class::Layer(3)),
+    ("astudio-cad", Class::Layer(3)),
+    ("astudio-metafile", Class::Layer(3)),
     ("astudio-io", Class::Layer(4)),
     ("astudio-tools", Class::Layer(4)),
     ("astudio-engine", Class::Layer(5)),
@@ -56,4 +59,8 @@ pub const INTRA_LAYER: &[(&str, &str)] = &[
     // Effects outline strokes and text, and combine shapes (VectorCraft's order, P2-14).
     ("astudio-effects", "astudio-pathops"),
     ("astudio-effects", "astudio-text"),
+    // EPS reuses the renderer's TIFF writer for previews and opens Windows metafile previews
+    // (VectorCraft's order, P2-15).
+    ("astudio-eps", "astudio-render"),
+    ("astudio-eps", "astudio-metafile"),
 ];

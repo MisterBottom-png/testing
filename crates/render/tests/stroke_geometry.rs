@@ -7,10 +7,8 @@ use astudio_color::vector::{Color, Gradient, GradientKind, GradientPaint, Gradie
 use astudio_geom::{Point, Rect, Shape, shapes};
 use astudio_render::{Renderer, effects};
 use astudio_testkit::fixtures::DocBuilder;
-#[cfg(any())]
 use astudio_testkit::raster::assert_similar;
 use astudio_testkit::raster::{Image, render_region};
-#[cfg(any())]
 use astudio_testkit::svg;
 use astudio_vdoc::{Appearance, AppearanceItem, ArrowAlign, Arrowhead, Dash, Document, LineCap, StrokeLayer};
 
@@ -72,8 +70,6 @@ fn zero_length_dashes_draw_dots_with_a_round_cap_and_squares_with_a_projecting_c
     assert_eq!(render(&dotted(LineCap::Butt)).ink(), 0);
 }
 
-// Needs the SVG crate (P2-15): switched off until then.
-#[cfg(any())]
 #[test]
 fn dotted_lines_survive_svg_export_and_render_the_same() {
     for cap in [LineCap::Round, LineCap::Square] {

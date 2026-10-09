@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runs every fuzz target under crates/*/fuzz (P2-11: PhotoCraft's codecs, psd and raw targets) for a
+# Runs every fuzz target under crates/*/fuzz (P2-11: PhotoCraft's codecs, psd and raw targets; P2-15:
+# the svg, pdf, eps, cad and metafile importers) for a
 # fixed time each. Needs the nightly toolchain and cargo-fuzz (`rustup toolchain install nightly`,
 # `cargo install cargo-fuzz --locked`); a developer check on Linux, nothing ships from these crates.
 #
@@ -15,7 +16,11 @@ mkdir -p "$CARGO_TARGET_DIR"
 status=0
 for c in $crates; do
   for t in $(cd "crates/$c" && cargo +nightly fuzz list); do
-    if (cd "crates/$c" && cargo +nightly fuzz run "$t" -- -max_total_time="$secs" > "$CARGO_TARGET_DIR/$c-$t.log" 2>&1); then
+    # Seed files (small valid inputs, crates/<crate>/fuzz/seeds/<target>) are read alongside the
+    # corpus the fuzzer grows; it never writes into them.
+    dirs=()
+    if [ -d "crates/$c/fuzz/seeds/$t" ]; then mkdir -p "crates/$c/fuzz/corpus/$t"; dirs=("fuzz/corpus/$t" "fuzz/seeds/$t"); fi
+    if (cd "crates/$c" && cargo +nightly fuzz run "$t" "${dirs[@]}" -- -max_total_time="$secs" > "$CARGO_TARGET_DIR/$c-$t.log" 2>&1); then
       runs=$(grep -oE '^Done [0-9]+ runs' "$CARGO_TARGET_DIR/$c-$t.log" | tail -1)
       echo "fuzz $c/$t: ok (${runs:-no summary} in ${secs} s)"
     else

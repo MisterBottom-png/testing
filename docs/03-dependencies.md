@@ -195,16 +195,21 @@ What this means as crates are ported:
 - **Expected, for now unavoidable** (forced by crates outside A-Studio), to be added to `deny.toml`'s
   `skip` list with their reason when the crate that brings them is ported:
   egui 0.36 / `epaint` (harfrust 0.12, skrifa 0.44, vello 0.1; L6 UI only), the PDF stack
-  (skrifa 0.42 and its font crates), `resvg` 0.45 (usvg/svgtypes 0.45/0.15; VectorCraft's `svg`
-  names resvg 0.45 next to usvg 0.48: check at the P2-15 port whether resvg 0.48 can replace it).
-  Look again at each upstream sync: newer egui, krilla and resvg releases may remove them.
+  (skrifa 0.42 and its font crates). Look again at each upstream sync: newer egui and krilla
+  releases may remove them. (`resvg`, a dev-dependency of `astudio-svg`'s tests, moved from 0.45 to
+  0.48 at the P2-15 port, so one `usvg` and one `svgtypes` remain; the svg tests pass unchanged.)
 - **Listed in `deny.toml` today:** `getrandom` 0.3/0.4 (proptest, tests only);
   `miniz_oxide` 0.8/0.9 (png 0.18 itself), `quick-error` 1/2 (proptest's rusty-fork vs image-webp and
   tiff) and `syn` 2/3 (zerocopy-derive through `half`), all from image decoding (P2-13) and present in
   both upstream lock files; the font stack of `astudio-text` (P2-04): `skrifa` 0.42 and `read-fonts`
   0.39 (`subsetter` 0.2, `write-fonts` 0.48), `read-fonts` 0.43 (`harfrust` 0.13), `font-types` 0.11,
   as in VectorCraft's lock file; the vector renderer (P2-14): `skrifa` 0.44 and `read-fonts` 0.41
-  through `vello_cpu` 0.2, also as in VectorCraft's lock file.
+  through `vello_cpu` 0.2, also as in VectorCraft's lock file; the importers (P2-15): `base64` 0.22
+  and `imagesize` 0.14 (krilla 0.8), `harfrust` 0.12 (usvg 0.48). `hayro-jbig2` is held at 0.3.0, as
+  in VectorCraft's lock file (0.3.1 brings a second `fearless_simd` and `hayro-ccitt`).
+- **Unmaintained, no vulnerability (P2-15):** `rustybuzz` and `ttf-parser` (RUSTSEC-2026-0206 and
+  -0192) through krilla 0.8, the PDF writer; ignored in `deny.toml` with that reason until a krilla
+  release moves off them.
 - **What `cargo deny` looks at (P2-11):** the platforms A-Studio ships, `x86_64-pc-windows-msvc` and
   `wasm32-unknown-unknown` (D7), with every feature on. Dependencies only other platforms or cfgs
   build are left out: `r-efi` (UEFI) and `libfuzzer-sys` (NCSA licence), which rav1e, the optional

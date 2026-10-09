@@ -1,0 +1,29 @@
+[package]
+name = "astudio-eps"
+description = "A-Studio: Encapsulated PostScript: EPS writer (PostScript Level 2 and 3) with TIFF previews, and reader"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
+astudio-vdoc = { path = "../vdoc" }
+astudio-effects = { path = "../effects" }
+astudio-vbrush = { path = "../vbrush" }
+astudio-text = { path = "../text" }
+# Windows metafile previews, opened when a file's PostScript can't be read.
+astudio-metafile = { path = "../metafile" }
+# The TIFF writer (previews) and PackBits, shared with raster export.
+astudio-render = { path = "../render" }
+kurbo = { workspace = true }
+image = { workspace = true }
+flate2 = { workspace = true }
+
+[dev-dependencies]
+astudio-testkit = { path = "../testkit" }
+
+[lints]
+workspace = true

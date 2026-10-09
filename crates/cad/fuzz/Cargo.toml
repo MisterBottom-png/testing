@@ -1,0 +1,26 @@
+[package]
+name = "astudio-cad-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+# Standalone: excluded from the A-Studio workspace.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+astudio-cad = { path = ".." }
+astudio-vdoc = { path = "../../vdoc" }
+astudio-render = { path = "../../render" }
+astudio-svg = { path = "../../svg" }
+
+[[bin]]
+name = "import"
+path = "fuzz_targets/import.rs"
+test = false
+doc = false
+bench = false

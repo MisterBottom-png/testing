@@ -22,7 +22,7 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | L3 | `astudio-compose`, `astudio-gpu` | pc `compose`, `gpu` | CPU compositor = reference oracle; wgpu compositor = canvas |
 | L3 | `astudio-render` | vc `render` | P2-14. vello_cpu; draws vector layers into tiles |
 | L3 | `astudio-format` | pc `format` + vc `format` | `.astudio` read/write; `.pcraft` and `.vectorcraft` readers |
-| L3 | `astudio-svg`, `astudio-pdf`, `astudio-eps`, `astudio-cad`, `astudio-metafile` | vc same names | |
+| L3 | `astudio-svg`, `astudio-pdf`, `astudio-eps`, `astudio-cad`, `astudio-metafile` | vc same names | P2-15. Inside L3, `eps` uses `render` (TIFF previews) and `metafile` (metafile previews), VectorCraft's order; each has a cargo-fuzz target |
 | L4 | `astudio-io`, `astudio-tools` | pc `io`, vc `tools` (pc tools live in its engine and ui) | |
 | L5 | `astudio-engine` | pc `engine` + vc `engine` | One command registry, one undo history, one guard |
 | L6 | `astudio-ui` | pc `ui-egui` + vc `ui-egui` | Modes, panels, menus |

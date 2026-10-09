@@ -7,3 +7,5 @@
 *.ico binary
 # CSV files are written by Python's csv module with CRLF row ends; keep them byte for byte.
 *.csv -text
+# Fuzz seeds are byte-exact inputs (a PDF's offsets count its CRLFs).
+crates/*/fuzz/seeds/** -text
