@@ -198,8 +198,10 @@ What this means as crates are ported:
   (skrifa 0.42 and its font crates), `resvg` 0.45 (usvg/svgtypes 0.45/0.15; VectorCraft's `svg`
   names resvg 0.45 next to usvg 0.48: check at the P2-11 port whether resvg 0.48 can replace it).
   Look again at each upstream sync: newer egui, krilla and resvg releases may remove them.
-- **Test-only today:** `getrandom` 0.3 and 0.4, `r-efi` 5 and 6 (both through proptest), `syn` 2 and 3
-  (zerocopy-derive through proptest; serde and thiserror use syn 3).
+- **Listed in `deny.toml` today:** `getrandom` 0.3/0.4 and `r-efi` 5/6 (proptest, tests only);
+  `miniz_oxide` 0.8/0.9 (png 0.18 itself), `quick-error` 1/2 (proptest's rusty-fork vs image-webp and
+  tiff) and `syn` 2/3 (zerocopy-derive through `half`), all from image decoding (P2-13) and present in
+  both upstream lock files.
 
 Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 
