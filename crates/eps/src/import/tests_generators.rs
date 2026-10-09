@@ -400,11 +400,12 @@ fn xshow_and_array_meshes() {
     assert_eq!(of_kind(&r.document, "Mesh").len(), 2);
 }
 
-/// What procedures that keep and restore the graphics state ask of the interpreter: each `current…` operator's answer is taken by its `set…` operator
-/// and asked again (device settings are accepted and kept as they are)
-/// (colour rendering, half-tone, transfers, black generation and undercolour removal as
-/// procedures, `rootfont`), VM switches with `setglobal` and `currentglobal`, a font's VM with
-/// `gcheck`, and level and `version` probes in `stopped`; then art drawn through such procedures.
+/// What procedures that keep and restore the graphics state ask of the interpreter. Each
+/// `current…` operator's answer is taken by its `set…` operator and asked again (colour rendering,
+/// half-tone, transfers, black generation and undercolour removal as procedures, `rootfont`;
+/// device settings are accepted and kept as they are). VM switches with `setglobal` and
+/// `currentglobal`, a font's VM with `gcheck`, and level and `version` probes in `stopped` work too.
+/// Then art is drawn through procedures that keep and restore line width, flatness and colour.
 #[test]
 fn graphics_state_queries_set_the_same_state_again() {
     use super::tests::check;
@@ -430,7 +431,7 @@ fn graphics_state_queries_set_the_same_state_again() {
 9 setlinewidth 1 0 0 setrgbcolor 40 setflat
 back 20 20 moveto 180 130 lineto stroke
 showpage"##;
-    let r = open("an illustration app", program);
+    let r = open("test", program);
     let line = all(&r.document).into_iter().find(|n| stroke(n).is_some()).unwrap();
     let s = stroke(&line).unwrap();
     assert_eq!((s.width, s.paint.color()), (3.0, Some(Color::cmyk(0.1, 0.2, 0.3, 0.4))));
