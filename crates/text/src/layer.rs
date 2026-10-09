@@ -169,13 +169,47 @@ pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
     text_object_with(layer, dpi, &[])
 }
 
-/// The installed face each of the layer's [`engine_runs`] names by PostScript name (as PSD files
-/// store fonts: `Arial-BoldMT`), as engine family and style; `None` where none is installed, and
-/// the run's family, weight and italic choose (PhotoCraft's `resolve_postscript`, P2-18).
+/// Families drawn with the same advance widths as common Windows and Mac fonts (the metric
+/// aliases font configuration carries, which PhotoCraft's font matching gets from it): used when
+/// the named family isn't installed, so the text keeps its length and line breaks.
+const METRIC_ALIASES: &[(&str, &[&str])] = &[
+    ("Arial", &["Liberation Sans", "Arimo"]),
+    ("Helvetica", &["Liberation Sans", "Arimo"]),
+    ("Arial Narrow", &["Liberation Sans Narrow"]),
+    ("Times New Roman", &["Liberation Serif", "Tinos"]),
+    ("Times", &["Liberation Serif", "Tinos"]),
+    ("Courier New", &["Liberation Mono", "Cousine"]),
+    ("Courier", &["Liberation Mono", "Cousine"]),
+    ("Calibri", &["Carlito"]),
+    ("Cambria", &["Caladea"]),
+];
+
+/// The installed face each of the layer's [`engine_runs`] uses, as engine family and style: the
+/// face a PSD names by PostScript name (as PSD files store fonts: `Arial-BoldMT`; PhotoCraft's
+/// `resolve_postscript`), else, when the run's family isn't installed, a family with the same
+/// widths ([`METRIC_ALIASES`]), else PhotoCraft's default family; `None` where the run's own
+/// family, weight and italic find a face (P2-18).
 pub fn resolve_faces(db: &FontDb, layer: &TextLayer) -> Vec<Option<(String, String)>> {
     engine_runs(layer)
         .iter()
-        .map(|(_, st)| st.postscript_name.as_deref().and_then(|ps| db.find_postscript(ps)).map(|f| (f.family.clone(), f.style.clone())))
+        .map(|(_, st)| {
+            if let Some(f) = st.postscript_name.as_deref().and_then(|ps| db.find_postscript(ps)) {
+                return Some((f.family.clone(), f.style.clone()));
+            }
+            let family = if st.font_family.is_empty() { DEFAULT_FAMILY } else { &st.font_family };
+            let style = font_style(st.weight, st.italic);
+            if db.resolve(family, &style).is_some_and(|(_, m)| m != crate::FontMatch::Missing) {
+                return None;
+            }
+            let aliases = METRIC_ALIASES.iter().find(|(name, _)| name.eq_ignore_ascii_case(family)).map_or(&[][..], |(_, a)| *a);
+            let found = |name: &str| match db.resolve(name, &style) {
+                Some((f, m)) if m != crate::FontMatch::Missing => Some((f.family.clone(), f.style.clone())),
+                _ => None,
+            };
+            // Else PhotoCraft's default family stands in, as in PhotoCraft (VectorCraft's own
+            // fallback is another family).
+            aliases.iter().find_map(|a| found(a)).or_else(|| found(DEFAULT_FAMILY))
+        })
         .collect()
 }
 

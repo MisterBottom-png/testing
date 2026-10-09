@@ -62,7 +62,7 @@ pub struct CharStyle {
     #[serde(default)]
     pub all_caps: bool,
     /// OpenType features that differ from the defaults (OpenType panel), as tags: `"dlig"` turns
-    /// a feature on, `"-liga"` off.
+    /// a feature on, `"-liga"` off, `"salt=2"` picks alternate 2 (PhotoCraft text layers, P2-18).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub features: Vec<String>,
     /// Character style (Character Styles panel) these attributes come from; None = Normal.

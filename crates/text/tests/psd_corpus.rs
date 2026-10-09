@@ -1,9 +1,9 @@
 //! Type layers in the real-file corpus (`corpus/psd`, gitignored; feature `corpus`, fetched by
 //! `scripts/fetch-corpus.sh psd`; a missing corpus fails). Ported from PhotoCraft's
-//! `io/tests/text_corpus.rs`: the same strict model round trip (P2-05 done_when). PhotoCraft's
-//! second part, re-rendering each layer against Photoshop's cached pixels, needs text rendering
-//! into tiles (P2-08) and joins there; its `corpus_tysh_lossless` and the PSD-file half of
-//! `created_text_layer_roundtrips_through_psd` need PSD import and export (P5-03).
+//! `io/tests/text_corpus.rs`: the same strict model round trip (P2-05 done_when), and its second
+//! part, each layer redrawn against Photoshop's cached pixels (P2-18). Its `corpus_tysh_lossless`
+//! and the PSD-file half of `created_text_layer_roundtrips_through_psd` need PSD import and
+//! export (P5-03).
 #![cfg(feature = "corpus")]
 // Test helpers outside #[test] functions (clippy.toml allows these only inside them).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -109,7 +109,7 @@ fn corpus_text_layers_round_trip() {
 /// Each text layer redrawn with this machine's fonts against the pixels Photoshop cached for it
 /// (PhotoCraft's second half of `corpus_text_layers`, P2-18): ink placed and sized within
 /// PhotoCraft's tolerance (centre within a quarter of the ink height, left edge within half,
-/// height 0.6 to 1.6 times). The fonts usually differ (Arial, Myriad Pro and the rest fall back),
+/// height 0.6 to 1.6 times), and a width check of our own. The fonts usually differ (Arial, Myriad Pro and the rest fall back),
 /// so overlap (IoU) is printed, not asserted. PhotoCraft gets every layer on the pinned corpus.
 #[test]
 fn corpus_text_layers_redraw_where_photoshop_drew_them() {
@@ -179,7 +179,12 @@ fn corpus_text_layers_redraw_where_photoshop_drew_them() {
             let dy = ((ps.1 + ps.3) - (ob.y0 + ob.y1)) as f32 / 2.0;
             let dx0 = (ps.0 - ob.x0) as f32;
             let dh = (ob.y1 - ob.y0) as f32 / ph;
-            let ok = dy.abs() <= 0.25 * ph && dx0.abs() <= 0.5 * ph && (0.6..1.6).contains(&dh);
+            // And its width: the substitute fonts keep it within 0.8 to 1.3 times Photoshop's
+            // (PhotoCraft's own range on this corpus: 0.89 to 1.27; P2-18 review), or, for tiny
+            // text where a pixel of antialiasing counts, within half the ink height of it.
+            let (ow, pw) = ((ob.x1 - ob.x0) as f32, (ps.2 - ps.0).max(1) as f32);
+            let width_ok = (0.8..1.3).contains(&(ow / pw)) || (ow - pw).abs() <= 0.5 * ph;
+            let ok = dy.abs() <= 0.25 * ph && dx0.abs() <= 0.5 * ph && (0.6..1.6).contains(&dh) && width_ok;
             let layer = rec.name();
             println!(
                 "{name:40} {layer:16} {:?} ps=({}, {}, {}, {}) ours=({}, {}, {}, {}) iou={iou:.2} dy={dy:+.1} dx0={dx0:+.1} h×{dh:.2} {}",

@@ -219,3 +219,47 @@ fn small_caps_without_the_feature_are_synthesised() {
     let own = height("Source Sans 3", "x", Caps::SmallCaps);
     assert!(own > height("Source Sans 3", "x", Caps::Normal) + 1.0, "{own}");
 }
+
+/// Paragraph text starts with the top of its tallest lowercase ascender ('d') at the box top
+/// (PhotoCraft's `first_ascent`, Photoshop's look), where VectorCraft's own area type puts the
+/// font's ascent there (lower).
+#[test]
+fn box_text_starts_at_the_lowercase_ascender() {
+    use astudio_doc::text::TextShape;
+    let mut l = styled("dog", CharStyle { size_pt: 40.0, ..Default::default() });
+    l.shape = TextShape::Box { x: 10.0, y: 20.0, width: 300.0, height: 200.0 };
+    let lay = layout_layer(db(), &l, 72.0);
+    let d = kurbo::Shape::bounding_box(&lay.glyphs[0].outline);
+    assert!((d.y0 - 20.0).abs() < 0.5, "{d:?}");
+    // VectorCraft area type keeps Illustrator's default, the ascent at the frame top.
+    let (t, mut opts) = crate::layer::text_object(&l, 72.0);
+    opts.first_baseline = crate::FirstBaseline::Ascent;
+    let vc = crate::layout_with(db(), &t, &opts);
+    let vc_d = kurbo::Shape::bounding_box(&vc.glyphs[0].outline);
+    assert!(vc_d.y0 > d.y0 + 2.0, "{vc_d:?} vs {d:?}");
+}
+
+/// A family that isn't installed, with no metric-compatible stand-in, is drawn in PhotoCraft's
+/// default family (Inter), not VectorCraft's fallback; an installed family is left as it is.
+#[test]
+fn missing_families_fall_back_like_photocraft() {
+    let missing = styled("x", CharStyle { font_family: "No Such Family".into(), ..Default::default() });
+    assert_eq!(resolve_faces(db(), &missing), [Some(("Inter".to_string(), "Regular".to_string()))]);
+    let present = styled("x", CharStyle { font_family: "Source Sans 3".into(), ..Default::default() });
+    assert_eq!(resolve_faces(db(), &present), [None]);
+}
+
+/// Arial, Times New Roman and Courier New, when missing, are drawn with the installed families of
+/// the same widths (Liberation, Arimo, …), as font configuration maps them for PhotoCraft (checked
+/// where those stand-ins are installed and Arial isn't).
+#[test]
+fn missing_core_fonts_use_metric_compatible_families() {
+    let sys = FontDb::with_font_dirs(crate::system_font_dirs());
+    sys.load_system_fonts();
+    let has = |f: &str| sys.resolve(f, "Regular").is_some_and(|(_, m)| m != crate::FontMatch::Missing);
+    if has("Arial") || !has("Liberation Sans") {
+        return;
+    }
+    let arial = styled("x", CharStyle { font_family: "Arial".into(), weight: 700, ..Default::default() });
+    assert_eq!(resolve_faces(&sys, &arial), [Some(("Liberation Sans".to_string(), "Bold".to_string()))]);
+}

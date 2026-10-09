@@ -865,12 +865,13 @@ fn unclipped_inverted_mask_exports_backdrop_and_filter() {
 #[test]
 fn opentype_features_export_as_css() {
     let mut d = Document::new(200.0, 200.0);
-    let st = CharStyle { features: vec!["-liga".into(), "dlig".into()], ..Default::default() };
+    // `salt=2`: an alternate by number, as PhotoCraft text layers carry them (P2-18).
+    let st = CharStyle { features: vec!["-liga".into(), "dlig".into(), "salt=2".into()], ..Default::default() };
     let n = Node::new(d.alloc_id(), NodeKind::Text(Box::new(TextObject::point(Point::new(10.0, 50.0), "office", st))));
     let l = d.layers[0].id;
     d.insert(Some(l), 0, n).unwrap();
     let s = export(&d, &ExportOptions::default());
-    assert!(s.contains("font-feature-settings:&quot;liga&quot; 0, &quot;dlig&quot; 1"), "{s}");
+    assert!(s.contains("font-feature-settings:&quot;liga&quot; 0, &quot;dlig&quot; 1, &quot;salt&quot; 2"), "{s}");
 }
 
 #[test]
