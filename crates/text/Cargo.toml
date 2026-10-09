@@ -10,6 +10,10 @@ publish = false
 [dependencies]
 astudio-geom = { path = "../geom" }
 astudio-vdoc = { path = "../vdoc" }
+# PSD text layers (task T1, `psd` module): PhotoCraft's text-layer model and PSD descriptors.
+astudio-doc = { path = "../doc" }
+astudio-psd = { path = "../psd" }
+astudio-color = { path = "../color" }
 kurbo = { workspace = true }
 skrifa = { workspace = true }
 harfrust = { workspace = true }
@@ -23,6 +27,8 @@ unicode-script = "0.5"
 write-fonts = { version = "0.48", optional = true }
 
 [features]
+# Real-file corpus tests (scripts/fetch-corpus.sh psd). A missing corpus fails.
+corpus = []
 # `astudio_text::test_fonts` for other crates' tests (dev-dependencies only).
 test-fonts = ["dep:write-fonts"]
 

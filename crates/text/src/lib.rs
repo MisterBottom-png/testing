@@ -21,6 +21,7 @@ mod features;
 mod fontdb;
 pub mod hyphen;
 mod layout;
+pub mod psd;
 mod shape;
 #[cfg(any(test, feature = "test-fonts"))]
 pub mod test_fonts;
