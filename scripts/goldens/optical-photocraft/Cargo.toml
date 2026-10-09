@@ -1,0 +1,11 @@
+[package]
+name = "optical-photocraft"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+# PhotoCraft's own skrifa (upstream/photocraft/crates/text/Cargo.toml).
+skrifa = "=0.44.0"
