@@ -509,6 +509,9 @@ pub enum FirstBaseline {
     Leading,
     /// Exactly `first_baseline_min` below the top.
     Fixed,
+    /// The tallest lowercase ascender (the top of 'd') touches the frame top: how Photoshop sets
+    /// paragraph text (PhotoCraft text layers, P2-18).
+    LowercaseAscender,
 }
 
 /// Text Wrap Options of a wrap object (Object → Text Wrap).

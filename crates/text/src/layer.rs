@@ -193,7 +193,10 @@ pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
     t.kind = kind;
     t.runs = runs;
     t.para = paragraphs.first().cloned().unwrap_or_default();
-    (t, LayoutOptions { paragraphs, ..LayoutOptions::default() })
+    // Paragraph text starts with the tallest lowercase ascender at the box top, as in PhotoCraft
+    // and Photoshop (P2-18).
+    let first_baseline = if matches!(layer.shape, TextShape::Box { .. }) { crate::FirstBaseline::LowercaseAscender } else { crate::FirstBaseline::Ascent };
+    (t, LayoutOptions { paragraphs, first_baseline, ..LayoutOptions::default() })
 }
 
 /// A glyph outline in text-space pixels with its style ([`LayerLayout::styles`]).

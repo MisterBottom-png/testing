@@ -79,6 +79,8 @@ pub struct FontFace {
     pub(crate) instance: Option<harfrust::ShaperInstance>,
     /// [`Self::ideographic_centre`], read once: layout asks for it per glyph.
     ideographic_centre: std::sync::OnceLock<f64>,
+    /// [`Self::lowercase_ascender`], read once.
+    lowercase_ascender: std::sync::OnceLock<f64>,
 }
 
 impl std::fmt::Debug for FontFace {
@@ -175,6 +177,18 @@ impl FontFace {
         *self.ideographic_centre.get_or_init(|| {
             let gid = ['国', 'あ', '一'].into_iter().map(|c| self.glyph_for(c)).find(|g| *g != 0);
             gid.and_then(|g| self.vertical_glyph(g)).map_or(0.38, |(advance, origin)| (origin - advance * 0.5) / self.upem)
+        })
+    }
+    /// Height of the lowercase ascender in font units: the top of 'd' (what Photoshop and
+    /// PhotoCraft put a paragraph box's first line under), else the cap height, else three
+    /// quarters of the ascent.
+    pub fn lowercase_ascender(&self) -> f64 {
+        *self.lowercase_ascender.get_or_init(|| {
+            let top = self.skrifa().and_then(|f| {
+                let g = f.charmap().map('d')?;
+                f.glyph_metrics(Size::unscaled(), self.location()).bounds(g).map(|b| f64::from(b.y_max))
+            });
+            top.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(if self.cap_height > 0.0 { self.cap_height } else { self.ascent * 0.75 })
         })
     }
     /// Glyph id for `c` (0 = .notdef).
@@ -886,6 +900,7 @@ fn make_face(bytes: FontBytes, index: u32, spec: FaceStyle, path: Option<std::pa
         index,
         path,
         ideographic_centre: std::sync::OnceLock::new(),
+        lowercase_ascender: std::sync::OnceLock::new(),
     })
 }
 
