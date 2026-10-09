@@ -374,7 +374,7 @@ mod tests {
         assert!(fits(Rect::new(-5, -5, 15_000, 15_000), &rgba8), "225 MP of 8-bit RGB draws in bands");
         assert!(!fits(Rect::new(0, 0, 16_384, 16_384), &cmyk32), "5 GiB of 32-bit CMYK tiles");
         assert!(!fits(Rect::new(0, 0, 85_000_000, 3), &rgba8), "a thin strip touching 330,000 tiles");
-        assert!(!fits(Rect::new(i32::MIN, 0, i32::MIN + 100_000_000, 2), &rgba8), "one row past the buffer limit");
+        assert!(!fits(Rect::new(i32::MIN, 0, i32::MIN + 100_000_000, 2), &rgba8), "a row past the buffer limit (its tiles already pass the surface limit)");
         assert!(!fits(Rect::new(i32::MIN, i32::MIN, i32::MAX, i32::MAX), &rgba8));
         assert!(!fits(Rect::new(0, 0, 0, 10), &rgba8) && !fits(Rect::new(5, 5, 4, 4), &rgba8));
     }
