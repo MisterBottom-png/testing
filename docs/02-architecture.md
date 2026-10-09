@@ -10,11 +10,11 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | --- | --- | --- | --- |
 | L0 | `astudio-geom` | vc `geom` + pc `geom` | Done (P2-01). Crate root = vc `geom` (kurbo-based paths); `pixel` = pc `geom` root (integer rects, tiles, pc's float `Point`/`Affine`); `warp` = pc `geom::warp`. `scripts/upstream-compat.sh` builds both upstream apps against it |
 | L0 | `astudio-color` | pc `color` + pc `cms` + vc `color` | P2-02. Crate root = pc `color` (runtime bit depth, colour modes, blend modes); `cms` = pc `cms`, the one colour engine (D8, `docs/13-colour-engine.md`); `vector` = vc `color` (colours that keep their model, gradients, swatches), its ICC work on `cms`. Still to do: merge the two blend-mode sets and the duplicated sRGB/Lab maths, make Coated CMYK the default for new documents (P3), move swatches to `astudio-vdoc` if it helps |
-| L0 | `astudio-raster` | pc `raster` | Copy-on-write 256-px tiles |
+| L0 | `astudio-raster` | pc `raster` | P2-16. Copy-on-write 256-px tiles |
 | L0 standalone | `astudio-psd`, `astudio-raw`, `astudio-tablet` | pc same names | P2-11 (psd, raw). No workspace deps; `tablet` keeps the only `unsafe` |
 | L0 | `astudio-codecs`, `astudio-heif` | pc same names | P2-11. Flat image formats; `codecs` uses `heif` (HEIC photos, no workspace deps of its own) behind its `heif` feature, a same-layer edge |
 | L1 | `astudio-vdoc` | vc `doc` | Vector node tree, appearance, symbols, swatches |
-| L1 | `astudio-doc` | pc `doc` + Vector layer | Layer stack; `LayerContent::Vector` holds an `astudio-vdoc` tree (vdoc before doc inside L1) |
+| L1 | `astudio-doc` | pc `doc` + Vector layer | P2-16 (pc `doc`: layer stack, text-layer model). `LayerContent::Vector` holding an `astudio-vdoc` tree joins in P3-01 (vdoc before doc inside L1) |
 | L2 | `astudio-text` | vc `text` + ports from pc `text` | See `06-text-engine.md` |
 | L2 | `astudio-plugins` | pc+vc `plugins` | One wasmi host; one plug-in ABI with filter and live-effect entry points. Needs only L0 and L1 crates; sits below `astudio-effects` inside L2 |
 | L2 | `astudio-pathops`, `astudio-trace`, `astudio-effects`, `astudio-vbrush` | vc `pathops`, `trace`, `effects`, `brush` | Inside L2, `effects` may use `plugins`, `pathops` and `text`; `trace` may use `pathops` (VectorCraft's order) |
