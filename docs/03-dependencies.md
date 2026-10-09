@@ -206,7 +206,9 @@ What this means as crates are ported:
   as in VectorCraft's lock file; the vector renderer (P2-14): `skrifa` 0.44 and `read-fonts` 0.41
   through `vello_cpu` 0.2, also as in VectorCraft's lock file; the importers (P2-15): `base64` 0.22
   and `imagesize` 0.14 (krilla 0.8), `harfrust` 0.12 (usvg 0.48). `hayro-jbig2` is held at 0.3.0, as
-  in VectorCraft's lock file (0.3.1 brings a second `fearless_simd` and `hayro-ccitt`).
+  in VectorCraft's lock file (0.3.1 brings a second `fearless_simd` and `hayro-ccitt`): don't let
+  `cargo update` move it (`cargo update -p hayro-jbig2 --precise 0.3.0` puts it back) until the
+  hayro crates line up again.
 - **Unmaintained, no vulnerability (P2-15):** `rustybuzz` and `ttf-parser` (RUSTSEC-2026-0206 and
   -0192) through krilla 0.8, the PDF writer; ignored in `deny.toml` with that reason until a krilla
   release moves off them.

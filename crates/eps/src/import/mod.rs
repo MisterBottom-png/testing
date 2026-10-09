@@ -162,22 +162,31 @@ const INTERP_STACK: usize = 64 << 20;
 
 /// Read an EPS or PostScript file (its first page).
 ///
-/// Off the web, the interpreter runs on a thread of its own with [`INTERP_STACK`] of stack, so a
-/// deeply nested program can't overflow the caller's (if the thread can't start, it runs here).
+/// The interpreter runs on a thread of its own with [`INTERP_STACK`] of stack, so a deeply nested
+/// program can't overflow the caller's; if the thread can't start, the file isn't read.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn import(bytes: &[u8]) -> Result<Imported, String> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let r = std::thread::scope(|s| {
-            let t = std::thread::Builder::new().name("eps-import".into()).stack_size(INTERP_STACK).spawn_scoped(s, || import_here(bytes));
-            t.map(|t| t.join())
-        });
-        match r {
-            Ok(Ok(r)) => return r,
-            // The interpreter panicked: report it as an error, as the engine's guard would.
-            Ok(Err(_)) => return Err("this PostScript file can't be read (an internal error)".into()),
-            Err(_) => {}
-        }
+    let r = std::thread::scope(|s| {
+        let t = std::thread::Builder::new().name("eps-import".into()).stack_size(INTERP_STACK).spawn_scoped(s, || import_here(bytes));
+        t.map(|t| t.join())
+    });
+    match r {
+        Ok(Ok(r)) => r,
+        // A panic is a bug: tests must see it fail, not pass as an error.
+        #[cfg(test)]
+        Ok(Err(p)) => std::panic::resume_unwind(p),
+        // The interpreter panicked: report it as an error, as the engine's guard would.
+        #[cfg(not(test))]
+        Ok(Err(_)) => Err("this PostScript file can't be read (an internal error)".into()),
+        // No thread (out of memory or threads): reading on the caller's stack could overflow it.
+        Err(_) => Err("this PostScript file can't be read now: not enough memory to start reading it".into()),
     }
+}
+
+/// Read an EPS or PostScript file (its first page). On the web the interpreter runs on the
+/// caller's stack (its depth there: P3-07).
+#[cfg(target_arch = "wasm32")]
+pub fn import(bytes: &[u8]) -> Result<Imported, String> {
     import_here(bytes)
 }
 
