@@ -171,16 +171,35 @@ The licence column is the licence each crate is published under as far as I know
 
 ### Version conflicts to settle in the merge
 
-| Crate | PhotoCraft | VectorCraft | Pick |
-| --- | --- | --- | --- |
-| `base64` | 0.22.1 | 0.22.1 0.23.1 | 0.22 (both use it) |
-| `harfrust` | 0.12.0 | 0.12.0 0.13.3 | 0.13 (VectorCraft text engine) |
-| `muda` | 0.21.1 | 0.21.0 | 0.21.1 |
-| `skrifa` | 0.44.0 | 0.42.1 0.44.0 0.47.0 | 0.47 |
-| `svgtypes` | 0.15.3 | 0.15.3 0.16.1 | 0.16 |
-| `usvg` | 0.45.1 | 0.45.1 0.48.1 | 0.48 |
-| `vello_common` | 0.1.0 | 0.1.0 0.2.0 | 0.2 |
-| `vello_cpu` | 0.1.0 | 0.1.0 0.2.0 | 0.2 |
+Settled in P2-03 (9 October 2026). The picks are pinned once in the root `Cargo.toml`
+(`[workspace.dependencies]`); every ported crate takes them. `deny.toml` sets
+`multiple-versions = "deny"`, so CI fails on any second version of a crate unless `deny.toml`'s
+`skip` list names it with the reason.
+
+| Crate | PhotoCraft | VectorCraft | Pick | Old versions come from |
+| --- | --- | --- | --- | --- |
+| `base64` | 0.22.1 | 0.22.1 0.23.1 | 0.22 | 0.23 only through usvg 0.48 (VectorCraft SVG) |
+| `harfrust` | 0.12.0 | 0.12.0 0.13.3 | 0.13 (VectorCraft text engine) | 0.12 through egui 0.36's `epaint` |
+| `muda` | 0.21.1 | 0.21.0 | =0.21.1 | — |
+| `skrifa` | 0.44.0 | 0.42.1 0.44.0 0.47.0 | 0.47 | 0.44 through `epaint` and PhotoCraft text (ported onto 0.47 in P2-04 to P2-08); 0.42 through the PDF crates `krilla` 0.8, `hayro-interpret` 0.7 and `subsetter` 0.2 |
+| `svgtypes` | 0.15.3 | 0.15.3 0.16.1 | 0.16 | 0.15 through `resvg` 0.45 |
+| `usvg` | 0.45.1 | 0.45.1 0.48.1 | 0.48 | 0.45 through `resvg` 0.45 (VectorCraft `svg` and egui's SVG loader) |
+| `vello_common` | 0.1.0 | 0.1.0 0.2.0 | 0.2 | 0.1 through `epaint` |
+| `vello_cpu` | 0.1.0 | 0.1.0 0.2.0 | 0.2 | 0.1 through `epaint` |
+| `read-fonts`, `font-types`, `glifo`, `imagesize`, `roxmltree`, `tiny-skia-path`, `itertools`, `cpufeatures`, `fax` | | | not named directly | pulled in by the crates above (font stack, resvg 0.45, krilla) |
+
+What this means as crates are ported:
+
+- **Avoidable duplicates** (an A-Studio crate naming another version) are refused by CI. PhotoCraft's
+  text moves from skrifa 0.44 to 0.47 when it is ported onto VectorCraft's engine (D3).
+- **Expected, for now unavoidable** (forced by crates outside A-Studio), to be added to `deny.toml`'s
+  `skip` list with their reason when the crate that brings them is ported:
+  egui 0.36 / `epaint` (harfrust 0.12, skrifa 0.44, vello 0.1; L6 UI only), the PDF stack
+  (skrifa 0.42 and its font crates), `resvg` 0.45 (usvg/svgtypes 0.45/0.15; VectorCraft's `svg`
+  names resvg 0.45 next to usvg 0.48: check at the P2-11 port whether resvg 0.48 can replace it).
+  Look again at each upstream sync: newer egui, krilla and resvg releases may remove them.
+- **Test-only today:** `getrandom` 0.3 and 0.4, `r-efi` 5 and 6 (both through proptest), `syn` 2 and 3
+  (zerocopy-derive through proptest; serde and thiserror use syn 3).
 
 Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 

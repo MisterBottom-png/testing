@@ -51,6 +51,16 @@ thiserror = "2"
 proptest = "1"
 rayon = "1"
 moxcms = "0.8"
+# P2-03: one version of each crate the two upstream apps pinned differently (docs/03-dependencies.md
+# "Version conflicts"). Ported crates take these; a second version only with a reason in deny.toml.
+base64 = "0.22"
+harfrust = "0.13"
+skrifa = "0.47"
+svgtypes = "0.16"
+usvg = "0.48"
+vello_common = { version = "0.2", default-features = false }
+vello_cpu = "0.2"
+muda = { version = "=0.21.1", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
