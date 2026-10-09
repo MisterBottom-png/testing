@@ -65,7 +65,7 @@ shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
 status=0
 for app in photocraft vectorcraft; do
   dir="$out/$app"
-  echo "== $app $(git -C "upstream/$app" rev-parse --short HEAD) against astudio-geom and astudio-color"
+  echo "== $app $(git -C "upstream/$app" rev-parse --short HEAD) against the A-Studio crates"
   # The upstream Cargo.lock is kept, so every other dependency stays at its pinned version.
   if ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo check --workspace --all-targets --quiet ) \
     && ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo build -p "$app" --quiet ); then
