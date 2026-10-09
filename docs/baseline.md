@@ -77,3 +77,19 @@ GitHub Actions `windows-latest`, run 37825571138 (`.github/workflows/p1-measure.
 Target (under 100 ms) met on Windows too. A whole-layer change costs about 1.1 s there
 (first render plus full composite on 2 threads).
 
+
+## PSD text round trip (task P2-05)
+
+Measured 9 October 2026 on Linux (dev machine) over `corpus/psd` (170 files at PhotoCraft's pins,
+`scripts/fetch-corpus.sh psd`): 21 text layers in 10 files.
+
+| Run | Text layers that round-trip exactly (text, character runs, paragraph runs, shape) |
+| --- | --- |
+| PhotoCraft e5e3e39, `cargo test -p photocraft-io --features corpus --test text_corpus` | 21 of 21 (its geometry check: 21 of 21 within tolerance) |
+| A-Studio, `cargo test -p astudio-text --features corpus --test psd_corpus` | 21 of 21 (the test's floor) |
+
+Both read each layer's `TySh`, keep it as `psd_raw` (as PSD import does) and write it back through
+`build_tysh`. Without `psd_raw`, 10 layers (all in psd-tools `layer_effects.psd`) lose the
+"no automatic kerning" mode of their last character, which EngineData has no slot for; PhotoCraft's
+`psd_round_trips_manual_kerning` test documents the same limit. PhotoCraft's geometry check
+(re-rendering against Photoshop's pixels) joins A-Studio with text rendering in P2-08.

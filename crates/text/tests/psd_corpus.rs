@@ -37,7 +37,7 @@ fn dpi(file: &PsdFile) -> f32 {
 }
 
 /// Text layers that round-trip exactly with PhotoCraft's own code (measured, see docs/baseline.md).
-const EXACT_FLOOR: usize = 0;
+const EXACT_FLOOR: usize = 21;
 
 #[test]
 fn corpus_text_layers_round_trip() {
@@ -68,6 +68,9 @@ fn corpus_text_layers_round_trip() {
             if let Some(txt2) = &txt2 {
                 psd::apply_txt2(&mut t, &block.data, txt2);
             }
+            // As PhotoCraft's PSD import does: the original block is kept, and writing patches it,
+            // so Photoshop-only settings survive.
+            t.psd_raw = Some(std::sync::Arc::new(block.data.clone()));
             assert!(!t.runs.is_empty(), "{name}/{layer}: no style runs parsed");
             assert_eq!(t.runs.iter().map(|r| r.len).sum::<usize>().min(t.text.len()), t.text.len(), "{name}/{layer}: runs cover text");
             let st = &t.runs[0].style;
