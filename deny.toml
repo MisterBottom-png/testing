@@ -12,11 +12,18 @@ allow = [
 confidence-threshold = 0.9
 
 [bans]
-multiple-versions = "warn"
+# P2-03: one version of every crate (docs/03-dependencies.md). A second version is allowed only
+# when a crate outside A-Studio forces it, listed in `skip` below with the reason.
+multiple-versions = "deny"
 wildcards = "deny"
 # Path dependencies between A-Studio's own unpublished crates carry no version; that is not a
 # wildcard on crates.io. Approved by the owner on 8 October 2026.
 allow-wildcard-paths = true
+skip = [
+  # Test-only: proptest's rand 0.9 uses getrandom 0.3, its tempfile uses getrandom 0.4.
+  { crate = "getrandom@0.3.4", reason = "proptest (rand_core 0.9), tests only" },
+  { crate = "r-efi@5", reason = "getrandom 0.3 (proptest), tests only" },
+]
 
 [advisories]
 yanked = "deny"
