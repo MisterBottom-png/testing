@@ -27,6 +27,8 @@ jobs:
           repository: storytold/craft-fonts
           ref: 8dcdacd5153e64560d109541a47d806f26f048c0
           path: craft-fonts
+      # astudio-gpu's GPU tests (CPU and GPU compositors agree, P2-19) run on whatever adapter wgpu
+      # finds, a software one included, and print "skipping" when there is none, as upstream.
       - run: cargo test --workspace
       # Only the text crate with the fonts embedded: every test binary of the workspace would
       # carry them (about 40 MB each).

@@ -21,17 +21,16 @@ pub use crate::layer::FAUX_ITALIC_DEG;
 pub const FAUX_BOLD_RADIUS: f32 = 0.018;
 /// Largest raster we produce (pixels), as a guard against absurd sizes.
 const MAX_PIXELS: u64 = 256 * 1024 * 1024;
-/// Most memory the rasterizer's working buffer (premultiplied `f32` samples) may take: a text
-/// layer of absurd size is skipped rather than allocating gigabytes (P2-08 review, P2-18). 1 GiB
-/// holds a CMYK layer of 53 megapixels, an RGB one of 67.
+/// Most memory the rasterizer's working buffers (premultiplied `f32` samples and coverage) take at
+/// once (P2-08 review, P2-18). A layer whose buffers would be larger is drawn in horizontal bands
+/// (P2-19); 1 GiB holds a whole CMYK layer of 44 megapixels, an RGB one of 53.
 const MAX_BUFFER_BYTES: u64 = 1 << 30;
 
-/// The working buffer of a `w` × `h` raster with `stride` samples a pixel fits in
-/// [`MAX_BUFFER_BYTES`] (and in [`MAX_PIXELS`]).
-fn buffer_fits(w: usize, h: usize, stride: usize) -> bool {
-    let pixels = (w as u64).checked_mul(h as u64);
-    pixels.is_some_and(|p| p <= MAX_PIXELS)
-        && pixels.and_then(|p| p.checked_mul(stride as u64)).and_then(|s| s.checked_mul(4)).is_some_and(|b| b <= MAX_BUFFER_BYTES)
+/// Rows a band of a `w` × `h` raster with `stride` samples a pixel may have so that its working
+/// buffers (samples plus coverage, `f32` each) stay within `budget` bytes; at least one row.
+fn band_rows(w: usize, h: usize, stride: usize, budget: u64) -> usize {
+    let row_bytes = (w as u64).saturating_mul(stride as u64 + 1).saturating_mul(4).max(1);
+    usize::try_from(budget / row_bytes).unwrap_or(h).clamp(1, h.max(1))
 }
 
 /// Rendered text: pixels in document space plus the covered rectangle.
@@ -159,30 +158,73 @@ pub fn rasterize(layout: &LayerLayout, transform: &Affine, format: PixelFormat, 
 
 /// [`rasterize`] with the glyph outlines bent by `warp` (Type › Warp Text).
 pub fn rasterize_warped(layout: &LayerLayout, transform: &Affine, format: PixelFormat, antialias: AntiAlias, warp: Option<&Warp>) -> Rendered {
+    rasterize_in_bands(layout, transform, format, antialias, warp, MAX_BUFFER_BYTES)
+}
+
+/// [`rasterize_warped`], drawing the ink rectangle in horizontal bands whose working buffers
+/// (accumulation and coverage) take at most about `budget` bytes, so a very large text layer draws
+/// rather than coming back empty (P2-18 review, P2-19). The output surface is capped by
+/// [`MAX_PIXELS`].
+pub(crate) fn rasterize_in_bands(
+    layout: &LayerLayout,
+    transform: &Affine,
+    format: PixelFormat,
+    antialias: AntiAlias,
+    warp: Option<&Warp>,
+    budget: u64,
+) -> Rendered {
     let format = PixelFormat { alpha: true, ..format };
     let rect = ink_rect_warped(layout, transform, warp);
     let (w, h) = (rect.width() as usize, rect.height() as usize);
     let mut surface = Surface::new(format);
     let n = format.mode.color_channels();
     let stride = n + 1;
-    if w == 0 || h == 0 || !buffer_fits(w, h, stride) {
+    if w == 0 || h == 0 || (w as u64).saturating_mul(h as u64) > MAX_PIXELS {
         return Rendered { surface, rect: Rect::new(0, 0, 0, 0) };
     }
-    // Premultiplied accumulation.
-    let mut acc = vec![0.0f32; w * h * stride];
-    // Negated as f64: `-rect.x0` overflows for an ink rectangle at `i32::MIN` (P2-08 review).
-    let xf = Xform([1.0, 0.0, 0.0, 1.0, -f64::from(rect.x0), -f64::from(rect.y0)]).mul(&Xform(transform.m));
+    let band_rows = band_rows(w, h, stride, budget);
     let mut colors: Vec<Color> = Vec::new();
     for st in &layout.styles {
         if !colors.contains(&st.color) {
             colors.push(st.color);
         }
     }
-    for c in &colors {
+    let mut top = 0usize;
+    while top < h {
+        let bh = band_rows.min(h - top);
+        let y0 = rect.y0.saturating_add(i32::try_from(top).unwrap_or(i32::MAX));
+        let band = Rect::new(rect.x0, y0, rect.x1, y0.saturating_add(i32::try_from(bh).unwrap_or(i32::MAX)));
+        draw_band(layout, transform, &format, antialias, warp, &colors, band, &mut surface);
+        top += bh;
+    }
+    surface.prune();
+    Rendered { surface, rect }
+}
+
+/// Draws the part of `layout` inside `band` into `surface`.
+#[allow(clippy::too_many_arguments)]
+fn draw_band(
+    layout: &LayerLayout,
+    transform: &Affine,
+    format: &PixelFormat,
+    antialias: AntiAlias,
+    warp: Option<&Warp>,
+    colors: &[Color],
+    band: Rect,
+    surface: &mut Surface,
+) {
+    let (w, h) = (band.width() as usize, band.height() as usize);
+    let n = format.mode.color_channels();
+    let stride = n + 1;
+    // Premultiplied accumulation.
+    let mut acc = vec![0.0f32; w * h * stride];
+    // Negated as f64: `-rect.x0` overflows for an ink rectangle at `i32::MIN` (P2-08 review).
+    let xf = Xform([1.0, 0.0, 0.0, 1.0, -f64::from(band.x0), -f64::from(band.y0)]).mul(&Xform(transform.m));
+    for c in colors {
         let mut cov = Coverage::new(w, h);
         draw(layout, &xf, &mut cov, Some(c), warp);
         let cov = cov.finish();
-        let comps = color_in(&format, c);
+        let comps = color_in(format, c);
         let a = c.alpha.clamp(0.0, 1.0);
         for (i, &cv) in cov.iter().enumerate() {
             let cv = if antialias == AntiAlias::None { if cv >= 0.5 { 1.0 } else { 0.0 } } else { cv };
@@ -207,9 +249,7 @@ pub fn rasterize_warped(layout: &LayerLayout, transform: &Affine, format: PixelF
             }
         }
     }
-    surface.write_region(rect, &acc);
-    surface.prune();
-    Rendered { surface, rect }
+    surface.write_region(band, &acc);
 }
 
 /// One element of a glyph outline in document space (see [`outlines`]).
@@ -269,17 +309,18 @@ pub fn render_layer(db: &FontDb, layer: &TextLayer, dpi: f32, format: PixelForma
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_BUFFER_BYTES, MAX_PIXELS, buffer_fits, rect_from_bounds};
+    use super::{MAX_BUFFER_BYTES, MAX_PIXELS, band_rows, rect_from_bounds};
 
-    /// A huge ink rectangle is refused before its buffer is allocated (P2-08 review: the pixel cap
-    /// alone allowed 4 GB); a large but sane one passes.
+    /// The memory rule for one band (P2-08 review: the pixel cap alone allowed 4 GB; P2-19: layers
+    /// past it are drawn in bands, `render_tests::bands_draw_the_same_pixels`).
     #[test]
-    fn buffers_are_capped_by_memory() {
-        assert!(buffer_fits(6000, 4000, 4));
-        assert!(!buffer_fits(16_000, 16_000, 4), "1 GB of RGB samples");
-        assert!(!buffer_fits(usize::MAX, 2, 4));
-        let side = ((MAX_BUFFER_BYTES / 20) as f64).sqrt() as usize;
-        assert!(buffer_fits(side, side, 5) && !buffer_fits(side + 64, side + 64, 5));
+    fn bands_are_capped_by_memory() {
+        assert_eq!(band_rows(6000, 4000, 4, MAX_BUFFER_BYTES), 4000, "24 MP RGB in one band");
+        let rows = band_rows(16_000, 16_000, 4, MAX_BUFFER_BYTES);
+        assert!(rows < 16_000 && 16_000 * rows as u64 * 5 * 4 <= MAX_BUFFER_BYTES, "{rows}");
+        assert_eq!(band_rows(usize::MAX, 2, 4, MAX_BUFFER_BYTES), 1, "at least one row");
+        assert_eq!(band_rows(10, 0, 4, MAX_BUFFER_BYTES), 1);
+        assert_eq!(band_rows(10, 7, 4, 0), 1);
     }
     use astudio_geom::pixel::Rect;
 

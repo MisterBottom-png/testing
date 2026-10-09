@@ -17,6 +17,7 @@ members = [
     "crates/vbrush",
     "crates/effects",
     "crates/paint",
+    "crates/vector",
     "crates/algo",
     "crates/trace",
     "crates/compose",

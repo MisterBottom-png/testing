@@ -236,3 +236,41 @@ fn empty_text_renders_nothing() {
     let (l, _) = e.render(&point("a\n\nb", 12.0), 72.0, PixelFormat::RGBA8);
     assert_eq!(l.lines.len(), 3, "an empty line is a line");
 }
+
+/// A layer drawn in many bands has the pixels of one drawn whole (P2-19: layers whose working
+/// buffers pass 1 GiB are drawn in bands instead of coming back empty). Rotated, multicolour and
+/// faux-bold, so glyphs and the bold dilation straddle band edges. Each band shifts the outline's
+/// coordinates, which moves the last float bits of coverage; so premultiplied samples are compared,
+/// within a rounding step (largest float difference seen: 1.2e-4; colour at near-zero coverage
+/// carries no meaning).
+#[test]
+fn bands_draw_the_same_pixels() {
+    use crate::render::rasterize_in_bands;
+    let mut t = styled("Banded ink\nsecond line", CharStyle::default());
+    t.runs = vec![
+        TextRun { len: 7, style: CharStyle { font_family: "Inter".into(), size_pt: 40.0, faux_bold: true, ..Default::default() } },
+        TextRun {
+            len: t.text.len() - 7,
+            style: CharStyle { font_family: "Inter".into(), size_pt: 40.0, color: Color::rgb(0.9, 0.1, 0.2), ..Default::default() },
+        },
+    ];
+    t.transform = Affine::translate(30.0, 80.0).mul(&Affine::rotate(0.3));
+    let layout = crate::layer::layout_layer(db(), &t, 72.0);
+    for (fmt, tol) in [(PixelFormat::RGBA8, 1.5 / 255.0), (PixelFormat { sample: SampleType::F32, ..PixelFormat::RGBA8 }, 1e-3)] {
+        let whole = rasterize_in_bands(&layout, &t.transform, fmt, t.antialias, None, u64::MAX);
+        assert!(whole.rect.height() > 40, "{:?}", whole.rect);
+        let want = whole.surface.read_region(whole.rect);
+        assert!(alpha_sum(&whole.surface, whole.rect) > 1000.0);
+        // One row, then seven rows, a band.
+        for budget in [1, 7 * whole.rect.width() as u64 * 5 * 4] {
+            let banded = rasterize_in_bands(&layout, &t.transform, fmt, t.antialias, None, budget);
+            assert_eq!(banded.rect, whole.rect);
+            let got = banded.surface.read_region(whole.rect);
+            assert_eq!(got.len(), want.len());
+            for (i, (p, q)) in got.as_chunks::<4>().0.iter().zip(want.as_chunks::<4>().0).enumerate() {
+                let close = (p[3] - q[3]).abs() <= tol && (0..3).all(|c| (p[c] * p[3] - q[c] * q[3]).abs() <= tol);
+                assert!(close, "pixel {i}, budget {budget}, {fmt:?}: {p:?} vs {q:?}");
+            }
+        }
+    }
+}

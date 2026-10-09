@@ -8,10 +8,23 @@ license.workspace = true
 publish = false
 
 [dependencies]
+half = "2"
 astudio-geom = { path = "../geom" }
 astudio-color = { path = "../color" }
 astudio-raster = { path = "../raster" }
 astudio-doc = { path = "../doc" }
+astudio-compose = { path = "../compose" }
+# Same major version as eframe's wgpu so the app's device can be shared.
+wgpu = { version = "30", default-features = false, features = ["std", "wgsl"] }
+log = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = { workspace = true }
+
+[dev-dependencies]
+wgpu = { version = "30" }
+pollster = "1"
+astudio-vector = { path = "../vector" }
 
 [lints]
 workspace = true
