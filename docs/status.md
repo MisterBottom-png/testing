@@ -4,17 +4,15 @@
 
 ## Start of the next session
 
-1. Check out branch `ccr-bdfb1782-6gges2` of `MisterBottom-png/testing` (it holds all of this work on
-   top of `a-studio`), or `a-studio` once the owner has merged it there. Then run `scripts/bootstrap.sh`.
+1. Check out branch `a-studio` of `MisterBottom-png/testing`, then run `scripts/bootstrap.sh`.
 2. Check that `/next-task` and the agents (`rule-reviewer`, `upstream-scout`, `clean-room-auditor`) are
    listed.
 3. Next task: see the end of this file.
 
 ## Where the work lives
 
-- Git: this session worked on branch `ccr-bdfb1782-6gges2` (the session's branch), which started from
-  `a-studio` and carries every merge below. `a-studio` itself has not moved yet: merge
-  `ccr-bdfb1782-6gges2` into it (a fast-forward) when the owner agrees.
+- Git: this session worked on branch `ccr-bdfb1782-6gges2` (the session's branch); the owner had it
+  fast-forwarded into `a-studio` on 9 October 2026, so both hold the same history.
 - Task branches were merged into the session branch with `--no-ff`; none is left unfinished.
 - CI (`.github/workflows/ci.yml`) runs on Windows on every push.
 
@@ -35,7 +33,6 @@
 
 ## Questions for the owner
 
-- Merge `ccr-bdfb1782-6gges2` into `a-studio`?
 - Decided: renaming upstream names in colour profile names waits for the P3 rebrand (task P3-06).
 - Open for later: the final app icon and the app id (placeholder `io.github.a-studio.astudio`);
   whether the web build stays (D7 left it unchanged).
