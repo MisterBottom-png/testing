@@ -25,7 +25,9 @@ pixel-and-vector editor. Read `docs/00-decisions.md` and `docs/02-architecture.m
   AGPL code (Krita, GIMP, Inkscape, lib2geom). Ideas from them are fine; code is not.
 - **No ArtCraft marks** in shipped files (`scripts/rebrand-scan.sh --shipped`). Plain-text credit only.
 - **Assets.** Every new file under `assets/` gets a row in `ASSETS.md` in the same commit, with its
-  licence text beside it. Fonts never go in this repo; they come from `CRAFT_FONTS_DIR`.
+  licence text beside it. The small bundled UI fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4; SIL OFL, owner
+  approved 9 October 2026) live in `assets/fonts` with their OFL texts; the large CJK and Arabic
+  fonts never go in this repo: they come from `CRAFT_FONTS_DIR`.
 - **Upstream code.** When you port a file, keep its licence header and note the upstream path and
   commit in the commit message (`ported from photocraft@e5e3e39 crates/doc/src/lib.rs`).
 
