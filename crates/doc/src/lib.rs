@@ -147,7 +147,10 @@ impl LayerMask {
     /// Effective mask values over `r` (row-major) into `out`, including
     /// density; all ones when disabled.
     pub fn values_into(&self, r: Rect, out: &mut Vec<f32>) {
-        let n = r.width() as usize * r.height() as usize;
+        let Some(n) = astudio_raster::region_len(r, 1) else {
+            out.clear();
+            return;
+        };
         if !self.enabled {
             out.clear();
             out.resize(n, 1.0);

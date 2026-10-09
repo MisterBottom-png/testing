@@ -1,6 +1,6 @@
 [package]
 name = "astudio-doc"
-description = "A-Studio: Layer stack; LayerContent::Vector holds a vdoc tree"
+description = "A-Studio: Pixel document model: layer stack, layer kinds, styles (Vector layers join in P3-01)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

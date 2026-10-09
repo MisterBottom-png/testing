@@ -236,7 +236,8 @@ impl Surface {
         let n = self.channels();
         let w = r.width() as usize;
         out.clear();
-        out.resize(w * r.height() as usize * n, 0.0);
+        let Some(len) = region_len(r, n) else { return };
+        out.resize(len, 0.0);
         let dp = self.default_pixel();
         for tc in r.tiles() {
             let tr = tc.rect().intersect(&r);
@@ -268,7 +269,10 @@ impl Surface {
     /// directly; missing tiles are filled with the default pixel.
     pub fn read_rgba_into(&self, r: Rect, out: &mut [[f32; 4]]) {
         let w = r.width() as usize;
-        debug_assert_eq!(out.len(), w * r.height() as usize);
+        // A buffer that does not fit `r` is left untouched (it would be indexed out of range).
+        if region_len(r, 1) != Some(out.len()) {
+            return;
+        }
         let fmt = self.format;
         let n = fmt.channels();
         let dp = to_rgba(&fmt, &self.default_pixel());
@@ -315,7 +319,10 @@ impl Surface {
     /// directly; other formats convert through [`Surface::read_rgba_into`] one tile row at a time.
     pub fn read_rgba8_into(&self, r: Rect, out: &mut [[u8; 4]]) {
         let w = r.width() as usize;
-        debug_assert_eq!(out.len(), w * r.height() as usize);
+        // A buffer that does not fit `r` is left untouched (it would be indexed out of range).
+        if region_len(r, 1) != Some(out.len()) {
+            return;
+        }
         let fmt = self.format;
         let rgba8 = matches!((fmt.mode, fmt.sample, fmt.alpha), (ColorMode::Rgb, SampleType::U8, true));
         let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
@@ -359,7 +366,9 @@ impl Surface {
     pub fn read_region(&self, r: Rect) -> Vec<f32> {
         let n = self.channels();
         let w = r.width() as usize;
-        let mut out = vec![0.0f32; w * r.height() as usize * n];
+        // A region too large to address reads as empty.
+        let Some(len) = region_len(r, n) else { return Vec::new() };
+        let mut out = vec![0.0f32; len];
         let dp = self.default_pixel();
         for tc in r.tiles() {
             let tr = tc.rect().intersect(&r);
@@ -382,11 +391,14 @@ impl Surface {
         out
     }
 
-    /// Write interleaved normalised floats into a rectangle.
+    /// Write interleaved normalised floats into a rectangle. Data whose length does not match
+    /// `r` (a truncated buffer from a file, say) writes nothing.
     pub fn write_region(&mut self, r: Rect, data: &[f32]) {
         let n = self.channels();
         let w = r.width() as usize;
-        assert_eq!(data.len(), w * r.height() as usize * n, "region data length mismatch");
+        if region_len(r, n) != Some(data.len()) {
+            return;
+        }
         let sample = self.format.sample;
         for tc in r.tiles() {
             let tr = tc.rect().intersect(&r);
@@ -465,11 +477,14 @@ impl Surface {
         s
     }
 
-    /// Write interleaved encoded bytes (same format as the surface) into `r`.
+    /// Write interleaved encoded bytes (same format as the surface) into `r`. Bytes whose length
+    /// does not match `r` (a truncated buffer from a file, say) write nothing.
     pub fn write_interleaved(&mut self, r: Rect, bytes: &[u8]) {
         let bpp = self.format.bytes_per_pixel();
         let w = r.width() as usize;
-        assert_eq!(bytes.len(), w * r.height() as usize * bpp, "interleaved length mismatch");
+        if region_len(r, bpp) != Some(bytes.len()) {
+            return;
+        }
         for tc in r.tiles() {
             let tr = tc.rect().intersect(&r);
             let t = self.tile_mut(tc);
@@ -486,7 +501,9 @@ impl Surface {
     pub fn to_interleaved(&self, r: Rect) -> Vec<u8> {
         let bpp = self.format.bytes_per_pixel();
         let w = r.width() as usize;
-        let mut out = vec![0u8; w * r.height() as usize * bpp];
+        // A region too large to address reads as empty.
+        let Some(len) = region_len(r, bpp) else { return Vec::new() };
+        let mut out = vec![0u8; len];
         for tc in r.tiles() {
             let tr = tc.rect().intersect(&r);
             let span = tr.width() as usize * bpp;
@@ -632,9 +649,19 @@ pub struct Rgba8Image {
 }
 
 impl Rgba8Image {
+    /// An all-transparent image; one too large to address is empty (0 x 0).
     pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height, pixels: vec![0; width as usize * height as usize * 4] }
+        match (width as usize).checked_mul(height as usize).and_then(|n| n.checked_mul(4)) {
+            Some(len) => Self { width, height, pixels: vec![0; len] },
+            None => Self { width: 0, height: 0, pixels: Vec::new() },
+        }
     }
+}
+
+/// Number of values for `r` at `per_pixel` values each, `None` when it does not fit in `usize`
+/// (32-bit on the web, so a large document can overflow there).
+pub fn region_len(r: Rect, per_pixel: usize) -> Option<usize> {
+    (r.width() as usize).checked_mul(r.height() as usize)?.checked_mul(per_pixel)
 }
 
 /// Is this sample type able to hold values above 1.0 (HDR)?
@@ -647,6 +674,39 @@ mod tests {
     use super::*;
     use astudio_color::PixelFormat;
     use proptest::prelude::*;
+
+    /// P2-16 review: buffers of the wrong length used to stop the program (`assert_eq!` in
+    /// write_region and write_interleaved, out-of-range indexing in the read_rgba*_into fast
+    /// paths). A decoder handing over a truncated buffer now writes nothing instead.
+    #[test]
+    fn wrong_length_buffers_are_ignored() {
+        let r = Rect::new(0, 0, 4, 4);
+        let mut s = Surface::new(PixelFormat::RGBA8);
+        s.write_region(r, &[1.0; 7]);
+        s.write_interleaved(r, &[255; 7]);
+        let _ = Surface::from_interleaved(PixelFormat::RGBA8, r, &[0; 3]);
+        assert_eq!(s.tile_count(), 0, "nothing was written");
+        let mut short = vec![[0.0f32; 4]; 3];
+        s.read_rgba_into(r, &mut short);
+        let mut short8 = vec![[0u8; 4]; 3];
+        s.read_rgba8_into(r, &mut short8);
+    }
+
+    /// P2-16 review: `w * h * channels` overflowed (a panic in debug builds, a too-small buffer
+    /// and then a panic in release); on the web `usize` is 32-bit, so a large document reached it.
+    #[test]
+    fn regions_too_large_to_address_are_empty() {
+        let huge = Rect::new(i32::MIN, i32::MIN, i32::MAX, i32::MAX);
+        assert_eq!(region_len(huge, 4), None);
+        let s = Surface::new(PixelFormat::RGBA8);
+        assert!(s.read_region(huge).is_empty());
+        assert!(s.to_interleaved(huge).is_empty());
+        let mut out = vec![1.0];
+        s.read_region_into(huge, &mut out);
+        assert!(out.is_empty());
+        let img = Rgba8Image::new(u32::MAX, u32::MAX);
+        assert_eq!((img.width, img.height, img.pixels.len()), (0, 0, 0));
+    }
 
     #[test]
     fn from_rgba_into_matches_from_rgba() {
