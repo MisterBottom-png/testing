@@ -14,6 +14,7 @@ astudio-vdoc = { path = "../vdoc" }
 astudio-doc = { path = "../doc" }
 astudio-psd = { path = "../psd" }
 astudio-color = { path = "../color" }
+astudio-raster = { path = "../raster" }
 kurbo = { workspace = true }
 skrifa = { workspace = true }
 harfrust = { workspace = true }

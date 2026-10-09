@@ -358,6 +358,21 @@ fn rows_and_columns_flow_in_order() {
     }
 }
 
+/// Per-paragraph styles through LayoutOptions (P2-08, PhotoCraft text layers): each paragraph
+/// takes its own alignment; without them both follow the object's style.
+#[test]
+fn paragraph_styles_apply_per_paragraph() {
+    let t = area("Left side\nRight side", style(12.0), Rect::new(0.0, 0.0, 400.0, 100.0), Justify::Left);
+    let plain = layout_with(db(), &t, &LayoutOptions::default());
+    assert!(plain.lines.iter().all(|l| l.x0 < 1.0), "both lines start at the left");
+    let right = astudio_vdoc::ParaStyle { justify: Justify::Right, ..t.para.clone() };
+    let opts = LayoutOptions { paragraphs: vec![t.para.clone(), right], ..Default::default() };
+    let l = layout_with(db(), &t, &opts);
+    assert_eq!(l.lines.len(), 2);
+    assert!(l.lines[0].x0 < 1.0, "first paragraph stays left: {}", l.lines[0].x0);
+    assert!(l.lines[1].x1 > 399.0 && l.lines[1].x0 > 200.0, "second paragraph sits right: {}..{}", l.lines[1].x0, l.lines[1].x1);
+}
+
 /// Area-type rows and columns come from the file: a damaged one asking for a million of each used
 /// to make layout allocate about 100 TB and abort the app (P2-04 review). They are capped at the
 /// Area Type Options command's 100.
@@ -424,4 +439,23 @@ fn layout_10k_area_text_is_fast() {
     eprintln!("layout of 10k chars (justified, hyphenated): {per:.3} ms");
     let budget = if cfg!(debug_assertions) { 400.0 } else { 10.0 };
     assert!(per < budget, "{per} ms");
+}
+
+/// P2-08 review: area frames with NaN edges or placed around 1e30 (damaged files) made the line
+/// placement loop forever: a NaN bottom is never passed, and at 1e30 a line spacing does not move
+/// the baseline. They now overflow like a full frame.
+#[test]
+fn damaged_area_frames_finish() {
+    for frame in [
+        Rect::new(f64::NAN, 0.0, f64::NAN, 1.0),
+        Rect::new(f64::NAN, 1e30, f64::NAN, 1e30 + 1.0),
+        Rect::new(0.0, f64::NAN, 100.0, f64::NAN),
+        Rect::new(0.0, 1e30, 100.0, 1e30 + 50.0),
+        Rect::new(0.0, -1e30, 100.0, 1e30),
+    ] {
+        for text in ["", "Hello wrapped words", "a\nb\nc"] {
+            let t = area(text, style(12.0), frame, Justify::Left);
+            let _ = layout_with(db(), &t, &LayoutOptions::default());
+        }
+    }
 }

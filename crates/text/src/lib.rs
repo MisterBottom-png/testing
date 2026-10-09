@@ -20,9 +20,14 @@ pub mod embed;
 mod features;
 mod fontdb;
 pub mod hyphen;
+pub mod layer;
 mod layout;
 pub mod optical;
 pub mod psd;
+pub mod raster;
+pub mod render;
+#[cfg(test)]
+mod render_tests;
 mod shape;
 #[cfg(any(test, feature = "test-fonts"))]
 pub mod test_fonts;
@@ -67,6 +72,10 @@ pub struct LayoutOptions {
     pub first_baseline_min: f64,
     pub composer: Composer,
     pub features: OtFeatures,
+    /// Per-paragraph styles (paragraph `i` of the text uses `paragraphs[i]`; missing entries use
+    /// the text object's own `para`). For PhotoCraft text layers, whose paragraphs each have a
+    /// style (P2-08); VectorCraft documents keep one style per object and leave this empty.
+    pub paragraphs: Vec<astudio_vdoc::ParaStyle>,
 }
 
 impl Default for LayoutOptions {
@@ -80,6 +89,7 @@ impl Default for LayoutOptions {
             first_baseline_min: 0.0,
             composer: Composer::EveryLine,
             features: OtFeatures::default(),
+            paragraphs: Vec::new(),
         }
     }
 }
