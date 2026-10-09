@@ -21,6 +21,18 @@ pub use crate::layer::FAUX_ITALIC_DEG;
 pub const FAUX_BOLD_RADIUS: f32 = 0.018;
 /// Largest raster we produce (pixels), as a guard against absurd sizes.
 const MAX_PIXELS: u64 = 256 * 1024 * 1024;
+/// Most memory the rasterizer's working buffer (premultiplied `f32` samples) may take: a text
+/// layer of absurd size is skipped rather than allocating gigabytes (P2-08 review, P2-18). 1 GiB
+/// holds a CMYK layer of 53 megapixels, an RGB one of 67.
+const MAX_BUFFER_BYTES: u64 = 1 << 30;
+
+/// The working buffer of a `w` × `h` raster with `stride` samples a pixel fits in
+/// [`MAX_BUFFER_BYTES`] (and in [`MAX_PIXELS`]).
+fn buffer_fits(w: usize, h: usize, stride: usize) -> bool {
+    let pixels = (w as u64).checked_mul(h as u64);
+    pixels.is_some_and(|p| p <= MAX_PIXELS)
+        && pixels.and_then(|p| p.checked_mul(stride as u64)).and_then(|s| s.checked_mul(4)).is_some_and(|b| b <= MAX_BUFFER_BYTES)
+}
 
 /// Rendered text: pixels in document space plus the covered rectangle.
 pub struct Rendered {
@@ -148,11 +160,11 @@ pub fn rasterize_warped(layout: &LayerLayout, transform: &Affine, format: PixelF
     let rect = ink_rect_warped(layout, transform, warp);
     let (w, h) = (rect.width() as usize, rect.height() as usize);
     let mut surface = Surface::new(format);
-    if w == 0 || h == 0 || (w as u64) * (h as u64) > MAX_PIXELS {
-        return Rendered { surface, rect: Rect::new(0, 0, 0, 0) };
-    }
     let n = format.mode.color_channels();
     let stride = n + 1;
+    if w == 0 || h == 0 || !buffer_fits(w, h, stride) {
+        return Rendered { surface, rect: Rect::new(0, 0, 0, 0) };
+    }
     // Premultiplied accumulation.
     let mut acc = vec![0.0f32; w * h * stride];
     // Negated as f64: `-rect.x0` overflows for an ink rectangle at `i32::MIN` (P2-08 review).
@@ -254,7 +266,18 @@ pub fn render_layer(db: &FontDb, layer: &TextLayer, dpi: f32, format: PixelForma
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_PIXELS, rect_from_bounds};
+    use super::{MAX_BUFFER_BYTES, MAX_PIXELS, buffer_fits, rect_from_bounds};
+
+    /// A huge ink rectangle is refused before its buffer is allocated (P2-08 review: the pixel cap
+    /// alone allowed 4 GB); a large but sane one passes.
+    #[test]
+    fn buffers_are_capped_by_memory() {
+        assert!(buffer_fits(6000, 4000, 4));
+        assert!(!buffer_fits(16_000, 16_000, 4), "1 GB of RGB samples");
+        assert!(!buffer_fits(usize::MAX, 2, 4));
+        let side = ((MAX_BUFFER_BYTES / 20) as f64).sqrt() as usize;
+        assert!(buffer_fits(side, side, 5) && !buffer_fits(side + 64, side + 64, 5));
+    }
     use astudio_geom::pixel::Rect;
 
     #[test]
