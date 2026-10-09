@@ -11,6 +11,7 @@ secs=${1:-30}
 shift || true
 crates=${*:-$(ls -d crates/*/fuzz | cut -d/ -f2)}
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$(pwd)/target/fuzz}
+mkdir -p "$CARGO_TARGET_DIR"
 status=0
 for c in $crates; do
   for t in $(cd "crates/$c" && cargo +nightly fuzz list); do

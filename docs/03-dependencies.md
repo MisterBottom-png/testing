@@ -210,8 +210,15 @@ What this means as crates are ported:
   AVIF encoder of `astudio-codecs`, needs only under `cfg(fuzzing)`. The fuzz crates under
   `crates/*/fuzz` (cargo-fuzz, libfuzzer-sys) are developer tools outside the workspace; nothing
   ships from them.
+- **`heic-rs` 0.1.1 panics on some damaged files** (a box smaller than its own header,
+  `boxes.rs:130`; PhotoCraft hit it too, and the `decode_heif` fuzz target finds it within
+  seconds). `astudio-heif` calls heic-rs only under `catch_unwind`, so on Windows such a file is a
+  "the HEIF decoder failed" error (tests in `crates/heif/src/lib.rs`). The web build cannot catch
+  panics (wasm32 aborts), so it must not enable the `heif` feature until heic-rs is fixed. No
+  A-Studio app enables `heif` yet; that choice is task P7-08.
 - **Advisory exception:** `paste` is unmaintained (RUSTSEC-2024-0436, no vulnerability); it is a
-  build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`.
+  build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`, and `rav1e`
+  (the optional AVIF encoder) directly.
 
 Two crates need a decision rather than an upgrade: `parley` (PhotoCraft text) is retired by the text-engine decision, and `wgpu` (PhotoCraft's GPU compositor) becomes the one compositor; VectorCraft's CPU raster path stays as the reference.
 

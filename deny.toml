@@ -41,8 +41,9 @@ skip = [
 yanked = "deny"
 ignore = [
   # paste is unmaintained (no known vulnerability): a build-time macro inside pulp, which exr (EXR
-  # images in astudio-codecs, P2-11) uses. Drop when exr moves off it.
-  { id = "RUSTSEC-2024-0436", reason = "unmaintained build-time macro via exr -> pulp; no vulnerability" },
+  # images in astudio-codecs, P2-11) uses, and inside rav1e (the optional AVIF encoder). Drop when
+  # both move off it.
+  { id = "RUSTSEC-2024-0436", reason = "unmaintained build-time macro via exr -> pulp and rav1e; no vulnerability" },
 ]
 
 [sources]

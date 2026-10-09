@@ -187,11 +187,22 @@ mod tests {
         0x00, 0x10, 0x75, 0x75, 0x69, 0x64, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08, 0x08, 0x08, 0x00, 0x03, 0x01, 0x03, 0x70, 0x00, 0xa8, 0x00,
     ];
 
+    /// The same heic-rs bug found again by A-Studio's first fuzz run (P2-11): a top-level `uuid` box
+    /// whose size (10) is smaller than its own header (24 bytes with the uuid).
+    const HEIC_RS_UUID_PANIC: [u8; 36] = [
+        0x00, 0x00, 0x00, 0x0a, 0x75, 0x75, 0x69, 0x64, 0xd6, 0x00, 0x4f, 0x4f, 0x2d, 0x26, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x75, 0x75, 0x69, 0x64, 0xd6, 0x00,
+        0x4f, 0x4f, 0x2d, 0x26, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x14,
+    ];
+
     #[test]
     fn a_heic_rs_panic_is_a_malformed_error() {
-        for apply_transforms in [true, false] {
-            let r = decode(&HEIC_RS_BOX_PANIC, &Options { apply_transforms, ..Default::default() });
-            assert!(matches!(r, Err(Error::Malformed(_))), "{r:?}");
+        for bytes in [&HEIC_RS_BOX_PANIC[..], &HEIC_RS_UUID_PANIC[..]] {
+            for apply_transforms in [true, false] {
+                let r = decode(bytes, &Options { apply_transforms, ..Default::default() });
+                assert!(matches!(r, Err(Error::Malformed(_)) | Err(Error::Unsupported(_))), "{r:?}");
+                // probe never panics either.
+                let _ = probe(bytes);
+            }
         }
     }
 

@@ -100,8 +100,8 @@ fn rank(c: Class) -> u8 {
 /// Checks one dependency edge `name` (class `from`) -> `dep` (class `to`) listed in `section`.
 fn edge_error(name: &str, from: Class, section: &str, dep: &str, to: Class) -> Option<String> {
     let dev = section.contains("dev-dependencies");
-    // A crate naming itself (a dev-dependency that switches on its own test features) is no edge.
-    if dep == name {
+    // A crate naming itself as a dev-dependency (to switch on its own test features) is no edge.
+    if dev && dep == name {
         return None;
     }
     if from == Class::Standalone {

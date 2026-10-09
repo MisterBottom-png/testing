@@ -170,9 +170,23 @@ impl ImageSourceData {
         }
         let mut body = Vec::new();
         write_blocks(&mut body, &blocks, version)?;
-        body.put(&self.trailing);
-        let (body, warnings) =
+        let (mut body, mut warnings) =
             if order.is_little() { transcode::transcode_blocks(&body, version, ByteOrder::Big, ByteOrder::Little)? } else { (body, Vec::new()) };
+        // Trailing bytes are written as stored, so they must read back as trailing bytes in `order`:
+        // only after a block that was written (at the start they would be taken for the byte-order
+        // signature; converting to little-endian can drop blocks) and with no `order` block
+        // signature in their first 4 bytes (the reader looks up to 3 bytes past a block for the
+        // next one). Reading also drops little-endian blocks it cannot convert and can leave other
+        // bytes behind (P2-11 fuzz); such bytes are dropped here, with a warning.
+        let sig = |b: &[u8]| {
+            if order.is_little() { b.starts_with(b"MIB8") || b.starts_with(b"46B8") } else { b.starts_with(b"8BIM") || b.starts_with(b"8B64") }
+        };
+        let keeps = !body.is_empty() && (0..=3).all(|k| self.trailing.get(k..).is_none_or(|t| !sig(t)));
+        if keeps {
+            body.put(&self.trailing);
+        } else if !self.trailing.is_empty() {
+            warnings.push(format!("{} bytes of trailing data without a block were dropped", self.trailing.len()));
+        }
         let mut out = Vec::with_capacity(36 + body.len());
         out.put(if version.is_psb() { SIGNATURE_PSB } else { SIGNATURE });
         out.put(&body);
@@ -1544,6 +1558,60 @@ pub mod transcode {
 mod tests {
     use super::transcode::*;
     use super::*;
+
+    /// Found by the `image_source_data` fuzz target (P2-11): an unknown little-endian block is
+    /// dropped on reading, leaving bytes that do not start with a block signature. They were
+    /// written back first, and reading the written data then failed ("8BIM or MIB8" expected);
+    /// now they are dropped on writing, with a warning.
+    #[test]
+    fn blockless_trailing_data_round_trips() {
+        let data = b"Adobe Photoshop Document Data Block\x00MIB8Ad\x05\x00\x01\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00eta Block\x000002\x00";
+        let (d, warnings) = ImageSourceData::from_bytes(data).unwrap();
+        assert_eq!(warnings.len(), 1, "the unknown block is reported");
+        for order in [ByteOrder::Big, ByteOrder::Little] {
+            let (out, warnings) = d.to_bytes(order).unwrap();
+            assert!(warnings.iter().any(|w| w.contains("trailing data")), "{warnings:?}");
+            let (again, _) = ImageSourceData::from_bytes(&out).unwrap();
+            assert_eq!(again.to_bytes(order).unwrap().0, out, "stable from the first write on");
+        }
+    }
+
+    /// Also from the fuzz target: the only block cannot be converted to little-endian, so the
+    /// little-endian write drops it and the trailing bytes would come first.
+    #[test]
+    fn trailing_data_after_a_block_dropped_on_writing() {
+        let data = b"Adobe Photoshop Document Data Block\x008BIMI\xff\x05\x00\x00\x00\x00\x04\x00\x008BIM\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff8\xff\x05\x00\x00[\x00\x00\x00\x00\x00\x00\x00sh";
+        let (d, _) = ImageSourceData::from_bytes(data).unwrap();
+        for order in [ByteOrder::Big, ByteOrder::Little] {
+            let (out, _) = d.to_bytes(order).unwrap();
+            let (again, _) = ImageSourceData::from_bytes(&out).unwrap();
+            assert_eq!(again.to_bytes(order).unwrap().0, out, "stable from the first write on");
+        }
+    }
+
+    /// Also from the fuzz target: trailing bytes after a block that hold `MIB8` one byte in. Kept
+    /// in a big-endian write; a little-endian write would make them look like a padded block, so
+    /// there they are dropped.
+    #[test]
+    fn trailing_data_that_looks_like_a_block_in_the_other_order() {
+        let mut data = SIGNATURE.to_vec();
+        data.extend_from_slice(b"8B64A1\x00\x00\x00\x00\x00\x00");
+        data.extend_from_slice(b"8MIB8");
+        data.extend_from_slice(&[0xff; 20]);
+        let (d, _) = ImageSourceData::from_bytes(&data).unwrap();
+        assert_eq!(d.global_blocks.len(), 1);
+        assert_eq!(d.trailing.len(), 25);
+        let (big, w) = d.to_bytes(ByteOrder::Big).unwrap();
+        assert!(w.is_empty(), "{w:?}");
+        assert_eq!(ImageSourceData::from_bytes(&big).unwrap().0.trailing, d.trailing);
+        let (little, w) = d.to_bytes(ByteOrder::Little).unwrap();
+        assert!(w.iter().any(|w| w.contains("trailing data")), "{w:?}");
+        let (again, _) = ImageSourceData::from_bytes(&little).unwrap();
+        // (The writer signs blocks 8BIM, as before; key and data are what must survive.)
+        let kd = |d: &ImageSourceData| d.global_blocks.iter().map(|b| (b.key, b.data.clone())).collect::<Vec<_>>();
+        assert_eq!(kd(&again), kd(&d));
+        assert!(again.trailing.is_empty());
+    }
     use crate::compression::Compression;
     use crate::descriptor::{Descriptor, Id, UnicodeString, Value, VersionedDescriptor};
     use crate::header::ColorMode;
