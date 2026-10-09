@@ -29,6 +29,7 @@ pub mod render;
 #[cfg(test)]
 mod render_tests;
 mod shape;
+pub mod spell;
 #[cfg(any(test, feature = "test-fonts"))]
 pub mod test_fonts;
 pub mod thread;

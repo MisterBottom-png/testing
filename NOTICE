@@ -22,6 +22,8 @@ Third-party material
   License 1.1. See assets/fonts/OFL-Inter.txt.
 - JetBrains Mono (assets/fonts/JetBrainsMono-*.ttf) - Copyright 2020 The JetBrains Mono Project
   Authors; SIL Open Font License 1.1. See assets/fonts/OFL-JetBrainsMono.txt.
+- SCOWL English word list (assets/dict/en_US-scowl-50.txt.gz) - Copyright 2000-2018 Kevin Atkinson
+  and the SCOWL contributors; SCOWL licence. See assets/dict/LICENSE-SCOWL.txt.
 - The synthetic coated CMYK profile (crates/color/profiles/photocraft-coated-cmyk.icc) - CC0-1.0.
   See crates/color/profiles/LICENSE-CC0-1.0.txt.
 
@@ -41,6 +43,6 @@ packages carry each one's full licence text (task P7-08). Notices those licences
   licence; whether release builds enable it is a release decision (task P7-08).
 
 When more upstream code and assets are merged in, copy each upstream NOTICE entry here (Lucide
-icons under ISC, the SCOWL word list, the CC BY 3.0 magnetic lasso glyph, Adobe CMap resources
+icons under ISC, the CC BY 3.0 magnetic lasso glyph, Adobe CMap resources
 under BSD-3-Clause through hayro-cmap, egui default fonts, the craft-fonts OFL faces of release
 builds). The per-file list is in ASSETS.md.
