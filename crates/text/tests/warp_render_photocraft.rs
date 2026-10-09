@@ -60,7 +60,7 @@ fn warp_text_renders_like_photocraft() {
                 if let Some(g) = font.outline_glyphs().get(skrifa::GlyphId::new(gid)) {
                     g.draw(DrawSettings::unhinted(Size::new(size_px), LocationRef::default()), &mut pen).unwrap();
                 }
-                layout.glyphs.push(LayerGlyph { outline: pen.0, style: 0, size_px: f64::from(size_px) });
+                layout.glyphs.push(LayerGlyph { outline: pen.0, style: 0, size_px: f64::from(size_px), synthetic_bold: false });
             }
             "style" => {
                 let w = TextWarp { style: f[1].into(), value: 50.0, horizontal_distortion: 0.0, vertical_distortion: 0.0, horizontal: true };

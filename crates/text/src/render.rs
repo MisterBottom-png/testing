@@ -74,8 +74,11 @@ fn draw(layout: &LayerLayout, transform: &Xform, sink: &mut impl LineSink, only_
             continue;
         }
         let r = g.size_px * f64::from(FAUX_BOLD_RADIUS);
-        let offsets: &[(f64, f64)] =
-            if st.faux_bold { &[(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0), (0.7, 0.7), (-0.7, -0.7), (0.7, -0.7), (-0.7, 0.7)] } else { &[(0.0, 0.0)] };
+        let offsets: &[(f64, f64)] = if st.faux_bold || g.synthetic_bold {
+            &[(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0), (0.7, 0.7), (-0.7, -0.7), (0.7, -0.7), (-0.7, 0.7)]
+        } else {
+            &[(0.0, 0.0)]
+        };
         for &(ox, oy) in offsets {
             let local = Xform([1.0, 0.0, 0.0, 1.0, ox * r, oy * r]);
             match warp {

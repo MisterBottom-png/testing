@@ -235,6 +235,8 @@ pub struct LayerGlyph {
     pub style: usize,
     /// Font size in pixels (faux bold's radius scales with it).
     pub size_px: f64,
+    /// Drawn emboldened as faux bold is: bold was asked of a face that isn't (P2-18).
+    pub synthetic_bold: bool,
 }
 
 /// An underline or strikethrough rectangle (text-space pixels) with its style.
@@ -277,6 +279,19 @@ impl LayerLayout {
 
 /// Faux-italic slant in degrees (PhotoCraft's, Photoshop-like).
 pub const FAUX_ITALIC_DEG: f64 = 12.0;
+/// Slant of a synthetic oblique, when italic is asked of an upright face (PhotoCraft's font
+/// matching, fontique, uses 14°).
+pub const SYNTHETIC_OBLIQUE_DEG: f64 = 14.0;
+
+/// Synthetic bold and oblique for a style on `face` (PhotoCraft's `synthetic_bold` and its font
+/// matching's skew): a bold request (≥ 600) on a face that isn't bold (≤ 500) is emboldened, an
+/// italic request on an upright face slanted. Faux Bold and Faux Italic stay separate, explicit
+/// styles.
+pub fn synthesis(st: &PcStyle, face: &crate::FontFace) -> (bool, f64) {
+    let bold = st.weight >= 600 && face.weight <= 500.0;
+    let skew = if st.italic && !face.italic { SYNTHETIC_OBLIQUE_DEG } else { 0.0 };
+    (bold, skew)
+}
 
 /// Lays `layer` out with `db` at `dpi`.
 pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
@@ -290,20 +305,23 @@ pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
         let Some(st) = out.styles.get(g.run) else { continue };
         // Tabs, soft hyphens and control characters have an empty outline: keep it so (re-reading
         // the font would draw a box or a hyphen, P2-08 review).
-        let outline = if st.faux_italic && !g.outline.elements().is_empty() {
+        let face = db.face_by_id(g.font_id);
+        let (synthetic_bold, synthetic_skew) = face.as_deref().map_or((false, 0.0), |f| synthesis(st, f));
+        let skew_deg = if st.faux_italic { FAUX_ITALIC_DEG } else { 0.0 } + synthetic_skew;
+        let outline = if skew_deg != 0.0 && !g.outline.elements().is_empty() {
             // Slant in the glyph's own frame (font units, y down), before it is placed: what
             // PhotoCraft's glyph transform did, also for rotated and vertical glyphs.
-            let Some(face) = db.face_by_id(g.font_id) else { continue };
+            let Some(face) = face else { continue };
             let hs = f64::from(if st.horizontal_scale > 0.0 { st.horizontal_scale } else { 1.0 });
             let vs = f64::from(if st.vertical_scale > 0.0 { st.vertical_scale } else { 1.0 });
-            let s = FAUX_ITALIC_DEG.to_radians().tan() * vs / hs;
+            let s = skew_deg.to_radians().tan() * vs / hs;
             let mut p = (*db.outline(&face, g.gid)).clone();
             p.apply_affine(to_px * g.xf * Affine::new([1.0, 0.0, -s, 1.0, 0.0, 0.0]));
             p
         } else {
             to_px * g.outline.clone()
         };
-        out.glyphs.push(LayerGlyph { outline, style: g.run, size_px: f64::from(st.size_pt) * k });
+        out.glyphs.push(LayerGlyph { outline, style: g.run, size_px: f64::from(st.size_pt) * k, synthetic_bold });
     }
     if !l.vertical {
         for line in &l.lines {

@@ -63,3 +63,30 @@ fn any_opentype_feature_reaches_the_shaper() {
     assert_ne!(plain, alt, "cv11 picks the single-storey a");
     assert_eq!(plain, off);
 }
+
+/// Bold asked of a family without a bold face is emboldened, italic asked of one without an
+/// italic slanted (PhotoCraft's `synthetic_bold` and its font matching's 14° skew); a family
+/// with the face uses it as it is.
+#[test]
+fn missing_bold_and_italic_faces_are_synthesised() {
+    let glyph = |family: &str, weight: u16, italic: bool| {
+        let l = layout_layer(db(), &styled("l", CharStyle { font_family: family.into(), weight, italic, size_pt: 100.0, ..Default::default() }), 72.0);
+        let g = l.glyphs.into_iter().next().unwrap();
+        (g.synthetic_bold, kurbo::Shape::bounding_box(&g.outline))
+    };
+    // Source Serif 4 is bundled in Regular only.
+    let (plain_bold, plain) = glyph("Source Serif 4", 400, false);
+    let (bold, _) = glyph("Source Serif 4", 700, false);
+    assert!(!plain_bold && bold, "bold synthesised");
+    let (_, slanted) = glyph("Source Serif 4", 400, true);
+    // The slant leans the stem's top to the right: wider ink, the same height.
+    assert!(slanted.width() > plain.width() + 10.0, "{slanted:?} vs {plain:?}");
+    assert!((slanted.height() - plain.height()).abs() < 1e-6);
+    // Source Sans 3 has its Bold and Italic: nothing is faked.
+    let (sans_bold, _) = glyph("Source Sans 3", 700, false);
+    assert!(!sans_bold);
+    let italic_face = db().face("Source Sans 3", "Italic").unwrap();
+    assert!(italic_face.italic);
+    let asks_italic = CharStyle { italic: true, ..Default::default() };
+    assert_eq!(crate::layer::synthesis(&asks_italic, &italic_face), (false, 0.0), "a real italic is not slanted again");
+}
