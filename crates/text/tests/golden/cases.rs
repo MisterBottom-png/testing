@@ -55,14 +55,20 @@ pub fn cases() -> Vec<Case> {
 }
 
 /// The layout as golden lines: one per line (baseline, extent) and one per glyph (source byte,
-/// glyph id, pen position, advance, line), positions to 1/1000 pt.
+/// glyph id, pen position, advance, line, direction and the transform that draws it, which
+/// carries tate-chu-yoko, upright and sideways turns, mark offsets and scaling): positions to
+/// 1/1000 pt, the transform's scale and turn to six decimals.
 pub fn dump(name: &str, l: &crate::Layout) -> String {
     let mut s = format!("case {name} vertical={}\n", l.vertical);
     for (i, line) in l.lines.iter().enumerate() {
         s += &format!("line {i} baseline={:.3} x0={:.3} x1={:.3}\n", line.baseline, line.x0, line.x1);
     }
     for g in &l.glyphs {
-        s += &format!("glyph byte={} gid={} x={:.3} y={:.3} adv={:.3} line={}\n", g.byte, g.gid, g.origin.x, g.origin.y, g.advance, g.line);
+        let m = g.xf.as_coeffs();
+        s += &format!(
+            "glyph byte={} gid={} x={:.3} y={:.3} adv={:.3} line={} rtl={} xf={:.6},{:.6},{:.6},{:.6},{:.3},{:.3}\n",
+            g.byte, g.gid, g.origin.x, g.origin.y, g.advance, g.line, g.rtl, m[0], m[1], m[2], m[3], m[4], m[5]
+        );
     }
     s
 }

@@ -5,7 +5,7 @@
 //! error (release builds). Nothing is fetched: the build reads only the local checkout.
 //!
 //! Web (wasm32) builds embed only the UI font, BIZ UDPGothic Regular (~4.7 MB): the browser has no
-//! system fonts, and all four fonts (~24 MB) would push the `.wasm` past static hosts' per-file
+//! system fonts, and all of its fonts (about 40 MB at craft-fonts@8dcdacd) would push the `.wasm` past static hosts' per-file
 //! limits (Cloudflare Pages: 25 MiB).
 
 use std::fmt::Write as _;

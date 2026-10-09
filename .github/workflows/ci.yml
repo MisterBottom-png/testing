@@ -28,6 +28,9 @@ jobs:
           ref: 8dcdacd5153e64560d109541a47d806f26f048c0
           path: craft-fonts
       - run: cargo test --workspace
+      # Only the text crate with the fonts embedded: every test binary of the workspace would
+      # carry them (about 40 MB each).
+      - run: cargo test -p astudio-text
         env:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
       - run: cargo xtask layers

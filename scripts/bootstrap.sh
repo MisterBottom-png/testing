@@ -30,7 +30,8 @@ if [ "$FONTS" = 1 ]; then
   # Pinned: the golden paragraphs (crates/text/tests/data/golden_paragraphs.txt) were laid out
   # with these font files; CI checks out the same commit.
   [ -d ../craft-fonts ] || git clone --filter=blob:none https://github.com/storytold/craft-fonts ../craft-fonts
-  git -C ../craft-fonts checkout -q 8dcdacd5153e64560d109541a47d806f26f048c0
+  git -C ../craft-fonts fetch -q origin 8dcdacd5153e64560d109541a47d806f26f048c0
+  git -C ../craft-fonts checkout -q FETCH_HEAD
   echo "fonts: export CRAFT_FONTS_DIR=\"$(cd ../craft-fonts && pwd)\""
 fi
 { echo "photocraft $(git -C upstream/photocraft rev-parse HEAD)"; echo "vectorcraft $(git -C upstream/vectorcraft rev-parse HEAD)"; } > upstream.lock
