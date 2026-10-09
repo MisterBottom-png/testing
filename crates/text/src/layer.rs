@@ -59,8 +59,14 @@ pub fn char_style(st: &PcStyle, auto_leading: f32) -> CharStyle {
     if st.caps == Caps::SmallCaps {
         features.push("smcp".into());
     }
+    // Every OpenType feature with its value (PhotoCraft passes any four-letter tag, P2-18): `tag`,
+    // `-tag`, or `tag=n` for an alternate by number.
     for f in &st.features {
-        features.push(if f.value == 0 { format!("-{}", f.tag) } else { f.tag.clone() });
+        features.push(match f.value {
+            0 => format!("-{}", f.tag),
+            1 => f.tag.clone(),
+            n => format!("{}={n}", f.tag),
+        });
     }
     let leading = st.leading_pt.map(f64::from).or_else(|| (auto_leading != ENGINE_AUTO_LEADING && auto_leading > 0.0).then(|| size * f64::from(auto_leading)));
     CharStyle {
@@ -155,6 +161,22 @@ pub fn engine_runs(layer: &TextLayer) -> Vec<(std::ops::Range<usize>, PcStyle)> 
 /// `layer` as a text object in points, with the per-paragraph styles for [`layout_with`]. The
 /// object's runs are [`engine_runs`], in order (glyph `run` indices map to them).
 pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
+    text_object_with(layer, dpi, &[])
+}
+
+/// The installed face each of the layer's [`engine_runs`] names by PostScript name (as PSD files
+/// store fonts: `Arial-BoldMT`), as engine family and style; `None` where none is installed, and
+/// the run's family, weight and italic choose (PhotoCraft's `resolve_postscript`, P2-18).
+pub fn resolve_faces(db: &FontDb, layer: &TextLayer) -> Vec<Option<(String, String)>> {
+    engine_runs(layer)
+        .iter()
+        .map(|(_, st)| st.postscript_name.as_deref().and_then(|ps| db.find_postscript(ps)).map(|f| (f.family.clone(), f.style.clone())))
+        .collect()
+}
+
+/// [`text_object`] with the faces [`resolve_faces`] found (missing entries: as in
+/// [`text_object`]).
+pub fn text_object_with(layer: &TextLayer, dpi: f32, faces: &[Option<(String, String)>]) -> (TextObject, LayoutOptions) {
     let k = px_per_pt(dpi);
     let paras = layer.paragraph_runs();
     // The paragraph style at a byte offset (PhotoCraft runs end on character boundaries).
@@ -169,10 +191,15 @@ pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
         paras.last().map(|p| &p.style)
     };
     let mut runs = Vec::new();
-    for (range, style) in engine_runs(layer) {
+    for (i, (range, style)) in engine_runs(layer).into_iter().enumerate() {
         let text = layer.text.get(range.clone()).unwrap_or("").to_string();
         let auto = para_at(range.start).map_or(ENGINE_AUTO_LEADING, |p| p.auto_leading);
-        runs.push(TextRun { text, style: char_style(&style, auto) });
+        let mut st = char_style(&style, auto);
+        if let Some(Some((family, face))) = faces.get(i) {
+            st.font_family = family.clone();
+            st.font_style = face.clone();
+        }
+        runs.push(TextRun { text, style: st });
     }
     // One style per paragraph of the engine's split (at '\n').
     let mut paragraphs = Vec::new();
@@ -196,7 +223,9 @@ pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
     // Paragraph text starts with the tallest lowercase ascender at the box top, as in PhotoCraft
     // and Photoshop (P2-18).
     let first_baseline = if matches!(layer.shape, TextShape::Box { .. }) { crate::FirstBaseline::LowercaseAscender } else { crate::FirstBaseline::Ascent };
-    (t, LayoutOptions { paragraphs, first_baseline, ..LayoutOptions::default() })
+    // PhotoCraft's engine keeps ligatures in tracked text.
+    let features = crate::OtFeatures { ligatures_with_tracking: true, ..crate::OtFeatures::default() };
+    (t, LayoutOptions { paragraphs, first_baseline, features, ..LayoutOptions::default() })
 }
 
 /// A glyph outline in text-space pixels with its style ([`LayerLayout::styles`]).
@@ -254,7 +283,7 @@ pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
     let k = px_per_pt(dpi);
     let to_px = Affine::scale(k);
     let styles: Vec<PcStyle> = engine_runs(layer).into_iter().map(|(_, s)| s).collect();
-    let (t, opts) = text_object(layer, dpi);
+    let (t, opts) = text_object_with(layer, dpi, &resolve_faces(db, layer));
     let l = layout_with(db, &t, &opts);
     let mut out = LayerLayout { styles, px_per_pt: k, vertical: l.vertical, ..LayerLayout::default() };
     for g in &l.glyphs {
