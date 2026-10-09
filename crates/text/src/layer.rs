@@ -312,12 +312,31 @@ pub fn synthesis(st: &PcStyle, face: &crate::FontFace) -> (bool, f64) {
     (bold, skew)
 }
 
+/// Photoshop's Small Caps in a font without small capitals (`smcp`): capitals drawn smaller
+/// (VectorCraft's synthesized small caps, at 70%, Photoshop's and Illustrator's size), where
+/// PhotoCraft only asked for the feature and showed lowercase (P2-18).
+pub const SYNTHETIC_SMALL_CAPS: f64 = 70.0;
+
+fn small_caps_without_smcp(db: &FontDb, t: &mut TextObject) {
+    for run in &mut t.runs {
+        let st = &mut run.style;
+        if !st.features.iter().any(|f| f == "smcp") {
+            continue;
+        }
+        if db.face(&st.font_family, &st.font_style).is_some_and(|f| !f.has_feature(b"smcp")) {
+            st.features.retain(|f| f != "smcp");
+            st.small_caps = Some(SYNTHETIC_SMALL_CAPS);
+        }
+    }
+}
+
 /// Lays `layer` out with `db` at `dpi`.
 pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
     let k = px_per_pt(dpi);
     let to_px = Affine::scale(k);
     let styles: Vec<PcStyle> = engine_runs(layer).into_iter().map(|(_, s)| s).collect();
-    let (t, opts) = text_object_with(layer, dpi, &resolve_faces(db, layer));
+    let (mut t, opts) = text_object_with(layer, dpi, &resolve_faces(db, layer));
+    small_caps_without_smcp(db, &mut t);
     let l = layout_with(db, &t, &opts);
     let mut out = LayerLayout { styles, px_per_pt: k, vertical: l.vertical, ..LayerLayout::default() };
     for g in &l.glyphs {

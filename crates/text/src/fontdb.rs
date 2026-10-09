@@ -191,6 +191,14 @@ impl FontFace {
             top.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(if self.cap_height > 0.0 { self.cap_height } else { self.ascent * 0.75 })
         })
     }
+    /// Does the face's glyph substitution table offer OpenType feature `tag` (`smcp`)?
+    pub fn has_feature(&self, tag: &[u8; 4]) -> bool {
+        use skrifa::raw::TableProvider;
+        let Some(f) = self.skrifa() else { return false };
+        let Ok(gsub) = f.gsub() else { return false };
+        let Ok(list) = gsub.feature_list() else { return false };
+        list.feature_records().iter().any(|r| r.feature_tag().to_be_bytes() == *tag)
+    }
     /// Glyph id for `c` (0 = .notdef).
     pub fn glyph_for(&self, c: char) -> u32 {
         self.skrifa().and_then(|f| f.charmap().map(c)).map(|g| g.to_u32()).unwrap_or(0)

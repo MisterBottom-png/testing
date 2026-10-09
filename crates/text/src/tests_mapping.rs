@@ -131,3 +131,91 @@ fn vertical_type_is_underlined_and_struck_through() {
     let mid = (strike.x0 + strike.x1) / 2.0;
     assert!(mid > ink.x0 && mid < ink.x1, "strikethrough across the glyphs: {strike:?} {ink:?}");
 }
+
+/// Vertical anchors as in PhotoCraft's `vertical_tests.rs`: point type centres its first column
+/// on the anchor and starts at it, the next column one leading to the left; box type starts its
+/// columns at the box's right edge and keeps them within its height.
+#[test]
+fn vertical_type_anchors_like_photocraft() {
+    use astudio_doc::text::{Orientation, TextShape};
+    let vertical = |text: &str| {
+        let mut l = styled(text, CharStyle { size_pt: 20.0, ..Default::default() });
+        l.orientation = Orientation::Vertical;
+        l
+    };
+    let ink = |l: &TextLayer| {
+        let lay = layout_layer(db(), l, 72.0);
+        // Spaces have no outline (and no bounds to count).
+        lay.glyphs.iter().filter(|g| !g.outline.elements().is_empty()).map(|g| kurbo::Shape::bounding_box(&g.outline)).collect::<Vec<_>>()
+    };
+    // One column: centred on x = 0 (the ink within the 20 px column), from y = 0 down.
+    let one = ink(&vertical("abc"));
+    let all = one.iter().copied().reduce(|a, b| a.union(b)).unwrap();
+    assert!(all.x0 > -10.5 && all.x1 < 10.5 && (all.x0 + all.x1).abs() < 6.0, "{all:?}");
+    assert!(all.y0 >= -0.5 && all.y0 < 6.0, "{all:?}");
+    // The second paragraph is the next column, to the left by the leading (1.2 × 20 px).
+    let two = ink(&vertical("abc\nabc"));
+    let (first, second) = (two[0], two[3]);
+    assert_eq!(two.len(), 6);
+    assert!(((first.x0 + first.x1) / 2.0 - (second.x0 + second.x1) / 2.0 - 24.0).abs() < 0.5, "{first:?} {second:?}");
+    assert!((first.y0 - second.y0).abs() < 1e-6);
+    // A box: columns start at its right edge (x = 210) and wrap within its height (20 to 80).
+    let mut boxed = vertical("ab cd ef gh ij kl mn op");
+    boxed.shape = TextShape::Box { x: 10.0, y: 20.0, width: 200.0, height: 60.0 };
+    let (t, opts) = crate::layer::text_object(&boxed, 72.0);
+    assert!(crate::layout_with(db(), &t, &opts).lines.len() >= 3);
+    let glyphs = ink(&boxed);
+    let b = glyphs.iter().copied().reduce(|a, b| a.union(b)).unwrap();
+    assert!(b.x1 <= 210.5 && b.x1 > 195.0 && b.x0 >= 9.5, "{b:?}");
+    assert!(b.y0 >= 19.5 && b.y1 <= 80.5, "{b:?}");
+}
+
+/// Auto leading as in PhotoCraft (`layout.rs` line heights): each line sits the paragraph's
+/// auto-leading factor times its largest size below the one before; explicit leading wins.
+#[test]
+fn auto_leading_follows_the_paragraph_factor() {
+    use astudio_doc::text::{ParagraphRun, ParagraphStyle};
+    let baselines = |l: &TextLayer| {
+        let (t, o) = crate::layer::text_object(l, 72.0);
+        crate::layout_with(db(), &t, &o).lines.iter().map(|l| l.baseline).collect::<Vec<_>>()
+    };
+    let s = CharStyle { size_pt: 20.0, ..Default::default() };
+    let mut l = styled("ab\ncd\nef", s.clone());
+    l.paragraphs = vec![ParagraphRun { len: 8, style: ParagraphStyle { auto_leading: 1.75, ..Default::default() } }];
+    let b = baselines(&l);
+    assert!((b[1] - b[0] - 35.0).abs() < 1e-6 && (b[2] - b[1] - 35.0).abs() < 1e-6, "{b:?}");
+    // A larger size on the second line makes that line's leading.
+    let mut mixed = TextLayer {
+        text: "ab\ncD".into(),
+        runs: vec![TextRun { len: 4, style: s.clone() }, TextRun { len: 1, style: CharStyle { size_pt: 40.0, ..s.clone() } }],
+        ..Default::default()
+    };
+    mixed.paragraphs = vec![ParagraphRun { len: 5, style: ParagraphStyle { auto_leading: 1.5, ..Default::default() } }];
+    let b = baselines(&mixed);
+    assert!((b[1] - b[0] - 60.0).abs() < 1e-6, "{b:?}");
+    // Explicit leading in points replaces auto leading.
+    let fixed = styled("ab\ncd", CharStyle { leading_pt: Some(50.0), ..s });
+    let b = baselines(&fixed);
+    assert!((b[1] - b[0] - 50.0).abs() < 1e-6, "{b:?}");
+}
+
+/// Small Caps use the font's small capitals (`smcp`) when it has them; otherwise smaller
+/// capitals stand in (70%), as Photoshop draws them, rather than plain lowercase.
+#[test]
+fn small_caps_without_the_feature_are_synthesised() {
+    use astudio_doc::text::Caps;
+    let height = |family: &str, text: &str, caps: Caps| {
+        let l = layout_layer(db(), &styled(text, CharStyle { font_family: family.into(), size_pt: 100.0, caps, ..Default::default() }), 72.0);
+        kurbo::Shape::bounding_box(&l.glyphs[0].outline).height()
+    };
+    let inter = db().face("Inter", "Regular").unwrap();
+    let sans = db().face("Source Sans 3", "Regular").unwrap();
+    assert!(!inter.has_feature(b"smcp") && sans.has_feature(b"smcp"));
+    // Inter: a synthesised small capital "x" is a capital "X" at 70% (not Inter's lowercase x,
+    // which is taller).
+    let (lower, small, cap) = (height("Inter", "x", Caps::Normal), height("Inter", "x", Caps::SmallCaps), height("Inter", "X", Caps::Normal));
+    assert!((small - 0.7 * cap).abs() < 1.0 && (small - lower).abs() > 2.0, "{lower} {small} {cap}");
+    // Source Sans 3 draws its own small capitals.
+    let own = height("Source Sans 3", "x", Caps::SmallCaps);
+    assert!(own > height("Source Sans 3", "x", Caps::Normal) + 1.0, "{own}");
+}
