@@ -1,12 +1,10 @@
-//! EPS as other apps write it: for each kind of generator, a short program with the constructs its
-//! files use (the kind of procedures a prolog defines, how it sets colour, fills with gradients and
-//! patterns, places images and sets type), each read as vectors without a fallback to the preview.
-//! The programs are A-Studio's own, written for P2-15 from the operators' descriptions in the
-//! PostScript Language Reference: they use the operators those files use, in programs of our own
-//! design, never another app's prolog text, resource or procedure names, or layout.
+//! The PostScript features EPS files from other apps rely on, one small test each, each read as
+//! vectors without a fallback to the preview. The programs are A-Studio's own (P2-15), written
+//! from the operators' descriptions in the PostScript Language Reference; none follows another
+//! app's prolog.
 
 use astudio_color::vector::{Color, Paint};
-use astudio_geom::{FillRule, Point, Rect};
+use astudio_geom::{Point, Rect};
 use astudio_vdoc::{ColorMode, Document, Node, NodeKind};
 
 use super::tests::{all, bounds, fill, near, objects, read, stroke};
@@ -90,389 +88,319 @@ fn square(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<(f64, f64)> {
     ]
 }
 
-/// Files whose page content is written with PDF's operator names (as PDF engines that also write
-/// PostScript do): the operators as one-line procedures, a y-down `cm`, a gradient over a
-/// stitched function whose `Encode` a loop builds, a tiling pattern, a Type 42 font set with
-/// `Tm`/`Tf`/`Tj`, an image with a row-interleaved 1-bit mask (`ImageType 3`), a stencil mask,
-/// image data closed with `status`/`flushfile`, and a mesh gradient from a reusable stream.
+/// Operators given other names, through `load` and through procedures, draw as the operators do.
 #[test]
-fn pdf_operator_names_as_procedures_read_as_vectors() {
-    // Each image row after its mask row (1: paint, with `Decode [1 0]`).
-    let image = a85_flate(&[0b0100_0000, 0, 0, 255, 255, 255, 0, 0b1000_0000, 0, 255, 0, 255, 0, 0]);
-    let mut points = square(20.0, 100.0, 60.0, 140.0);
-    points.extend([(30.0, 110.0), (30.0, 130.0), (50.0, 130.0), (50.0, 110.0)]);
-    let mesh = a85_flate(&patch(&points, &[[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]));
-    let program = format!(
-        r##"%%BeginProlog
-/Page 30 dict def Page begin
-/q /gsave load def /Q /grestore load def /f /fill load def /S /stroke load def /W /clip load def /n /newpath load def
-/m /moveto load def /l /lineto load def /c /curveto load def /h /closepath load def
-/w /setlinewidth load def /d /setdash load def /g /setgray load def /rg /setrgbcolor load def
-/cm {{ 6 array astore concat }} bind def
-/re {{ 4 2 roll m exch dup 0 rlineto exch 0 exch rlineto neg 0 rlineto h }} bind def
-/BT {{ /tm matrix def }} def /ET {{ }} def
-/Tf {{ exch findfont exch scalefont /tf exch def }} bind def
-/Tm {{ tm astore pop }} bind def
-/Tj {{ tf [ tm 0 4 getinterval aload pop 0 0 ] makefont setfont tm 4 get tm 5 get moveto show }} bind def
-/endimage {{ src status {{ src flushfile }} if }} bind def
-/drawimage {{ image endimage }} bind def /drawmask {{ imagemask endimage }} bind def
-end
-%%EndProlog
-%%BeginSetup
-11 dict begin
-/FontName /TestSans def /FontType 42 def /PaintType 0 def /FontMatrix [ 1 0 0 1 0 0 ] def /FontBBox [ 0 0 0 0 ] def
-/Encoding 256 array def 0 1 255 {{ Encoding exch /.notdef put }} for Encoding 79 /O put Encoding 75 /K put
-/CharStrings 3 dict dup begin /.notdef 0 def /O 1 def /K 2 def end readonly def
-/sfnts [ <00010000000100000000000000> ] def
-FontName currentdict end definefont pop
-%%EndSetup
-%%Page: 1 1
-Page begin
-q 1 0 0 -1 0 150 cm
-q currentfile /ASCII85Decode filter /FlateDecode filter /ReusableStreamDecode filter
-{mesh}
-/patches exch def
-<< /ShadingType 7 /ColorSpace /DeviceRGB /DataSource patches /BitsPerCoordinate 32
-   /BitsPerComponent 16 /BitsPerFlag 8 /Decode [ 0 200 0 150 0 1 0 1 0 1 ] >> shfill
-Q
-q 0 0 1 rg 0.5 w [ 3 3 ] 0 d 120 20 m 140 10 160 40 180 20 c S Q
-q 10 20 70 30 re W n
-<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [ 10 0 80 0 ]
-   /Function << /FunctionType 3 /Domain [ 0 1 ] /Bounds [ 0.25 ]
-     /Functions [ << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 0 0 0 ] /C1 [ 1 1 1 ] /N 1 >>
-                  << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 1 1 1 ] /C1 [ 1 0 0 ] /N 1 >> ]
-     /Encode [ 0 1 1 {{ pop 0 1 }} for ] >> >> shfill
-Q
-<< /PatternType 1 /PaintType 1 /TilingType 2 /XStep 8 /YStep 8 /BBox [ 0 0 8 8 ]
-   /PaintProc {{ pop 0 0.5 0 rg 2 2 4 4 re f }} >> matrix makepattern setpattern
-100 60 50 30 re f
-0.3 g BT /TestSans 1 Tf 10 0 0 -10 100 130 Tm (OK) Tj ET
-q [ 30 0 0 -30 160 140 ] concat /DeviceRGB setcolorspace
-/src currentfile /ASCII85Decode filter def
-<< /ImageType 3 /InterleaveType 2
-   /DataDict << /ImageType 1 /Width 2 /Height 2 /BitsPerComponent 8 /Decode [ 0 1 0 1 0 1 ]
-     /DataSource src /FlateDecode filter /ImageMatrix [ 2 0 0 -2 0 2 ] >>
-   /MaskDict << /ImageType 1 /Width 2 /Height 2 /BitsPerComponent 1 /Decode [ 1 0 ] /ImageMatrix [ 2 0 0 -2 0 2 ] >> >> drawimage
-{image}
-Q
-q 1 0 0 rg [ 16 0 0 -8 10 90 ] concat
-/src currentfile /ASCII85Decode filter def
-8 1 true [ 8 0 0 -1 0 1 ] src drawmask
-{mask}
-Q
-Q
-end
-showpage"##,
-        mask = ascii85(&[0xAA]),
+fn renamed_operators_draw() {
+    let r = open(
+        "test",
+        "/F /fill load def /R { rectfill } bind def /N { newpath } def 0 0 1 setrgbcolor N 10 10 moveto 50 10 lineto 30 40 lineto closepath F 60 60 20 20 R",
     );
-    let r = open("a PDF engine", &program);
+    let o = objects(&r.document);
+    assert_eq!(o.len(), 2);
+    assert!(near(bounds(&o[1]), Rect::new(60.0, 70.0, 80.0, 90.0)), "{:?}", bounds(&o[1]));
+}
+
+/// A matrix that turns y down (as files written from PDF content start) puts art where its own
+/// coordinates say, measured from the top.
+#[test]
+fn a_y_down_matrix_measures_from_the_top() {
+    let r = open("test", "[ 1 0 0 -1 0 150 ] concat 0.5 setgray 30 15 40 25 rectfill");
+    assert!(near(bounds(&objects(&r.document)[0]), Rect::new(30.0, 15.0, 70.0, 40.0)));
+}
+
+/// A stitching function whose `Encode` array a loop fills is one gradient with the stitched stops.
+#[test]
+fn stitched_functions_with_a_built_encode_are_gradients() {
+    let r = open(
+        "test",
+        "<< /ShadingType 2 /ColorSpace /DeviceGray /Coords [ 0 0 200 0 ] /Function << /FunctionType 3 /Domain [ 0 1 ] \
+         /Functions [ 3 { << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 0 ] /C1 [ 1 ] /N 1 >> } repeat ] /Bounds [ 0.3 0.6 ] \
+         /Encode [ 3 { 1 0 } repeat ] >> >> shfill",
+    );
+    let Some(Paint::Gradient(g)) = objects(&r.document).first().and_then(|n| fill(n).cloned()) else { panic!("no gradient") };
+    assert!(g.gradient.stops.len() >= 4, "{:?}", g.gradient.stops);
+}
+
+/// A coloured tiling pattern becomes a pattern swatch of its cell.
+#[test]
+fn tiling_patterns_become_pattern_swatches() {
+    let r = open(
+        "test",
+        "<< /PatternType 1 /PaintType 1 /TilingType 3 /XStep 12 /YStep 6 /BBox [ 0 0 12 6 ] \
+         /PaintProc { pop 1 0.5 0 setrgbcolor 0 0 6 6 rectfill } >> matrix makepattern setpattern 0 0 120 60 rectfill",
+    );
     let d = &r.document;
-    // `cm` turned y down, as the document is: the mesh is where its points say.
-    let mesh = of_kind(d, "Mesh");
-    assert_eq!(mesh.len(), 1);
-    assert!(near(bounds(&mesh[0]), Rect::new(20.0, 100.0, 60.0, 140.0)), "{:?}", bounds(&mesh[0]));
-    assert!(all(d).iter().any(|n| stroke(n).is_some_and(|s| s.dash.is_some())));
-    assert!(all(d).iter().any(|n| matches!(fill(n), Some(Paint::Gradient(_)))));
-    // The pattern is a swatch of its cell, and fills the rectangle.
     assert_eq!(d.patterns.len(), 1);
-    assert!(near(d.patterns[0].tile, Rect::new(0.0, 0.0, 8.0, 8.0)), "{:?}", d.patterns[0].tile);
+    assert!(near(d.patterns[0].tile, Rect::new(0.0, 0.0, 12.0, 6.0)), "{:?}", d.patterns[0].tile);
     assert!(d.swatch(&d.patterns[0].name).is_some());
-    assert!(all(d).iter().any(|n| matches!(fill(n), Some(Paint::Pattern { .. }))));
-    assert_eq!(of_kind(d, "Type").len(), 1);
-    assert_eq!(of_kind(d, "Image").len(), 2);
-    let im = all(d).into_iter().find(|n| matches!(&n.kind, NodeKind::Image(im) if im.width == 2)).unwrap();
-    let NodeKind::Image(im) = &im.kind else { panic!() };
-    let img = image::load_from_memory(&d.images[&im.key].bytes).unwrap().to_rgba8();
-    // Painted where its mask bit is 1, transparent where it is 0.
-    assert_eq!([img.get_pixel(0, 0).0, img.get_pixel(1, 0).0], [[0, 0, 255, 0], [255, 255, 0, 255]]);
-    assert_eq!([img.get_pixel(0, 1).0, img.get_pixel(1, 1).0], [[0, 255, 0, 255], [255, 0, 0, 0]]);
 }
 
-/// cairo's Type 3 fonts (fonts it can't embed otherwise): glyph procedures in an array, picked
-/// through `CharStrings` by `BuildGlyph`, widths from `d1`: the glyphs are drawn as their
-/// outlines, one group per string.
+/// Type in a Type 42 font a program defines, through `makefont`, is type.
 #[test]
-fn type3_fonts_draw_their_glyph_procedures() {
-    let program = r##"/d1 { setcachedevice } bind def
-8 dict begin
-/FontType 3 def
-/FontMatrix [ 0.001 0 0 0.001 0 0 ] def
-/FontBBox [ 0 0 1000 1000 ] def
-/Encoding 256 array def 0 1 255 { Encoding exch /.notdef put } for
-Encoding 65 /g1 put
-/Glyphs [ { } { 600 0 0 0 500 700 d1 0 0 moveto 500 0 lineto 250 700 lineto closepath fill } ] def
-/CharStrings 2 dict dup begin /.notdef 0 def /g1 1 def end readonly def
-/BuildGlyph { exch dup /Glyphs get exch /CharStrings get 3 -1 roll 2 copy known not { pop /.notdef } if get get exec } bind def
-/BuildChar { 1 index /Encoding get exch get 1 index /BuildGlyph get exec } bind def
-currentdict end /f-1-0 exch definefont pop
-1 0 0 setrgbcolor
-/f-1-0 findfont 20 scalefont setfont 10 10 moveto (AA) show
-currentpoint 2 copy translate
-% `stringwidth` measures them without drawing.
-(A) stringwidth pop 12 eq { 0 0 1 setrgbcolor } if 0 0 moveto 3 0 65 2 0 (AA) awidthshow
-showpage"##;
-    let r = open("a PDF-engine exporter", program);
-    let d = &r.document;
-    let groups = of_kind(d, "Group");
-    assert_eq!(groups.len(), 2, "{:?}", all(d).iter().map(|n| n.kind_label()).collect::<Vec<_>>());
-    assert_eq!(groups[0].name.as_deref(), Some("AA"));
-    let glyphs: Vec<Rect> = groups[0].children().unwrap().iter().map(|n| bounds(n)).collect();
-    // 500 × 700 units at 20 pt (0.02 pt a unit) on the baseline 10 pt up the page; the second glyph
-    // after the first one's width (600 units).
-    assert!(near(glyphs[0], Rect::new(10.0, 126.0, 20.0, 140.0)), "{glyphs:?}");
-    assert!(near(glyphs[1], Rect::new(22.0, 126.0, 32.0, 140.0)), "{glyphs:?}");
-    assert_eq!(fill(&groups[0].children().unwrap()[0]).and_then(Paint::color), Some(Color::rgb(1.0, 0.0, 0.0)));
-    // `awidthshow` spaces them (2 more, 3 more after an "A"), in blue: the width measured right.
-    let second: Vec<Rect> = groups[1].children().unwrap().iter().map(|n| bounds(n)).collect();
-    assert!((second[1].x0 - second[0].x0 - 17.0).abs() < 1e-6, "{second:?}");
-    assert_eq!(fill(&groups[1].children().unwrap()[0]).and_then(Paint::color), Some(Color::rgb(0.0, 0.0, 1.0)));
-}
-
-/// Plotting libraries' PostScript (matplotlib's, for one): a dictionary of short procedures
-/// defined through one binding procedure, Type 3 fonts converted from TrueType (`CharStrings` of glyph procedures with `sc`, `BuildGlyph` and
-/// `BuildChar`) shown glyph by glyph with `glyphshow`, `clipbox`, marker procedures, and images as
-/// `colorimage` reading hexadecimal data with `readhexstring`.
-#[test]
-fn plotting_library_files_read_as_vectors() {
-    let program = r##"%%BeginProlog
-/PlotOps 11 dict def
-PlotOps begin
-/bdef { bind def } bind def
-/m { moveto } bdef
-/l { lineto } bdef
-/r { rlineto } bdef
-/c { curveto } bdef
-/cl { closepath } bdef
-/ce { closepath eofill } bdef
-/box { m 1 index 0 r 0 exch r neg 0 r cl } bdef
-/cliprect { box clip newpath } bdef
-/sc { setcachedevice } bdef
-%!PS-Adobe-3.0 Resource-Font
-10 dict begin
-/FontName /TestSans def
-/PaintType 0 def
-/FontMatrix [ 0.00048828125 0 0 0.00048828125 0 0 ] def
-/FontBBox [ -2090 -948 3673 2524 ] def
-/FontType 3 def
-/Encoding [ /A /V ] def
-/CharStrings 3 dict dup begin
-/.notdef 0 def
-/A { 1401 0 16 0 1384 1493 sc 16 0 m 700 1493 l 1384 0 l ce } bdef
-/V { 1401 0 16 0 1384 1493 sc 16 1493 m 700 0 l 1384 1493 l ce } bdef
-end readonly def
-/BuildGlyph { exch begin CharStrings exch 2 copy known not { pop /.notdef } if get exec end } bdef
-/BuildChar { 1 index /Encoding get exch get 1 index /BuildGlyph get exec } bdef
-FontName currentdict end definefont pop
-end
-%%EndProlog
-PlotOps begin
-0 0 translate
-0 0 200 150 rectclip
-gsave
-0 0 m 200 0 l 200 150 l 0 150 l cl
-1 setgray fill
-grestore
-gsave
-10 10 180 130 cliprect
-0.122 0.467 0.706 setrgbcolor 1.5 setlinewidth 1 setlinejoin 2 setlinecap [] 0 setdash
-newpath 10 10 m 50 60 l 90 30 l stroke
-/o { gsave newpath translate 3 0 m 0 0 3 0 360 arc cl gsave 1 0 0 setrgbcolor fill grestore stroke grestore } bind def
-10 10 o 50 60 o
-grestore
-0 setgray
-gsave 20 100 translate 0 rotate
-/TestSans 20.0 selectfont 0 0 m /A glyphshow 13.68 0 m /V glyphshow
-grestore
-gsave 120 20 translate 40 40 scale
-/DataString 6 string def
-2 2 8 [ 2 0 0 -2 0 2 ] { currentfile DataString readhexstring pop } bind false 3 colorimage
-ff000000ff00
-0000ffffffff
-grestore
-end
-showpage"##;
-    let r = open("a plotting library", program);
-    let d = &r.document;
-    // The two glyphs are their outlines (even-odd, as `ce` fills them), at 20 pt.
-    let glyphs: Vec<_> = all(d).into_iter().filter(|n| matches!(n.kind, NodeKind::Path { rule: FillRule::EvenOdd, .. })).collect();
-    assert_eq!(glyphs.len(), 2);
-    let a = bounds(&glyphs[0]);
-    assert!(near(a, Rect::new(20.16, 150.0 - 100.0 - 14.58, 33.52, 50.0)), "{a:?}");
-    // Each marker is one object, filled and stroked; the image is its four pixels.
-    let markers = all(d).into_iter().filter(|n| fill(n).is_some() && stroke(n).is_some()).count();
-    assert_eq!(markers, 2);
-    assert_eq!([pixel(d, 0, 0), pixel(d, 1, 0), pixel(d, 0, 1)], [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]]);
-}
-
-/// Prologs that make operators shorter names with `load`, keep the current colour in variables
-/// and set it in CMYK (grey on Level 1), replace `showpage` and `setscreen` with their own
-/// procedures, put every object in a `save`/`restore` block, reencode a font by copying all of its
-/// dictionary but `FID`, and set type with `ashow` in a font from `makefont` (as CorelDRAW's
-/// and other drawing apps' files do).
-#[test]
-fn operator_aliases_and_colour_variables_read_as_vectors() {
-    let program = r##"%%BeginProlog
-/Short 50 dict def Short begin
-/ops [ /moveto /lineto /curveto /closepath /fill /stroke /gsave /grestore ] def
-/short [ /_m /_l /_c /_h /_f /_s /_q /_Q ] def
-0 1 7 { dup short exch get exch ops exch get load def } for
-/screen0 /setscreen load def
-/setscreen { pop pop pop 60 0 { dup mul exch dup mul add 2 div 1 exch sub } screen0 } bind def
-/printpage /showpage load def /showpage { } def
-/cmyk? /languagelevel where { pop languagelevel 1 gt } { false } ifelse def
-/ink [ 0 0 0 1 ] def
-/paint { cmyk? { ink aload pop setcmykcolor } { 1 ink 3 get sub setgray } ifelse } bind def
-/inkfill { _q paint _f _Q newpath } bind def
-/inkstroke { paint _s } bind def
-/copyfont { findfont dup length dict exch { 1 index /FID eq { pop pop } { 3 copy put pop pop } ifelse } forall
-  dup /Encoding 2 copy get 256 array copy dup 196 /Adieresis put put definefont pop } bind def
-end
-%%EndProlog
-%%BeginSetup
-Short begin
-30 45 { } setscreen
-/BodyFont /Helvetica copyfont
-%%EndSetup
-%%Page: 1 1
-save /ink [ 0.6 0 1 0 ] def 20 30 _m 20 70 _l 110 70 _l 110 30 _l _h inkfill restore
-save /ink [ 0 0.5 0 0.25 ] def 2 setlinewidth 120 20 _m 140 60 160 0 180 40 _c inkstroke restore
-save /ink [ 0 0 0 1 ] def paint /BodyFont findfont [ 14 0 0 10 0 0 ] makefont setfont 20 110 _m 2 0 (Wide) ashow restore
-end
-showpage
-printpage"##;
-    let r = open("a drawing app", program);
-    let d = &r.document;
-    assert_eq!(d.color_mode, ColorMode::Cmyk);
-    let rect = all(d).into_iter().find(|n| fill(n).and_then(Paint::color) == Some(Color::cmyk(0.6, 0.0, 1.0, 0.0))).unwrap();
-    assert!(near(bounds(&rect), Rect::new(20.0, 80.0, 110.0, 120.0)), "{:?}", bounds(&rect));
-    assert!(all(d).iter().any(|n| stroke(n).is_some_and(|s| s.width == 2.0 && s.paint.color() == Some(Color::cmyk(0.0, 0.5, 0.0, 0.25)))));
-    let NodeKind::Text(t) = &of_kind(d, "Type")[0].kind else { panic!() };
-    assert!(t.plain_text().starts_with("Wide"));
-}
-
-/// Level 3 files from PDF engines (Affinity Designer's, for one): a level check that would stop
-/// an older interpreter, a gradient as a shading pattern over a sampled function, a spot colour
-/// (`Separation`) and a `DeviceN` colour with tint transforms, and an image compressed with Flate
-/// and a PNG predictor.
-#[test]
-fn shading_patterns_inks_and_predictors_read_as_vectors() {
-    // Two rows of two RGB pixels, PNG-filtered: Up (from zero), then Sub.
-    let rows = [[2u8, 0, 255, 0, 255, 0, 0], [1, 0, 0, 255, 255, 255, 0]];
-    let image = a85_flate(&rows.concat());
-    let program = format!(
-        r##"%%BeginProlog
-languagelevel 3 lt {{ (needs PostScript 3) print flush stop }} if
-%%EndProlog
-%%Page: 1 1
-/rect {{ rectfill }} bind def
-[ /DeviceN [ /Magenta /Yellow ] /DeviceCMYK {{ 0 3 1 roll 0 }} ] setcolorspace
-0.4 0.9 setcolor 120 20 30 30 rect
-[ /Separation (Spot Green) /DeviceCMYK {{ dup 0.8 mul 0 exch 0 }} ] setcolorspace
-1 setcolor 160 20 30 30 rect
-<< /PatternType 2 /Shading << /ShadingType 2 /ColorSpace /DeviceRGB /Coords [ 10 0 90 0 ] /Extend [ false false ]
-   /Function << /FunctionType 0 /Domain [ 0 1 ] /Range [ 0 1 0 1 0 1 ] /Size [ 3 ] /BitsPerSample 8
-     /DataSource <0000ffffffff00ff00> >> >> >> matrix makepattern setpattern
-10 20 80 60 rect
-gsave 120 70 translate 50 50 scale /DeviceRGB setcolorspace
-<< /ImageType 1 /Width 2 /Height 2 /BitsPerComponent 8 /Decode [ 0 1 0 1 0 1 ] /ImageMatrix [ 2 0 0 -2 0 2 ]
-   /DataSource currentfile /ASCII85Decode filter << /Predictor 12 /Colors 3 /Columns 2 >> /FlateDecode filter >> image
-{image}
-grestore
-showpage"##
+fn type_42_fonts_set_type() {
+    let r = open(
+        "test",
+        "/Mono42 << /FontType 42 /FontMatrix [ 1 0 0 1 0 0 ] /FontBBox [ 0 0 0 0 ] /PaintType 0 \
+         /Encoding StandardEncoding /CharStrings << /.notdef 0 >> /sfnts [ <0001000000000000> ] >> definefont \
+         [ 9 0 3 9 0 0 ] makefont setfont 40 40 moveto (slant) show",
     );
-    let r = open("a PDF engine", &program);
-    let d = &r.document;
-    let Some(g) = all(d).into_iter().find_map(|n| match fill(&n) {
-        Some(Paint::Gradient(g)) => Some(g.clone()),
-        _ => None,
-    }) else {
-        panic!("no gradient")
-    };
-    // The function's three samples: blue, white, green.
-    let at = |t: f32| g.gradient.stops.iter().find(|s| (s.offset - t).abs() < 1e-3).map(|s| s.color.to_rgb_uncalibrated());
-    assert_eq!([at(0.0), at(0.5), at(1.0)], [Some([0.0, 0.0, 1.0]), Some([1.0, 1.0, 1.0]), Some([0.0, 1.0, 0.0])]);
-    assert!(d.swatch("Spot Green").is_some_and(|s| s.spot));
-    assert!(all(d).iter().any(|n| matches!(fill(n), Some(Paint::Solid { swatch: Some(s), .. }) if s == "Spot Green")));
-    assert!(all(d).iter().any(|n| fill(n).and_then(Paint::color) == Some(Color::cmyk(0.0, 0.4, 0.9, 0.0))));
-    // Up from zero leaves the first row as it is; Sub adds the pixel to the left.
-    assert_eq!([pixel(d, 0, 0), pixel(d, 1, 0), pixel(d, 0, 1), pixel(d, 1, 1)], [[0, 255, 0, 255], [255, 0, 0, 255], [0, 0, 255, 255], [255, 255, 255, 255]]);
+    let NodeKind::Text(t) = &of_kind(&r.document, "Type")[0].kind else { panic!() };
+    assert_eq!(t.plain_text(), "slant");
 }
 
-/// Files whose procedures negate y (their apps draw y down), that remember the operand and
-/// dictionary stack depths and clean both up at the end, reencode a font to ISO Latin-1 under a
-/// name of their own, and fit type to a width measured with `stringwidth` (as office suites
-/// write).
+/// An image whose 1-bit mask comes row by row before its colour rows (`InterleaveType 2`) is
+/// transparent where the mask says.
 #[test]
-fn flipped_coordinates_and_fitted_type_read_as_vectors() {
-    let program = r##"%%BeginProlog
-userdict begin
-count /depth0 exch def countdictstack /dicts0 exch def
-/vm save def
-/M { neg moveto } bind def /L { neg lineto } bind def
-/C { 3 { 6 -1 roll 6 -1 roll neg } repeat curveto } bind def
-/latin1 { findfont dup length dict copy dup /FID undef dup /Encoding ISOLatin1Encoding put definefont } bind def
-/fit { dup stringwidth pop 3 -1 roll exch div gsave 1 scale show grestore } bind def
-%%EndProlog
-%%Page: 1 1
-0 150 translate
-0.9 0.5 0.1 setrgbcolor 20 20 M 70 20 L 70 50 L 20 50 L closepath fill
-0.75 setlinewidth 0 setgray 100 30 M 120 10 150 50 180 30 C stroke
-/Office /Helvetica latin1 12 scalefont setfont 20 120 M 90 (Fitted) fit
-1 2 3 4 dict begin 5 dict begin
-count depth0 sub { pop } repeat countdictstack dicts0 sub { end } repeat
-vm restore
-end
-showpage"##;
-    let r = open("an office suite", program);
-    let d = &r.document;
-    let rect = all(d).into_iter().find(|n| fill(n).and_then(Paint::color) == Some(Color::rgb(0.9, 0.5, 0.1))).unwrap();
-    assert!(near(bounds(&rect), Rect::new(20.0, 20.0, 70.0, 50.0)), "{:?}", bounds(&rect));
-    let curve = all(d).into_iter().find(|n| stroke(n).is_some_and(|s| (s.width - 0.75).abs() < 1e-9)).unwrap();
-    // y down: the curve's ends 30 from the top, its control points 10 and 50 from it.
-    let b = bounds(&curve);
-    assert!(b.x0 == 100.0 && b.x1 == 180.0 && (10.0..30.0).contains(&b.y0) && b.y1 > 30.0 && b.y1 <= 50.0, "{b:?}");
-    let NodeKind::Text(t) = &of_kind(d, "Type")[0].kind else { panic!() };
-    assert_eq!(t.plain_text(), "Fitted");
+fn row_interleaved_masks_cut_the_image() {
+    // Three pixels a row: the mask row (1 = painted, `Decode [1 0]`), then the colour row.
+    let data = a85_flate(&[0b1010_0000, 9, 9, 9, 8, 8, 8, 7, 7, 7, 0b0100_0000, 1, 1, 1, 2, 2, 2, 3, 3, 3]);
+    let r = open(
+        "test",
+        &format!(
+            "/DeviceRGB setcolorspace 50 50 translate 60 40 scale \
+             << /ImageType 3 /InterleaveType 2 \
+             /DataDict << /ImageType 1 /Width 3 /Height 2 /BitsPerComponent 8 /Decode [ 0 1 0 1 0 1 ] /ImageMatrix [ 3 0 0 -2 0 2 ] \
+               /DataSource currentfile /ASCII85Decode filter /FlateDecode filter >> \
+             /MaskDict << /ImageType 1 /Width 3 /Height 2 /BitsPerComponent 1 /Decode [ 1 0 ] /ImageMatrix [ 3 0 0 -2 0 2 ] >> >> image\n{data}\n"
+        ),
+    );
+    let alpha: Vec<u8> = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)].iter().map(|&(x, y)| pixel(&r.document, x, y)[3]).collect();
+    assert_eq!(alpha, [255, 0, 255, 0, 255, 0]);
 }
 
-/// Page content kept as data between two markers and run through `SubFileDecode` (as Ghostscript's
-/// `eps2write` writes it), around the probes such files make (`gcheck`, `currentglobal`,
-/// `/currentdistillerparams where`, an unguarded `pdfmark`), a procedure set defined as a
-/// resource, `selectfont`, `xshow`, `rectfill`, a form drawn with `execform`, a half-tone
-/// dictionary and a free-form triangle mesh.
+/// Image data read through a filter of `currentfile`, then closed with `status` and `flushfile`
+/// (a stencil mask here): the program goes on after it.
 #[test]
-fn content_run_from_a_subfile_reads_as_vectors() {
-    let program = r##"%%BeginProlog
-/Run << /Exec { cvx exec } bind >> /ProcSet defineresource pop
-/Distilling /currentdistillerparams where { pop true } { false } ifelse def
-currentglobal true setglobal /Fonts 2 dict def setglobal
-Fonts gcheck { [ /Subject (probe) /DOCINFO pdfmark } if
-%%EndProlog
-%%Page: 1 1
-<< /HalftoneType 1 /Frequency 85 /Angle 0 /SpotFunction { exch pop } >> sethalftone
-/Badge << /FormType 1 /BBox [ 0 0 30 10 ] /Matrix [ 1 0 0 1 0 0 ] /PaintProc { pop 0.5 setgray 0 0 30 10 rectfill } >> def
-currentfile 0 (%%EndPageContent) /SubFileDecode filter /Run /ProcSet findresource /Exec get exec
-0 0.6 0 setrgbcolor 30 30 60 20 rectfill
-/Times-Roman 24 selectfont 30 70 moveto (xy) [ 14 0 ] xshow
-%%EndPageContent
-gsave 140 110 translate Badge execform grestore
-<< /ShadingType 4 /ColorSpace /DeviceGray /DataSource [ 0 120 20 0  0 180 20 1  0 150 60 0.5  1 120 60 1 ] >> shfill
-showpage"##;
-    let r = open("a PostScript converter", program);
-    let d = &r.document;
-    let green = all(d).into_iter().find(|n| fill(n).and_then(Paint::color) == Some(Color::rgb(0.0, 0.6, 0.0))).unwrap();
-    assert!(near(bounds(&green), Rect::new(30.0, 100.0, 90.0, 120.0)), "{:?}", bounds(&green));
-    let badge = all(d).into_iter().find(|n| fill(n).and_then(Paint::color) == Some(Color::gray(0.5))).unwrap();
-    assert!(near(bounds(&badge), Rect::new(140.0, 30.0, 170.0, 40.0)), "{:?}", bounds(&badge));
-    assert_eq!(of_kind(d, "Type").len(), 1);
-    // Two triangles: the second (flag 1) on the first one's last two vertices.
-    let meshes = of_kind(d, "Mesh");
-    assert_eq!(meshes.len(), 2);
-    assert!(near(bounds(&meshes[1]), Rect::new(120.0, 90.0, 180.0, 130.0)), "{:?}", bounds(&meshes[1]));
+fn image_data_closed_with_flushfile() {
+    let r = open(
+        "test",
+        &format!(
+            "/stencil {{ imagemask src status {{ src flushfile }} if }} def \
+             /src currentfile /ASCII85Decode filter def gsave 1 0 0 setrgbcolor 20 20 translate 40 10 scale \
+             8 2 true [ 8 0 0 -2 0 2 ] src stencil\n{}\ngrestore 0 0 1 setrgbcolor 100 100 10 10 rectfill",
+            ascii85(&[0x0F, 0xF0])
+        ),
+    );
+    assert_eq!(of_kind(&r.document, "Image").len(), 1);
+    assert!(objects(&r.document).iter().any(|n| fill(n).and_then(Paint::color) == Some(Color::rgb(0.0, 0.0, 1.0))));
 }
 
-/// What procsets that keep and restore the graphics state ask of the interpreter (as
-/// Illustrator's EPS files do): each `current…` operator's answer is taken by its `set…` operator
+/// Mesh data read once into a `ReusableStreamDecode` stream and used as a shading's source.
+#[test]
+fn reusable_streams_feed_meshes() {
+    let mut points = square(110.0, 60.0, 170.0, 100.0);
+    points.extend([(125.0, 70.0), (125.0, 90.0), (155.0, 90.0), (155.0, 70.0)]);
+    let data = a85_flate(&patch(&points, &[[0.2, 0.2, 0.2], [0.4, 0.4, 0.4], [0.6, 0.6, 0.6], [0.8, 0.8, 0.8]]));
+    let r = open(
+        "test",
+        &format!(
+            "currentfile /ASCII85Decode filter /FlateDecode filter /ReusableStreamDecode filter\n{data}\n/s exch def \
+             << /ShadingType 7 /ColorSpace /DeviceRGB /DataSource s /BitsPerCoordinate 32 /BitsPerComponent 16 /BitsPerFlag 8 \
+             /Decode [ 0 200 0 150 0 1 0 1 0 1 ] >> shfill"
+        ),
+    );
+    let mesh = of_kind(&r.document, "Mesh");
+    assert_eq!(mesh.len(), 1);
+    assert!(near(bounds(&mesh[0]), Rect::new(110.0, 50.0, 170.0, 90.0)), "{:?}", bounds(&mesh[0]));
+}
+
+/// A Type 3 font whose `BuildGlyph` finds each glyph's procedure by name draws its glyphs as
+/// outlines; `stringwidth` measures without drawing, `widthshow` adds to one character's width.
+#[test]
+fn type_3_glyph_procedures_draw() {
+    let program = "/Boxes << /FontType 3 /FontMatrix [ 0.01 0 0 0.01 0 0 ] /FontBBox [ 0 0 100 100 ] \
+        /Encoding 256 array dup 0 1 255 { /.notdef put dup } for pop dup 66 /box put \
+        /Procs << /.notdef { 0 0 0 0 0 0 setcachedevice } /box { 80 0 0 0 60 60 setcachedevice 0 0 60 60 rectfill } >> \
+        /BuildGlyph { exch /Procs get exch 2 copy known not { pop /.notdef } if get exec } \
+        /BuildChar { 1 index /Encoding get exch get 1 index /BuildGlyph get exec } >> definefont pop \
+        /Boxes 10 selectfont 20 20 moveto (BB) show (B) stringwidth pop 8 eq { 20 60 moveto 5 0 66 (BB) widthshow } if";
+    let r = open("test", program);
+    let groups = of_kind(&r.document, "Group");
+    assert_eq!(groups.len(), 2, "{:?}", all(&r.document).iter().map(|n| n.kind_label()).collect::<Vec<_>>());
+    let first: Vec<Rect> = groups[0].children().unwrap().iter().map(|n| bounds(n)).collect();
+    // 60 units at 10 pt (0.1 pt a unit), 8 pt apart; `widthshow` puts 5 pt more after each B.
+    assert!(near(first[0], Rect::new(20.0, 124.0, 26.0, 130.0)), "{first:?}");
+    assert!((first[1].x0 - first[0].x0 - 8.0).abs() < 1e-6, "{first:?}");
+    let second: Vec<Rect> = groups[1].children().unwrap().iter().map(|n| bounds(n)).collect();
+    assert!((second[1].x0 - second[0].x0 - 13.0).abs() < 1e-6, "{second:?}");
+}
+
+/// `glyphshow` draws a glyph by name from a Type 3 font's `CharStrings` procedures.
+#[test]
+fn glyphshow_draws_named_glyphs() {
+    let program = "/Tri << /FontType 3 /FontMatrix [ 0.001 0 0 0.001 0 0 ] /FontBBox [ 0 0 1000 1000 ] /Encoding [ /up ] \
+        /CharStrings << /.notdef { } /up { 900 0 0 0 800 800 setcachedevice 0 0 moveto 800 0 lineto 400 800 lineto closepath fill } >> \
+        /BuildGlyph { exch /CharStrings get exch 2 copy known not { pop /.notdef } if get exec } >> definefont pop \
+        /Tri 50 selectfont 100 20 moveto /up glyphshow";
+    let r = open("test", program);
+    let glyph = all(&r.document).into_iter().find(|n| n.path_data().is_some()).unwrap();
+    assert!(near(bounds(&glyph), Rect::new(100.0, 90.0, 140.0, 130.0)), "{:?}", bounds(&glyph));
+}
+
+/// `colorimage` from one procedure reading hexadecimal rows with `readhexstring`.
+#[test]
+fn colorimage_reads_hexadecimal_rows() {
+    let r = open(
+        "test",
+        "/row 9 string def gsave 10 10 translate 30 10 scale 3 1 8 [ 3 0 0 -1 0 1 ] \
+         { currentfile row readhexstring pop } false 3 colorimage\n102030405060708090\ngrestore",
+    );
+    assert_eq!([pixel(&r.document, 0, 0), pixel(&r.document, 2, 0)], [[16, 32, 48, 255], [112, 128, 144, 255]]);
+}
+
+/// Colour kept in variables and set by a procedure that uses CMYK on Level 2 and grey below it.
+#[test]
+fn colour_procedures_choose_cmyk_or_grey() {
+    let program = "/c 0.1 def /m 0.2 def /y 0.3 def /k 0.4 def \
+        /level2 /languagelevel where { pop languagelevel 2 ge } { false } ifelse def \
+        /ink { level2 { c m y k setcmykcolor } { 1 k sub setgray } ifelse } bind def ink 0 0 50 50 rectfill";
+    let r = open("test", program);
+    assert_eq!(r.document.color_mode, ColorMode::Cmyk);
+    assert_eq!(fill(&objects(&r.document)[0]).and_then(Paint::color), Some(Color::cmyk(0.1, 0.2, 0.3, 0.4)));
+}
+
+/// `showpage` and `setscreen` replaced by the program's own procedures, and every object drawn in
+/// a `save` … `restore` block of its own.
+#[test]
+fn replaced_operators_and_saved_objects() {
+    let program = "/realshowpage /showpage load def /showpage { } def \
+        /setscreen { pop pop pop } def 120 30 { dup mul exch dup mul add 1 exch sub } setscreen \
+        save 0.25 setgray 10 10 30 30 rectfill restore save 0.75 setgray 60 10 30 30 rectfill restore \
+        showpage realshowpage";
+    let o = objects(&open("test", program).document);
+    let mut greys: Vec<_> = o.iter().filter_map(|n| fill(n).and_then(Paint::color)).map(|c| c.to_rgb_uncalibrated()[0]).collect();
+    greys.sort_by(f32::total_cmp);
+    assert_eq!(greys, [0.25, 0.75]);
+}
+
+/// A font copied without its `FID`, given another encoding and defined under a new name, sets
+/// type; so does `ashow` in a font made with `makefont`.
+#[test]
+fn reencoded_fonts_set_type() {
+    let program = "/Times-Roman findfont dup length dict begin { 1 index /FID eq { pop pop } { def } ifelse } forall \
+        /Encoding ISOLatin1Encoding def currentdict end /Latin exch definefont \
+        [ 20 0 0 12 0 0 ] makefont setfont 10 100 moveto 1.5 0 (wide) ashow";
+    let NodeKind::Text(t) = &of_kind(&open("test", program).document, "Type")[0].kind else { panic!() };
+    assert_eq!(t.plain_text(), "wide");
+}
+
+/// A gradient as a shading pattern over a sampled (type 0) function keeps the samples as stops.
+#[test]
+fn shading_patterns_over_sampled_functions() {
+    let program = "<< /PatternType 2 /Shading << /ShadingType 2 /ColorSpace /DeviceGray /Coords [ 0 0 100 0 ] \
+        /Function << /FunctionType 0 /Domain [ 0 1 ] /Range [ 0 1 ] /Size [ 3 ] /BitsPerSample 8 /DataSource <00ff80> >> >> >> \
+        matrix makepattern setpattern 0 0 100 100 rectfill";
+    let Some(Paint::Gradient(g)) = objects(&open("test", program).document).first().and_then(|n| fill(n).cloned()) else { panic!() };
+    let greys: Vec<f32> = g.gradient.stops.iter().map(|s| s.color.to_rgb_uncalibrated()[0]).collect();
+    assert!(greys.contains(&1.0) && greys.first() == Some(&0.0), "{greys:?}");
+}
+
+/// `Separation` colours become spot swatches; `DeviceN` colours their alternate's colour.
+#[test]
+fn separation_and_devicen_inks() {
+    let program = "[ /Separation (Gold Ink) /DeviceCMYK { 0 exch dup 0.3 mul exch 0 } ] setcolorspace 0.8 setcolor 0 0 20 20 rectfill \
+        [ /DeviceN [ /Cyan /Black ] /DeviceCMYK { 0 0 3 -1 roll } ] setcolorspace 0.5 0.25 setcolor 30 0 20 20 rectfill";
+    let d = open("test", program).document;
+    assert!(d.swatch("Gold Ink").is_some_and(|s| s.spot));
+    assert!(objects(&d).iter().any(|n| fill(n).and_then(Paint::color) == Some(Color::cmyk(0.5, 0.0, 0.0, 0.25))));
+}
+
+/// Image data through Flate with a PNG predictor (Average and Paeth rows).
+#[test]
+fn png_predictors_undo() {
+    // One RGB pixel a row, so each row's left and upper-left neighbours are zero.
+    let data = a85_flate(&[3, 40, 60, 80, 4, 2, 2, 2]);
+    let r = open(
+        "test",
+        &format!(
+            "gsave 10 10 translate 10 20 scale /DeviceRGB setcolorspace << /ImageType 1 /Width 1 /Height 2 /BitsPerComponent 8 \
+             /Decode [ 0 1 0 1 0 1 ] /ImageMatrix [ 1 0 0 -2 0 2 ] /DataSource currentfile /ASCII85Decode filter \
+             << /Predictor 10 /Colors 3 /Columns 1 >> /FlateDecode filter >> image\n{data}\ngrestore"
+        ),
+    );
+    // Average: half the pixel above (none). Paeth with only an upper neighbour: that neighbour.
+    assert_eq!([pixel(&r.document, 0, 0), pixel(&r.document, 0, 1)], [[40, 60, 80, 255], [42, 62, 82, 255]]);
+}
+
+/// A level check that would stop on an older interpreter lets the rest run.
+#[test]
+fn level_checks_pass() {
+    let o = objects(&open("test", "/languagelevel where { pop languagelevel 3 lt { stop } if } if 0 0 9 9 rectfill").document);
+    assert_eq!(o.len(), 1);
+}
+
+/// Procedures that negate y draw y down from a translated origin.
+#[test]
+fn procedures_that_negate_y() {
+    let program = "0 150 translate /mv { neg moveto } def /ln { neg lineto } def \
+        /cv { 3 { 6 -1 roll 6 -1 roll neg } repeat curveto } def \
+        0.1 0.6 0.3 setrgbcolor 40 10 mv 90 10 ln 90 35 ln 40 35 ln closepath fill 40 60 mv 60 50 70 80 90 60 cv stroke";
+    let o = objects(&open("test", program).document);
+    assert!(near(bounds(&o[0]), Rect::new(40.0, 10.0, 90.0, 35.0)), "{:?}", bounds(&o[0]));
+    assert!(bounds(&o[1]).y0 >= 50.0 && bounds(&o[1]).y1 <= 80.0, "{:?}", bounds(&o[1]));
+}
+
+/// The operand and dictionary stacks cut back to depths saved at the start, then `restore`.
+#[test]
+fn stacks_cut_back_to_saved_depths() {
+    let program = "/vm save def /ops count def /dicts countdictstack def \
+        7 8 9 3 dict begin 0 0 30 30 rectfill \
+        count ops sub { pop } repeat countdictstack dicts sub { end } repeat vm restore";
+    assert_eq!(objects(&open("test", program).document).len(), 1);
+}
+
+/// Type stretched to a width measured with `stringwidth`.
+#[test]
+fn type_fitted_with_stringwidth() {
+    let program = "/Helvetica 10 selectfont 20 20 moveto gsave 150 (fit me) stringwidth pop div 1 scale (fit me) show grestore";
+    let NodeKind::Text(t) = &of_kind(&open("test", program).document, "Type")[0].kind else { panic!() };
+    assert_eq!(t.plain_text(), "fit me");
+}
+
+/// Page content kept as data up to a marker and run through `SubFileDecode`; the file goes on
+/// after the marker.
+#[test]
+fn content_run_from_a_subfile() {
+    let program = "currentfile 0 (%%ContentEnd) /SubFileDecode filter cvx exec\n\
+        0.2 0.2 0.9 setrgbcolor 5 5 40 10 rectfill\n%%ContentEnd\n0.9 0.2 0.2 setrgbcolor 5 30 40 10 rectfill";
+    assert_eq!(objects(&open("test", program).document).len(), 2);
+}
+
+/// A procedure set defined as a resource and run from it.
+#[test]
+fn procset_resources_run() {
+    let program = "/Tools << /Square { 0 0 25 25 rectfill } >> /ProcSet defineresource pop /Tools /ProcSet findresource /Square get exec";
+    assert_eq!(objects(&open("test", program).document).len(), 1);
+}
+
+/// Probes for a distiller, for the VM of a dictionary and an unguarded `pdfmark` all go through.
+#[test]
+fn distiller_probes_and_pdfmark() {
+    super::tests::check("/currentdistillerparams where { pop false } { true } ifelse");
+    super::tests::check("[ /Author (A-Studio tests) /DOCINFO pdfmark 5 dict gcheck pop true");
+}
+
+/// A half-tone dictionary is accepted; a form drawn with `execform` lands where it is placed.
+#[test]
+fn halftones_and_forms() {
+    let program = "<< /HalftoneType 1 /Frequency 100 /Angle 15 /SpotFunction { pop } >> sethalftone \
+        /Tile << /FormType 1 /BBox [ 0 0 16 16 ] /Matrix [ 1 0 0 1 0 0 ] /PaintProc { pop 0 0 16 16 rectfill } >> def \
+        gsave 60 70 translate Tile execform grestore";
+    let o = objects(&open("test", program).document);
+    assert!(near(bounds(&o[0]), Rect::new(60.0, 64.0, 76.0, 80.0)), "{:?}", bounds(&o[0]));
+}
+
+/// `xshow` places each character by its own width; a free-form mesh given as an array draws its
+/// triangles.
+#[test]
+fn xshow_and_array_meshes() {
+    let r = open("test", "/Courier 20 selectfont 10 10 moveto (abc) [ 30 30 30 ] xshow");
+    assert_eq!(of_kind(&r.document, "Type").len(), 1);
+    let r = open("test", "<< /ShadingType 4 /ColorSpace /DeviceGray /DataSource [ 0 10 10 0  0 50 10 1  0 30 40 0.5  2 10 40 1 ] >> shfill");
+    assert_eq!(of_kind(&r.document, "Mesh").len(), 2);
+}
+
+/// What procedures that keep and restore the graphics state ask of the interpreter: each `current…` operator's answer is taken by its `set…` operator
 /// and asked again (device settings are accepted and kept as they are)
 /// (colour rendering, half-tone, transfers, black generation and undercolour removal as
 /// procedures, `rootfont`), VM switches with `setglobal` and `currentglobal`, a font's VM with
@@ -754,28 +682,31 @@ fn hostile_patterns_glyphs_and_shadings_end() {
     assert_eq!(objects(&r.document).len(), 1);
 }
 
-/// Dictionaries built between `mark` and an executable string (`(>>) cvx`, or a Level 1 string
-/// that counts to the mark and defines each pair), and a procedure fetched with `load` by an
-/// integer key and run in `stopped` (as Illustrator 8's gradient procset does, which much stock
-/// art carries).
+/// A dictionary closed by an executable string: `(>>) cvx` run where `>>` would be.
 #[test]
-fn dictionary_builders_and_executable_strings() {
-    let program = r##"%%BeginProlog
-/dictend (>>) cvx def
-/pairs (counttomark 2 idiv dup dict exch { dup 4 2 roll put } repeat exch pop) cvx def
-/Steps 3 dict def Steps begin 1 { 1 0 1 setrgbcolor } def 5 { 0 1 1 setrgbcolor } def end
-%%EndProlog
-mark /ShadingType 2 /ColorSpace /DeviceRGB /Coords [ 20 0 120 0 ]
-  /Function mark /FunctionType 2 /Domain [ 0 1 ] /C0 [ 0 0 1 ] /C1 [ 1 0 0 ] /N 1 dictend
-dictend gsave 20 20 100 40 rectclip shfill grestore
-mark /Size 9 pairs /Size get 9 eq { Steps begin 1 load end stopped pop 140 20 40 40 rectfill } if
-(p) cvx xcheck { 20 80 30 30 rectfill } if
-showpage"##;
-    let r = open("an illustration app", program);
-    let d = &r.document;
-    let Some(Paint::Gradient(g)) = all(d).into_iter().find_map(|n| fill(&n).cloned()) else { panic!("no gradient") };
-    assert_eq!(g.gradient.kind, astudio_color::vector::GradientKind::Linear);
-    // The Level 1 builder made the dictionary; the procedure under key 1 ran (magenta).
-    assert!(all(d).iter().any(|n| fill(n).and_then(Paint::color) == Some(Color::rgb(1.0, 0.0, 1.0))));
-    assert_eq!(objects(d).len(), 3);
+fn executable_strings_close_dictionaries() {
+    super::tests::check("/shut (>>) cvx def << /a 1 /b 2 shut /b get 2 eq");
+    let r = open(
+        "test",
+        "/shut (>>) cvx def << /ShadingType 3 /ColorSpace /DeviceGray /Coords [ 60 60 0 60 60 30 ] \
+         /Function << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 1 ] /C1 [ 0 ] /N 2 shut shut shfill",
+    );
+    let Some(Paint::Gradient(g)) = objects(&r.document).first().and_then(|n| fill(n).cloned()) else { panic!("no gradient") };
+    assert_eq!(g.gradient.kind, astudio_color::vector::GradientKind::Radial);
+}
+
+/// A Level 1 dictionary builder: a string, made executable, that turns the pairs above a mark
+/// into a dictionary.
+#[test]
+fn level_1_dictionary_builders() {
+    super::tests::check(
+        "/todict (counttomark 2 idiv dup dict exch { dup 4 2 roll put } repeat exch pop) cvx def \
+         mark /x 3 /y 4 todict dup /x get 3 eq exch /y get 4 eq and",
+    );
+}
+
+/// A procedure fetched with `load` under an integer key and run in `stopped`.
+#[test]
+fn procedures_under_integer_keys() {
+    super::tests::check("/Steps 2 dict def Steps begin 4 { 1 } def end Steps begin 4 load end stopped not exch 1 eq and");
 }

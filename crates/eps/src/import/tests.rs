@@ -477,13 +477,13 @@ fn the_generic_category_defines_new_categories() {
     // resource categories).
     blue("/Generic /Category findresource pop 0 0 1 setrgbcolor");
     blue("[/Swatch /Ramp /Helper] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall 0 0 1 setrgbcolor");
-    let define = "[/Swatch /Gradient] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall \
-                  /G1 << /Kind 7 >> /Gradient defineresource pop";
-    check(&format!("{define} /G1 /Gradient findresource /Kind get 7 eq"));
-    check(&format!("{define} /Gradient /Category resourcestatus {{ pop pop true }} {{ false }} ifelse"));
-    check(&format!("{define} /G1 /Gradient resourcestatus {{ pop pop true }} {{ false }} ifelse"));
-    check(&format!("{define} /G1 /Gradient undefineresource /G1 /Gradient resourcestatus not"));
-    check(&format!("{define} {{ /G2 /Gradient findresource }} stopped"));
+    let define = "[/Swatch /Palette] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall \
+                  /G1 << /Kind 7 >> /Palette defineresource pop";
+    check(&format!("{define} /G1 /Palette findresource /Kind get 7 eq"));
+    check(&format!("{define} /Palette /Category resourcestatus {{ pop pop true }} {{ false }} ifelse"));
+    check(&format!("{define} /G1 /Palette resourcestatus {{ pop pop true }} {{ false }} ifelse"));
+    check(&format!("{define} /G1 /Palette undefineresource /G1 /Palette resourcestatus not"));
+    check(&format!("{define} {{ /G2 /Palette findresource }} stopped"));
     // Unknown categories aren't instances of Category; a category is a dictionary.
     check("/Nonsense /Category resourcestatus not");
     check("{ /Nonsense /Category findresource } stopped");
