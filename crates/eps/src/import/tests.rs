@@ -473,10 +473,11 @@ pub(super) fn check(cond: &str) {
 
 #[test]
 fn the_generic_category_defines_new_categories() {
-    // #234: the reference app's prolog.
+    // A program may make its own resource categories from Generic (PostScript Language Reference,
+    // resource categories).
     blue("/Generic /Category findresource pop 0 0 1 setrgbcolor");
-    blue("[/CSA /Gradient /Procedure] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall 0 0 1 setrgbcolor");
-    let define = "[/CSA /Gradient] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall \
+    blue("[/Swatch /Ramp /Helper] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall 0 0 1 setrgbcolor");
+    let define = "[/Swatch /Gradient] { /Generic /Category findresource dup length dict copy /Category defineresource pop } forall \
                   /G1 << /Kind 7 >> /Gradient defineresource pop";
     check(&format!("{define} /G1 /Gradient findresource /Kind get 7 eq"));
     check(&format!("{define} /Gradient /Category resourcestatus {{ pop pop true }} {{ false }} ifelse"));
