@@ -1,7 +1,7 @@
 # Research: Pantone colours for inserts and swing tags
 
 **Date:** 9 October 2026 · **Status:** research done, owner decided, prototype built and passing;
-nothing built yet · **Decision needed:** how to ship the colour data (question 1 at the end).
+next is the real port after P2-02 and P3-01 (see "Next steps" at the end).
 
 ## The ask
 
