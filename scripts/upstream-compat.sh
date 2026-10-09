@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof that both upstream apps build against A-Studio's merged crates (P2-01 geometry, P2-02 colour,
-# P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw).
+# P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw, P2-16 raster/doc).
 #
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
@@ -65,6 +65,9 @@ printf '\n[features]\ncorpus = ["astudio-psd/corpus"]\nserde = ["astudio-psd/ser
 shim photocraft codecs codecs 'pub use astudio_codecs::*;'
 printf '\n[features]\ncorpus = ["astudio-codecs/corpus"]\navif = ["astudio-codecs/avif"]\nheif = ["astudio-codecs/heif"]\n' >> "$out/photocraft/src-copy/crates/codecs/Cargo.toml"
 shim photocraft heif heif 'pub use astudio_heif::*;'
+# PhotoCraft's raster and doc = astudio-raster and astudio-doc (P2-16).
+shim photocraft raster raster 'pub use astudio_raster::*;'
+shim photocraft doc doc 'pub use astudio_doc::*;'
 shim photocraft raw raw 'pub use astudio_raw::*;'
 printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
 

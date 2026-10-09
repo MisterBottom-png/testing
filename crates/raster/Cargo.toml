@@ -10,6 +10,10 @@ publish = false
 [dependencies]
 astudio-geom = { path = "../geom" }
 astudio-color = { path = "../color" }
+serde = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
 
 [lints]
 workspace = true

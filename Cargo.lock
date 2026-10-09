@@ -158,6 +158,8 @@ dependencies = [
  "astudio-geom",
  "astudio-raster",
  "astudio-vdoc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -293,6 +295,8 @@ version = "0.0.1"
 dependencies = [
  "astudio-color",
  "astudio-geom",
+ "proptest",
+ "serde",
 ]
 
 [[package]]
