@@ -4,9 +4,9 @@
 //! 72 dpi, PhotoCraft's pixels there.
 
 use astudio_doc::TextLayer;
-use astudio_doc::text::{CharStyle, Kerning, ParagraphRun, ParagraphStyle, TextAlign, TextRun};
+use astudio_doc::text::{CharStyle, Kerning, Orientation, ParagraphRun, ParagraphStyle, TextAlign, TextRun};
 
-use crate::layer::text_object;
+use crate::layer::{engine_runs, text_object};
 use crate::{FontDb, TextLayout, layout_with};
 
 fn db() -> &'static FontDb {
@@ -46,6 +46,9 @@ fn manual_kerning_moves_the_next_glyph() {
     assert!((x(&kerned, 1) - x(&plain, 1) - 10.0).abs() < 1e-3, "{} vs {}", x(&kerned, 1), x(&plain, 1));
     assert!((x(&kerned, 2) - x(&plain, 2) - 10.0).abs() < 1e-3);
     assert!((width(&kerned) - width(&plain) - 10.0).abs() < 1e-3);
+    // Carets follow: the cluster after the kerned pair starts 10 px later.
+    let caret = |l: &TextLayout| crate::caret_position(l, 1).0.x;
+    assert!((caret(&kerned) - caret(&plain) - 10.0).abs() < 1e-3);
     // Negative kerning tightens; kerning on the last character doesn't move anything.
     let tight = layout(&runs_of("HOH", &[(1, CharStyle { kern: -50.0, ..s.clone() }), (2, s.clone())]));
     assert!((x(&tight, 1) - x(&plain, 1) + 5.0).abs() < 1e-3);
@@ -121,4 +124,48 @@ fn optical_kerning_goes_by_the_point_size() {
     // at 100 pt.
     assert!((at(12.0, 72.0) - at(12.0, 96.0)).abs() < 1e-6);
     assert!(at(12.0, 72.0) > at(100.0, 72.0) + 0.01);
+}
+
+/// The kern of a paragraph's last character goes with the whole character: a letter keeps its
+/// combining accent in one run, and the layout is the unkerned one (P2-17 review).
+#[test]
+fn a_kerned_last_letter_keeps_its_accent() {
+    let s = CharStyle { size_pt: 100.0, ..Default::default() };
+    let text = "ae\u{301}";
+    let plain = layout(&styled(text, s.clone()));
+    let kerned = layout(&styled(text, CharStyle { kern: 100.0, ..s.clone() }));
+    assert_eq!(kerned.glyphs.len(), plain.glyphs.len());
+    // The first letter's kern moves the second; the last one's moves nothing.
+    assert!((x(&kerned, 1) - x(&plain, 1) - 10.0).abs() < 1e-3);
+    assert!((width(&kerned) - width(&plain) - 10.0).abs() < 1e-3);
+    let runs: Vec<_> = engine_runs(&styled(text, CharStyle { kern: 100.0, ..s })).into_iter().map(|(r, st)| (r, st.kern)).collect();
+    assert_eq!(runs, [(0..1, 100.0), (1..text.len(), 0.0)]);
+}
+
+/// Which characters lose their kern: the last of each paragraph (multi-byte ones whole), not
+/// one in the middle; an empty last paragraph changes nothing.
+#[test]
+fn engine_runs_split_at_paragraph_ends() {
+    let k = CharStyle { kern: 50.0, ..Default::default() };
+    let kerns = |text: &str| engine_runs(&styled(text, k.clone())).into_iter().map(|(r, st)| (r, st.kern)).collect::<Vec<_>>();
+    assert_eq!(kerns("AB\nCD"), [(0..1, 50.0), (1..2, 0.0), (2..4, 50.0), (4..5, 0.0)]);
+    assert_eq!(kerns("ü€"), [(0..2, 50.0), (2..5, 0.0)]);
+    assert_eq!(kerns("AB\n"), [(0..1, 50.0), (1..2, 0.0), (2..3, 50.0)]);
+    // A flag (two regional indicators) and an emoji with a skin tone and a joiner stay whole.
+    assert_eq!(kerns("A\u{1F1EF}\u{1F1F5}"), [(0..1, 50.0), (1..9, 0.0)]);
+    assert_eq!(kerns("A\u{1F44B}\u{1F3FD}\u{200D}\u{1F525}"), [(0..1, 50.0), (1..16, 0.0)]);
+    // Unkerned runs are left as they are.
+    assert_eq!(engine_runs(&styled("AB\nCD", CharStyle::default())).len(), 1);
+}
+
+/// Tate-chu-yoko blocks (two digits set across a vertical column) aren't optically kerned
+/// (P2-17 review).
+#[test]
+fn tate_chu_yoko_blocks_are_not_optically_kerned() {
+    let at = |kerning: Kerning| {
+        let mut l = styled("10", CharStyle { size_pt: 40.0, kerning, ..Default::default() });
+        l.orientation = Orientation::Vertical;
+        layout(&l).glyphs.iter().map(|g| g.xf).collect::<Vec<_>>()
+    };
+    assert_eq!(at(Kerning::Optical), at(Kerning::Off));
 }

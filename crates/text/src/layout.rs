@@ -40,9 +40,13 @@ impl Ctx<'_> {
         let mut v = Vec::with_capacity(r.len());
         let levels = bidi.map_or(&[][..], |b| &b.levels);
         shape_range(self.db, self.text, r, &self.runs, &self.opts.features, levels, &mut v);
-        self.optical_kerning(&mut v);
         if self.vertical {
             tate_chu_yoko(&mut v, |g| self.style_at(g.byte).size);
+        }
+        // After tate-chu-yoko, whose blocks it leaves alone; before line breaking (so a pair a
+        // line break later separates keeps its kern, where PhotoCraft kerns within each line).
+        self.optical_kerning(&mut v);
+        if self.vertical {
             // An upright glyph advances down the column by its vertical advance (the font's vertical
             // metrics; without them at least one em, as CJK fonts' is), centred across it: a narrow
             // mark like § must not overlap its neighbours.
@@ -64,7 +68,7 @@ impl Ctx<'_> {
         if !self.runs.iter().any(|(_, s)| s.optical_kerning) {
             return;
         }
-        let blank = |g: &SGlyph| g.is_space() || g.is_soft_hyphen() || g.ch.is_control();
+        let blank = |g: &SGlyph| g.is_space() || g.ch == '\u{A0}' || g.is_soft_hyphen() || g.ch.is_control();
         for j in 1..v.len() {
             let (Some(a), Some(b)) = (v.get(j - 1), v.get(j)) else { break };
             let (Some((_, sa)), Some((_, sb))) = (self.runs.get(a.run), self.runs.get(b.run)) else { continue };

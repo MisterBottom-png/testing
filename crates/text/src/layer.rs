@@ -71,7 +71,8 @@ pub fn char_style(st: &PcStyle, auto_leading: f32) -> CharStyle {
         tracking: f64::from(st.tracking),
         // A manual kern replaces the automatic one, whatever the mode (as in Photoshop); Metrics is
         // the font's kerning, Optical the outlines' (P2-17), Off none.
-        kerning: (st.kerning == Kerning::Off || (st.kern != 0.0 && st.kern.is_finite())).then(|| if st.kern.is_finite() { f64::from(st.kern) } else { 0.0 }),
+        // (A NaN kern from a damaged file counts as manual, as in PhotoCraft, and kerns by 0.)
+        kerning: (st.kerning == Kerning::Off || st.kern != 0.0).then(|| if st.kern.is_finite() { f64::from(st.kern) } else { 0.0 }),
         optical_kerning: st.kerning == Kerning::Optical,
         baseline_shift: f64::from(st.baseline_shift_pt),
         h_scale: f64::from(if st.horizontal_scale > 0.0 { st.horizontal_scale } else { 1.0 }) * 100.0,
@@ -117,8 +118,9 @@ pub fn px_per_pt(dpi: f32) -> f64 {
 }
 
 /// The layer's character runs as the engine sets them (byte range, style): a manually kerned
-/// character with nothing after it in its paragraph gets a run of its own without the kern, since
-/// PhotoCraft kerns only between two characters (P2-17).
+/// character (with its accents) with nothing after it in its paragraph gets a run of its own
+/// without the kern, since PhotoCraft kerns only between two characters (P2-17). Characters at
+/// the end of a line a paragraph wraps onto keep theirs (the engine breaks lines later).
 pub fn engine_runs(layer: &TextLayer) -> Vec<(std::ops::Range<usize>, PcStyle)> {
     let mut out = Vec::new();
     let mut at = 0usize;
@@ -126,16 +128,18 @@ pub fn engine_runs(layer: &TextLayer) -> Vec<(std::ops::Range<usize>, PcStyle)> 
         let end = at.saturating_add(r.len).min(layer.text.len());
         let mut start = at;
         if r.style.kern != 0.0 {
-            // Characters followed by a paragraph end (or the end of the text).
+            // The last character (grapheme cluster: a letter keeps its accents) before each
+            // paragraph end or the end of the text.
             let text = layer.text.get(at..end).unwrap_or("");
             for (i, c) in text.char_indices() {
                 let next = at + i + c.len_utf8();
                 let last = c != '\n' && layer.text.get(next..).is_none_or(|t| t.is_empty() || t.starts_with('\n'));
                 if last {
-                    if at + i > start {
-                        out.push((start..at + i, r.style.clone()));
+                    let first = crate::shape::cluster_start(&layer.text, next).max(start);
+                    if first > start {
+                        out.push((start..first, r.style.clone()));
                     }
-                    out.push((at + i..next, PcStyle { kern: 0.0, ..r.style.clone() }));
+                    out.push((first..next, PcStyle { kern: 0.0, ..r.style.clone() }));
                     start = next;
                 }
             }

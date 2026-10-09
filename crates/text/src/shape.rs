@@ -253,6 +253,40 @@ struct Segment<'a> {
     level: Level,
 }
 
+/// Where the user-perceived character (grapheme cluster) that ends at byte `end` of `text`
+/// starts: back over combining marks, joiners and variation selectors, emoji modifiers and tags,
+/// the character a zero-width joiner joins, a regional-indicator pair (a flag) and Hangul vowel
+/// and final jamo. `end` itself when it isn't a character boundary.
+pub(crate) fn cluster_start(text: &str, end: usize) -> usize {
+    let Some(before) = text.get(..end) else { return end };
+    let extends =
+        |c: char| is_mark(c) || matches!(c, '\u{1F3FB}'..='\u{1F3FF}' | '\u{E0020}'..='\u{E007F}' | '\u{1160}'..='\u{11FF}' | '\u{D7B0}'..='\u{D7FF}');
+    let regional = |c: char| matches!(c, '\u{1F1E6}'..='\u{1F1FF}');
+    let mut chars = before.char_indices().rev().peekable();
+    let mut start = end;
+    while let Some((i, c)) = chars.next() {
+        start = i;
+        if extends(c) {
+            continue;
+        }
+        if regional(c)
+            && chars.peek().is_some_and(|&(_, p)| regional(p))
+            && let Some((j, _)) = chars.next()
+        {
+            start = j;
+        }
+        // The base, unless a joiner joins it to the one before.
+        if chars.peek().is_some_and(|&(_, p)| p == '\u{200D}')
+            && let Some((j, _)) = chars.next()
+        {
+            start = j;
+            continue;
+        }
+        break;
+    }
+    start
+}
+
 fn is_mark(c: char) -> bool {
     use unicode_general_category::{GeneralCategory, get_general_category};
     matches!(get_general_category(c), GeneralCategory::NonspacingMark | GeneralCategory::SpacingMark | GeneralCategory::EnclosingMark)

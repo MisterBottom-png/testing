@@ -1337,7 +1337,7 @@ impl FontDb {
     /// Optical kerning of glyphs `left` then `right` of `face`, in 1/1000 em at 95 pt and above
     /// ([`crate::optical`]); `None` when it doesn't apply (spaces, unreadable outlines).
     pub(crate) fn optical_pair(&self, face: &FontFace, left: u32, right: u32) -> Option<f32> {
-        let mut cache = self.optical.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut cache = self.optical.lock().unwrap_or_else(|e| e.into_inner());
         cache.pair(u64::from(face.id()), face.data(), face.index(), face.location().coords(), left, right)
     }
 
