@@ -27,6 +27,9 @@ pub struct OtFeatures {
     pub ordinals: bool,
     /// Swashes (`swsh`).
     pub swash: bool,
+    /// Keep standard ligatures in tracked text too (PhotoCraft text layers, whose engine does,
+    /// P2-18); otherwise tracking turns them off.
+    pub ligatures_with_tracking: bool,
 }
 
 impl Default for OtFeatures {
@@ -42,8 +45,27 @@ impl Default for OtFeatures {
             tabular_figures: false,
             ordinals: false,
             swash: false,
+            ligatures_with_tracking: false,
         }
     }
+}
+
+/// A character style's own OpenType setting outside the nine named ones: `ss01` (on), `-ss01`
+/// (off) or `salt=2` (an alternate by number), with a four-letter ASCII tag; `None` otherwise.
+fn other_feature(item: &str) -> Option<Feature> {
+    let (on, rest) = match item.strip_prefix('-') {
+        Some(r) => (false, r),
+        None => (true, item.strip_prefix('+').unwrap_or(item)),
+    };
+    let (tag, value) = match rest.split_once('=') {
+        Some((t, v)) => (t, v.parse::<u32>().ok()?),
+        None => (rest, u32::from(on)),
+    };
+    let bytes: [u8; 4] = tag.as_bytes().try_into().ok()?;
+    if !bytes.iter().all(|b| b.is_ascii_graphic()) || OtFeatures::known_tag(tag) || matches!(tag, "kern" | "case" | "vert" | "clig") {
+        return None;
+    }
+    Some(Feature::new(Tag::new(&bytes), if on { value } else { 0 }, ..))
 }
 
 fn f(tag: &[u8; 4], on: bool) -> Feature {
@@ -92,6 +114,11 @@ impl OtFeatures {
                 Some(r) => (false, r),
                 None => (true, t.strip_prefix('+').unwrap_or(t)),
             };
+            // `tag=n`: on for any n but 0.
+            let (on, t) = match t.split_once('=') {
+                Some((t, n)) => (on && n.trim() != "0", t),
+                None => (on, t),
+            };
             match t {
                 "liga" => o.ligatures = on,
                 "calt" => o.contextual = on,
@@ -118,7 +145,7 @@ impl OtFeatures {
         if st.kerning.is_some() || st.optical_kerning {
             v.push(f(b"kern", false));
         }
-        let liga = s.ligatures && st.tracking.abs() < 1e-9;
+        let liga = s.ligatures && (self.ligatures_with_tracking || st.tracking.abs() < 1e-9);
         if !liga {
             v.push(f(b"liga", false));
             v.push(f(b"clig", false));
@@ -142,6 +169,8 @@ impl OtFeatures {
                 v.push(f(tag, true));
             }
         }
+        // Anything else the style turns on or off (stylistic sets, alternates by number, …).
+        v.extend(st.features.iter().filter_map(|t| other_feature(t)));
         if self.vertical {
             // Not `vrt2`: its glyphs are already turned on their side, and the layout turns Latin
             // and digits itself (they would lie upside down, and tate-chu-yoko break).

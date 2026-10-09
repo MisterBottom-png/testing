@@ -471,6 +471,8 @@ mod tests_embed;
 #[cfg(test)]
 mod tests_kerning;
 #[cfg(test)]
+mod tests_mapping;
+#[cfg(test)]
 mod tests_scripts;
 #[cfg(test)]
 mod tests_snap;

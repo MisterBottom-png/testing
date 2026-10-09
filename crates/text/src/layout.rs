@@ -657,12 +657,22 @@ struct Metrics {
     xh: f64,
     /// Height of the top of the ideographic em box above the baseline.
     top: f64,
+    /// Height of the lowercase ascender ('d') above the baseline.
+    dh: f64,
 }
 
 impl Metrics {
     fn of(g: &SGlyph) -> Self {
         let em = g.face.units_per_em() * g.sy;
-        Self { asc: g.ascent, desc: g.descent, lead: g.leading, cap: g.cap, xh: g.xh, top: (g.face.ideographic_centre() + 0.5) * em }
+        Self {
+            asc: g.ascent,
+            desc: g.descent,
+            lead: g.leading,
+            cap: g.cap,
+            xh: g.xh,
+            top: (g.face.ideographic_centre() + 0.5) * em,
+            dh: g.face.lowercase_ascender() * g.sy,
+        }
     }
     fn max(g: &[SGlyph]) -> Option<Self> {
         let mut it = g.iter();
@@ -674,6 +684,7 @@ impl Metrics {
             cap: m.cap.max(g.cap),
             xh: m.xh.max(g.xh),
             top: m.top.max(Self::of(g).top),
+            dh: m.dh.max(Self::of(g).dh),
         }))
     }
     /// Distance from the frame top to the first baseline.
@@ -684,6 +695,7 @@ impl Metrics {
             FirstBaseline::XHeight => self.xh,
             FirstBaseline::Leading => self.lead,
             FirstBaseline::Fixed => 0.0,
+            FirstBaseline::LowercaseAscender => self.dh,
         };
         v.max(min)
     }
@@ -1044,8 +1056,11 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], para: &ParaStyle, regions: Opt
             let (asc, desc, lead) = style_metrics(cx.db, cx.style_at(pr.start));
             let st = cx.style_at(pr.start);
             let (cap, xh) = cap_x_heights(cx.db, st);
-            let centre = cx.db.face(&st.font_family, &st.font_style).map_or(EM_CENTER, |f| f.ideographic_centre());
-            Metrics { asc, desc, lead, cap, xh, top: (centre + 0.5) * st.size * st.v_scale / 100.0 }
+            let face = cx.db.face(&st.font_family, &st.font_style);
+            let centre = face.as_ref().map_or(EM_CENTER, |f| f.ideographic_centre());
+            let em = st.size * st.v_scale / 100.0;
+            let dh = face.as_ref().map_or(cap, |f| f.lowercase_ascender() / f.upem * em);
+            Metrics { asc, desc, lead, cap, xh, top: (centre + 0.5) * em, dh }
         };
         if pi > 0 {
             pen.pending += para.space_before;

@@ -109,9 +109,11 @@ pub(crate) fn type_props(st: &CharStyle, len: &dyn Fn(f64) -> String) -> Props {
         let v: Vec<String> = st
             .features
             .iter()
-            .map(|t| match t.strip_prefix('-') {
-                Some(off) => format!("\"{off}\" 0"),
-                None => format!("\"{t}\" 1"),
+            .map(|t| match (t.strip_prefix('-'), t.split_once('=')) {
+                (Some(off), _) => format!("\"{off}\" 0"),
+                // An alternate by number (`salt=2`, PhotoCraft text layers' features).
+                (None, Some((tag, n))) => format!("\"{tag}\" {}", n.trim().parse::<u32>().unwrap_or(1)),
+                (None, None) => format!("\"{t}\" 1"),
             })
             .collect();
         p.push(("font-feature-settings", v.join(", ")));
