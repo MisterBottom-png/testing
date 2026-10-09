@@ -257,6 +257,8 @@ pub struct FontDb {
     /// What the last scan read, to tell when fonts were installed or removed since.
     #[cfg(not(target_arch = "wasm32"))]
     stamp: Mutex<Option<ScanStamp>>,
+    /// Glyph profiles for optical kerning (P2-17), per face.
+    optical: Mutex<crate::optical::Cache>,
 }
 
 /// Where a database's system font scan looks: folders (read with their subfolders) and font files.
@@ -960,6 +962,7 @@ impl FontDb {
             sys: Mutex::new(SysFallback { enabled: true, ..Default::default() }),
             #[cfg(not(target_arch = "wasm32"))]
             stamp: Mutex::new(None),
+            optical: Mutex::new(crate::optical::Cache::default()),
         }
     }
 
@@ -1329,6 +1332,13 @@ impl FontDb {
     /// The loaded face with [`FontFace::id`] `id` (the face a laid-out glyph came from).
     pub fn face_by_id(&self, id: u32) -> Option<Arc<FontFace>> {
         self.read_faces().iter().find(|f| f.id == id).cloned()
+    }
+
+    /// Optical kerning of glyphs `left` then `right` of `face`, in 1/1000 em at 95 pt and above
+    /// ([`crate::optical`]); `None` when it doesn't apply (spaces, unreadable outlines).
+    pub(crate) fn optical_pair(&self, face: &FontFace, left: u32, right: u32) -> Option<f32> {
+        let mut cache = self.optical.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        cache.pair(u64::from(face.id()), face.data(), face.index(), face.location().coords(), left, right)
     }
 
     /// The available family `name` names, ignoring case and anything but letters and digits, as

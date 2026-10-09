@@ -40,6 +40,7 @@ impl Ctx<'_> {
         let mut v = Vec::with_capacity(r.len());
         let levels = bidi.map_or(&[][..], |b| &b.levels);
         shape_range(self.db, self.text, r, &self.runs, &self.opts.features, levels, &mut v);
+        self.optical_kerning(&mut v);
         if self.vertical {
             tate_chu_yoko(&mut v, |g| self.style_at(g.byte).size);
             // An upright glyph advances down the column by its vertical advance (the font's vertical
@@ -52,6 +53,49 @@ impl Ctx<'_> {
             }
         }
         v
+    }
+
+    /// Optical kerning (PhotoCraft's, P2-17), between shaping and line breaking: the space after
+    /// each character whose style and the next one's ask for it (Auto kerning, optical) changes
+    /// by the pair's optical kerning ([`crate::optical`]) plus the size adjustment. Pairs across
+    /// a change of face or size, with a space or control character, right to left, or upright in
+    /// vertical type aren't kerned.
+    fn optical_kerning(&self, v: &mut [SGlyph]) {
+        if !self.runs.iter().any(|(_, s)| s.optical_kerning) {
+            return;
+        }
+        let blank = |g: &SGlyph| g.is_space() || g.is_soft_hyphen() || g.ch.is_control();
+        for j in 1..v.len() {
+            let (Some(a), Some(b)) = (v.get(j - 1), v.get(j)) else { break };
+            let (Some((_, sa)), Some((_, sb))) = (self.runs.get(a.run), self.runs.get(b.run)) else { continue };
+            let optical = |s: &CharStyle| s.optical_kerning && s.kerning.is_none();
+            if a.byte == b.byte
+                || !optical(sa)
+                || !optical(sb)
+                || a.level.is_rtl()
+                || b.level.is_rtl()
+                || blank(a)
+                || blank(b)
+                || a.face.id() != b.face.id()
+                || (a.sx - b.sx).abs() > 1e-9
+                || (a.sy - b.sy).abs() > 1e-9
+                || (self.vertical && (stands_upright(a) || stands_upright(b) || a.tcy.is_some() || b.tcy.is_some()))
+            {
+                continue;
+            }
+            let Some(k) = self.db.optical_pair(&a.face, a.gid, b.gid) else { continue };
+            // The glyphs' size (sub- and superscript, small capitals applied), without the
+            // horizontal scale; the size adjustment goes by the style's size (text is in points).
+            let hs = sa.h_scale / 100.0;
+            let size = if hs > 0.0 { a.sx * a.face.upem / hs } else { sa.size };
+            let units = f64::from(k + crate::optical::size_adjust(sa.size as f32));
+            let dx = units / 1000.0 * size;
+            if dx.is_finite()
+                && let Some(g) = v.get_mut(j - 1)
+            {
+                g.adv += dx;
+            }
+        }
     }
 
     fn emit(&mut self, g: &SGlyph, pre: Affine, origin: Point, angle: f64, advance: f64, line: usize) {

@@ -69,12 +69,10 @@ pub fn char_style(st: &PcStyle, auto_leading: f32) -> CharStyle {
         size,
         leading,
         tracking: f64::from(st.tracking),
-        // Metrics: the font's kerning; Off: none, plus the manual value. (Manual kerning on top of
-        // the font's, and optical kerning, are P2-17.)
-        kerning: match st.kerning {
-            Kerning::Off => Some(f64::from(st.kern)),
-            Kerning::Metrics | Kerning::Optical => None,
-        },
+        // A manual kern replaces the automatic one, whatever the mode (as in Photoshop); Metrics is
+        // the font's kerning, Optical the outlines' (P2-17), Off none.
+        kerning: (st.kerning == Kerning::Off || (st.kern != 0.0 && st.kern.is_finite())).then(|| if st.kern.is_finite() { f64::from(st.kern) } else { 0.0 }),
+        optical_kerning: st.kerning == Kerning::Optical,
         baseline_shift: f64::from(st.baseline_shift_pt),
         h_scale: f64::from(if st.horizontal_scale > 0.0 { st.horizontal_scale } else { 1.0 }) * 100.0,
         v_scale: f64::from(if st.vertical_scale > 0.0 { st.vertical_scale } else { 1.0 }) * 100.0,
@@ -118,8 +116,40 @@ pub fn px_per_pt(dpi: f32) -> f64 {
     if dpi.is_finite() && dpi > 0.0 { f64::from(dpi) / 72.0 } else { 1.0 }
 }
 
+/// The layer's character runs as the engine sets them (byte range, style): a manually kerned
+/// character with nothing after it in its paragraph gets a run of its own without the kern, since
+/// PhotoCraft kerns only between two characters (P2-17).
+pub fn engine_runs(layer: &TextLayer) -> Vec<(std::ops::Range<usize>, PcStyle)> {
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    for r in layer.char_runs() {
+        let end = at.saturating_add(r.len).min(layer.text.len());
+        let mut start = at;
+        if r.style.kern != 0.0 {
+            // Characters followed by a paragraph end (or the end of the text).
+            let text = layer.text.get(at..end).unwrap_or("");
+            for (i, c) in text.char_indices() {
+                let next = at + i + c.len_utf8();
+                let last = c != '\n' && layer.text.get(next..).is_none_or(|t| t.is_empty() || t.starts_with('\n'));
+                if last {
+                    if at + i > start {
+                        out.push((start..at + i, r.style.clone()));
+                    }
+                    out.push((at + i..next, PcStyle { kern: 0.0, ..r.style.clone() }));
+                    start = next;
+                }
+            }
+        }
+        if end > start || (start == at && end == at) {
+            out.push((start..end, r.style));
+        }
+        at = end;
+    }
+    out
+}
+
 /// `layer` as a text object in points, with the per-paragraph styles for [`layout_with`]. The
-/// object's runs are the layer's character runs, in order (glyph `run` indices map to them).
+/// object's runs are [`engine_runs`], in order (glyph `run` indices map to them).
 pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
     let k = px_per_pt(dpi);
     let paras = layer.paragraph_runs();
@@ -135,13 +165,10 @@ pub fn text_object(layer: &TextLayer, dpi: f32) -> (TextObject, LayoutOptions) {
         paras.last().map(|p| &p.style)
     };
     let mut runs = Vec::new();
-    let mut at = 0usize;
-    for r in layer.char_runs() {
-        let end = at.saturating_add(r.len).min(layer.text.len());
-        let text = layer.text.get(at..end).unwrap_or("").to_string();
-        let auto = para_at(at).map_or(ENGINE_AUTO_LEADING, |p| p.auto_leading);
-        runs.push(TextRun { text, style: char_style(&r.style, auto) });
-        at = end;
+    for (range, style) in engine_runs(layer) {
+        let text = layer.text.get(range.clone()).unwrap_or("").to_string();
+        let auto = para_at(range.start).map_or(ENGINE_AUTO_LEADING, |p| p.auto_leading);
+        runs.push(TextRun { text, style: char_style(&style, auto) });
     }
     // One style per paragraph of the engine's split (at '\n').
     let mut paragraphs = Vec::new();
@@ -189,7 +216,7 @@ pub struct Decoration {
 pub struct LayerLayout {
     pub glyphs: Vec<LayerGlyph>,
     pub decorations: Vec<Decoration>,
-    /// The layer's character styles, one per run.
+    /// The layer's character styles, one per engine run ([`engine_runs`]).
     pub styles: Vec<PcStyle>,
     /// Line boxes `[x0, top, x1, bottom]` (horizontal type: along the line, ascent to descent).
     pub lines: Vec<[f64; 4]>,
@@ -219,7 +246,7 @@ pub const FAUX_ITALIC_DEG: f64 = 12.0;
 pub fn layout_layer(db: &FontDb, layer: &TextLayer, dpi: f32) -> LayerLayout {
     let k = px_per_pt(dpi);
     let to_px = Affine::scale(k);
-    let styles: Vec<PcStyle> = layer.char_runs().into_iter().map(|r| r.style).collect();
+    let styles: Vec<PcStyle> = engine_runs(layer).into_iter().map(|(_, s)| s).collect();
     let (t, opts) = text_object(layer, dpi);
     let l = layout_with(db, &t, &opts);
     let mut out = LayerLayout { styles, px_per_pt: k, vertical: l.vertical, ..LayerLayout::default() };

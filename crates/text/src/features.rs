@@ -114,7 +114,8 @@ impl OtFeatures {
         let own = self.with_tags(st.features.iter().map(String::as_str));
         let s = &own;
         let mut v = Vec::with_capacity(8);
-        if st.kerning.is_some() {
+        // Manual and optical kerning replace the font's kerning table.
+        if st.kerning.is_some() || st.optical_kerning {
             v.push(f(b"kern", false));
         }
         let liga = s.ligatures && st.tracking.abs() < 1e-9;
