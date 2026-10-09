@@ -24,6 +24,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-doc", Class::Layer(1)),
     ("astudio-text", Class::Layer(2)),
     ("astudio-pathops", Class::Layer(2)),
+    ("astudio-vbrush", Class::Layer(2)),
     ("astudio-plugins", Class::Layer(2)),
     ("astudio-effects", Class::Layer(2)),
     ("astudio-paint", Class::Layer(2)),
@@ -52,4 +53,7 @@ pub const INTRA_LAYER: &[(&str, &str)] = &[
     ("astudio-raster", "astudio-color"),
     ("astudio-doc", "astudio-vdoc"),
     ("astudio-effects", "astudio-plugins"),
+    // Effects outline strokes and text, and combine shapes (VectorCraft's order, P2-14).
+    ("astudio-effects", "astudio-pathops"),
+    ("astudio-effects", "astudio-text"),
 ];

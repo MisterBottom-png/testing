@@ -10,11 +10,29 @@ publish = false
 [dependencies]
 astudio-geom = { path = "../geom" }
 astudio-color = { path = "../color" }
-astudio-raster = { path = "../raster" }
 astudio-vdoc = { path = "../vdoc" }
-astudio-doc = { path = "../doc" }
 astudio-text = { path = "../text" }
 astudio-effects = { path = "../effects" }
+astudio-vbrush = { path = "../vbrush" }
+vello_cpu = { workspace = true }
+vello_common = { workspace = true }
+image = { workspace = true }
+flate2 = { workspace = true }
+jpeg-encoder = { workspace = true }
+gif = { workspace = true }
+weezl = "0.1"
+log = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vello_cpu = { workspace = true, features = ["multithreading"] }
+
+[dev-dependencies]
+astudio-testkit = { path = "../testkit" }
+image = { workspace = true, features = ["tga"] }
+tiff = { workspace = true }
+psd = "0.3"
+proptest = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

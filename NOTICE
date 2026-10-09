@@ -43,6 +43,10 @@ packages carry each one's full licence text (task P7-08). Notices those licences
 - HEIC photos (the `heif` feature of astudio-codecs) are decoded by heic-rs (MIT OR Apache-2.0),
   written from the ISO/IEC 23008-12 and ITU-T H.265 specifications. It grants no HEVC patent
   licence; whether release builds enable it is a release decision (task P7-08).
+- WebAssembly plug-ins run in the wasmi interpreter (MIT OR Apache-2.0); its wasmparser
+  dependency is under the Apache License 2.0 with the LLVM exception.
+- Vector layers are drawn by the Linebender crates vello_cpu, vello_common, peniko, color,
+  fearless_simd and glifo (Apache-2.0 OR MIT).
 
 When more upstream code and assets are merged in, copy each upstream NOTICE entry here (Lucide
 icons under ISC, the CC BY 3.0 magnetic lasso glyph, Adobe CMap resources

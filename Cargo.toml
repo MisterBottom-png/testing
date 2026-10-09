@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz"]
+exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz", "crates/plugins/example"]
 resolver = "3"
 members = [
     "crates/geom",
@@ -14,6 +14,7 @@ members = [
     "crates/doc",
     "crates/text",
     "crates/pathops",
+    "crates/vbrush",
     "crates/effects",
     "crates/paint",
     "crates/algo",
@@ -54,6 +55,9 @@ thiserror = "2"
 proptest = "1"
 log = "0.4"
 rayon = "1"
+wasmi = { version = "2.0.0", default-features = false, features = ["std", "validate", "stable", "portable-dispatch"] }
+linesweeper = "0.4"
+gif = { version = "0.14", default-features = false, features = ["std", "raii_no_panic"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 moxcms = "0.8"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
@@ -81,6 +85,25 @@ panic = "deny"
 unimplemented = "deny"
 todo = "deny"
 unreachable = "deny"
+
+
+# Plug-ins run in the wasmi interpreter, whose fuel and time budgets are tested (astudio-plugins
+# tests/abi.rs): unoptimised, it is too slow to stop runaway plug-ins in time. VectorCraft builds
+# every dependency at opt-level 2 in dev; A-Studio does it for the interpreter only (P2-14).
+[profile.dev.package.wasmi]
+opt-level = 2
+
+[profile.dev.package.wasmi_collections]
+opt-level = 2
+
+[profile.dev.package.wasmi_core]
+opt-level = 2
+
+[profile.dev.package.wasmi_ir]
+opt-level = 2
+
+[profile.dev.package.wasmparser]
+opt-level = 2
 
 [profile.release]
 panic = "unwind"

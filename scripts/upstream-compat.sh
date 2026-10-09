@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof that both upstream apps build against A-Studio's merged crates (P2-01 geometry, P2-02 colour,
-# P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw, P2-16 raster/doc).
+# P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw, P2-16 raster/doc, P2-14 pathops/brush/plugins/effects/render).
 #
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
@@ -77,6 +77,15 @@ shim vectorcraft geom geom 'pub use astudio_geom::*;'
 # VectorCraft's color = astudio_color::vector; its doc = astudio-vdoc.
 shim vectorcraft color color 'pub use astudio_color::vector::*;'
 shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
+# VectorCraft's pathops, brush, plugins, effects and render = the A-Studio crates (P2-14).
+shim vectorcraft pathops pathops 'pub use astudio_pathops::*;'
+shim vectorcraft brush vbrush 'pub use astudio_vbrush::*;'
+shim vectorcraft plugins plugins 'pub use astudio_plugins::*;'
+# Engine and UI tests read the example plug-in from the plugins crate's fixtures.
+mkdir -p "$out/vectorcraft/src-copy/crates/plugins/tests"
+cp -r crates/plugins/tests/fixtures "$out/vectorcraft/src-copy/crates/plugins/tests/"
+shim vectorcraft effects effects 'pub use astudio_effects::*;'
+shim vectorcraft render render 'pub use astudio_render::*;'
 # VectorCraft's text = astudio-text; its `test-fonts` feature passes through.
 shim vectorcraft text text 'pub use astudio_text::*;'
 printf '\n[features]\ntest-fonts = ["astudio-text/test-fonts"]\n' >> "$out/vectorcraft/src-copy/crates/text/Cargo.toml"

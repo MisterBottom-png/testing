@@ -35,6 +35,10 @@ skip = [
   { crate = "read-fonts@0.39.2", reason = "skrifa 0.42 (subsetter) and write-fonts 0.48" },
   { crate = "read-fonts@0.43.3", reason = "harfrust 0.13; skrifa 0.47 uses read-fonts 0.44" },
   { crate = "font-types@0.11.3", reason = "read-fonts 0.39 (subsetter, write-fonts)" },
+  # The vector renderer (astudio-render, P2-14): vello_cpu 0.2 reads glyphs with skrifa 0.44, as in
+  # VectorCraft's lock file.
+  { crate = "skrifa@0.44.0", reason = "vello_cpu 0.2 through glifo 0.3; A-Studio uses skrifa 0.47" },
+  { crate = "read-fonts@0.41.0", reason = "skrifa 0.44 (glifo 0.3, vello_cpu 0.2)" },
 ]
 
 [advisories]
