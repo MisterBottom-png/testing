@@ -122,6 +122,70 @@ impl Clut {
         }
     }
 
+    /// [`Self::tetra`] for a fixed number of outputs `O` (the 8-bit fast paths, P2-12): each corner
+    /// is read as one node (one range check), the result is an array. `base` and the strides are
+    /// in values, as for `tetra`.
+    #[inline(always)]
+    pub(crate) fn tetra_n<const O: usize>(&self, base: usize, s: [usize; 3], r: [f32; 3]) -> [f32; O] {
+        let node = |i: usize| -> [f32; O] { self.data.get(i..i + O).and_then(|v| v.try_into().ok()).unwrap_or([0.0; O]) };
+        let [rx, ry, rz] = r;
+        let [sx, sy, sz] = s;
+        let (p1, p2, p3, w1, w2, w3) = if rx >= ry {
+            if ry >= rz {
+                (base + sx, base + sx + sy, base + sx + sy + sz, rx, ry, rz)
+            } else if rx >= rz {
+                (base + sx, base + sx + sz, base + sx + sy + sz, rx, rz, ry)
+            } else {
+                (base + sz, base + sx + sz, base + sx + sy + sz, rz, rx, ry)
+            }
+        } else if rx >= rz {
+            (base + sy, base + sx + sy, base + sx + sy + sz, ry, rx, rz)
+        } else if ry >= rz {
+            (base + sy, base + sy + sz, base + sx + sy + sz, ry, rz, rx)
+        } else {
+            (base + sz, base + sy + sz, base + sx + sy + sz, rz, ry, rx)
+        };
+        let (v0, v1, v2, v3) = (node(base), node(p1), node(p2), node(p3));
+        std::array::from_fn(|k| v0[k] + (v1[k] - v0[k]) * w1 + (v2[k] - v1[k]) * w2 + (v3[k] - v2[k]) * w3)
+    }
+
+    /// [`Self::tetra_n`] in the cube at `base` and the one `s0` further along the first input,
+    /// blended by `r0` (4-input tables: CMYK). Both cubes take the same tetrahedron, so it is chosen
+    /// once; the arithmetic per cube is `tetra_n`'s, and the second cube is skipped when `r0` is 0.
+    #[inline(always)]
+    pub(crate) fn tetra2_n<const O: usize>(&self, base: usize, s0: usize, s: [usize; 3], r0: f32, r: [f32; 3]) -> [f32; O] {
+        let node = |i: usize| -> [f32; O] { self.data.get(i..i + O).and_then(|v| v.try_into().ok()).unwrap_or([0.0; O]) };
+        let [rx, ry, rz] = r;
+        let [sx, sy, sz] = s;
+        let (o1, o2, o3, w1, w2, w3) = if rx >= ry {
+            if ry >= rz {
+                (sx, sx + sy, sx + sy + sz, rx, ry, rz)
+            } else if rx >= rz {
+                (sx, sx + sz, sx + sy + sz, rx, rz, ry)
+            } else {
+                (sz, sx + sz, sx + sy + sz, rz, rx, ry)
+            }
+        } else if rx >= rz {
+            (sy, sx + sy, sx + sy + sz, ry, rx, rz)
+        } else if ry >= rz {
+            (sy, sy + sz, sx + sy + sz, ry, rz, rx)
+        } else {
+            (sz, sy + sz, sx + sy + sz, rz, ry, rx)
+        };
+        let cube = |b: usize| -> [f32; O] {
+            let (v0, v1, v2, v3) = (node(b), node(b + o1), node(b + o2), node(b + o3));
+            std::array::from_fn(|k| v0[k] + (v1[k] - v0[k]) * w1 + (v2[k] - v1[k]) * w2 + (v3[k] - v2[k]) * w3)
+        };
+        let mut v = cube(base);
+        if r0 > 0.0 {
+            let hi = cube(base + s0);
+            for k in 0..O {
+                v[k] += (hi[k] - v[k]) * r0;
+            }
+        }
+        v
+    }
+
     /// Tetrahedral interpolation inside one cube of three dimensions.
     #[inline]
     fn tetra(&self, base: usize, s: [usize; 3], r: [f32; 3], out: &mut [f32]) {

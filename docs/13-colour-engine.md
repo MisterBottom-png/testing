@@ -90,11 +90,51 @@ One engine, `astudio-color` (L0), in this order:
 
 What is dropped: nothing a user sees. moxcms leaves the shipped app (it stays as a test oracle).
 
+## Fast paths (P2-12)
+
+Measured 9 October 2026 with `scripts/cms-bench` (now also running A-Studio's engine; fastest of seven
+runs, same machine as above, 24 MP of random 8-bit pixels):
+
+| Conversion | A-Studio, 1 thread | PhotoCraft, 1 thread | moxcms, 1 thread | A-Studio / moxcms (1 thread, 4 threads) | Error, A-Studio (mean / max) |
+| --- | --- | --- | --- | --- | --- |
+| sRGB to Display P3 | 204 ms | 822 ms | 49 ms | 4.2, 4.1 | 0.000 / 1 (unchanged) |
+| sRGB to Coated CMYK | 597 ms | 992 ms | 468 ms | 1.3, 1.7 (target met) | 0.27 / 31 (unchanged) |
+| Coated CMYK to sRGB | 930 ms | 1,839 ms | 312 ms | 3.0, 2.5 | 0.21 / 6 (unchanged) |
+
+What changed, all in safe code in `astudio-color` (`cms/transform.rs`, `cms/clut.rs`):
+
+- **Exact 8-bit output encoding.** Output curves were evaluated through a table indexed by `x^(1/4)`
+  (two square roots and an interpolation per channel). Now a table indexed by the bits of the float
+  (log-spaced, fine near black) holds each bucket's 8-bit code and where in the bucket it steps up,
+  so the result is the exactly rounded curve. Tests: every value of a million, for sRGB, gamma 2.2,
+  gamma 1.8 and linear curves.
+- **Fixed loops** for the common cases: RGB matrix-shaper to RGB (3 to 3), RGB to CMYK (3 to 4)
+  and CMYK to RGB (4 to 3), with whole grid nodes read at once and no general-size loops.
+- 8-bit output through output curves is now exactly rounded, so it can differ by one step from the
+  16-bit and float-preview paths, which still interpolate the curves (8-bit is the more exact one).
+  Curves that are not monotonic keep the interpolated tables.
+- Tests (`tests/fast_paths.rs`): RGB to CMYK is bit-identical to the general path; RGB to RGB and
+  CMYK to RGB are never further from the exact pipeline than before (at most one value in 100,000
+  more often one step off); absolute colorimetric equals relative colorimetric between the built-in
+  D50-white profiles (the note below).
+
+Where the rest of the gap is:
+
+- **RGB to RGB** runs at about 70 machine instructions per pixel (profiled with valgrind): clamps,
+  table indexing and the exact rounding, scalar. moxcms reaches 2 to 3 processor cycles per pixel with
+  hand-written vector instructions (`unsafe` code A-Studio does not allow). Within 2 times needs
+  vector code (the `wide` crate, safe, Zlib licence, allowed above) or an approximate output table
+  (smaller and faster, but no longer exact near black for pure-gamma profiles).
+- **CMYK to RGB** is limited by memory: its 17x17x17x17 grid is 1 MB of floats, and random pixels
+  miss the cache. Halving it (16-bit or half-float nodes) changes accuracy slightly or needs hardware
+  conversion instructions the default Windows build does not assume.
+- On the canvas the screen conversion runs on the GPU (3D LUT); these CPU paths serve mode
+  conversion, export and thumbnails. At 4 threads a 24 MP image now takes 54 ms (RGB to RGB) to 259 ms
+  (CMYK to RGB).
+
 ## Open points
 
-- If the fast paths miss the target, moxcms could run display-only conversions. That would bring
-  back a second engine, with small colour differences between screen and export, so it needs the
-  owner's decision then.
+- Decided (D8, revised 9 October 2026): the fast paths stay as measured below; no second engine.
 - `tintbox` (a new pure-Rust port of LittleCMS's pipeline, seen in pdf_oxide issue 749) claims
   bit-identical output to LittleCMS. Not used: too new, licence and maintenance unverified. Look again
   at the next upstream sync.
@@ -104,7 +144,8 @@ What is dropped: nothing a user sees. moxcms leaves the shipped app (it stays as
 - The **absolute colorimetric** intent can give slightly different numbers from VectorCraft's old
   moxcms path for Wide Gamut RGB and Display P3: moxcms stored a D65 media white for them, the
   engine's built-in profiles store D50 (ICC v4). The other three intents are unchanged; no test
-  covers absolute colorimetric yet (add one with P2-12).
+  covered absolute colorimetric (P2-12 adds one: between the built-in D50-white profiles it equals
+  relative colorimetric).
 - Built-in profile descriptions still name the upstream apps ("... (Photocraft)", "VectorCraft
   Generic CMYK (SWOP-like)"). They are written into exported files and used to match profiles
   again on import, so renaming them is a file-format change: decide with the rebrand work (P3).

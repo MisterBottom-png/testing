@@ -1,4 +1,5 @@
-//! Speed and accuracy: PhotoCraft cms vs moxcms on the same profile bytes (A-Studio colour study).
+//! Speed and accuracy: A-Studio's engine (astudio-color, with the P2-12 fast paths), PhotoCraft cms
+//! and moxcms on the same profile bytes (A-Studio colour study, docs/13-colour-engine.md).
 use moxcms::{ColorProfile, Layout, RenderingIntent, TransformOptions as MoxOpts};
 use photocraft_cms::{Builtin, Intent, Transform, TransformOptions};
 use rayon::prelude::*;
@@ -19,15 +20,15 @@ fn noise(n: usize) -> Vec<u8> {
         .collect()
 }
 
-fn median(mut v: Vec<f64>) -> f64 {
-    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    v[v.len() / 2]
+fn fastest(v: Vec<f64>) -> f64 {
+    v.into_iter().fold(f64::INFINITY, f64::min)
 }
 
+/// Fastest of seven runs after a warm-up (the least disturbed by other load on a shared machine).
 fn time<F: FnMut()>(mut f: F) -> f64 {
     f(); // warm-up
-    median(
-        (0..5)
+    fastest(
+        (0..7)
             .map(|_| {
                 let t = Instant::now();
                 f();
@@ -46,7 +47,10 @@ fn err(out: &[u8], exact: &[f32]) -> (u32, f64, f64) {
 }
 
 fn case(name: &str, src_b: Builtin, dst_b: Builtin, sc: usize, dc: usize, sl: Layout, dl: Layout, bpc: bool) {
+    use astudio_color::cms as a;
     let (sp, dp) = (src_b.profile(), dst_b.profile());
+    let id = |b: Builtin| a::Builtin::from_id(b.id()).expect("same built-ins");
+    let (asp, adp) = (id(src_b).profile(), id(dst_b).profile());
     let n = W * H;
     let src = noise(n * sc);
     // PhotoCraft: build + convert (rayon on all cores), and on one thread.
@@ -75,13 +79,19 @@ fn case(name: &str, src_b: Builtin, dst_b: Builtin, sc: usize, dc: usize, sl: La
     let mut exact = vec![0f32; m * dc];
     let pcf = Transform::with_options(sp, dp, TransformOptions { intent: Intent::RelativeColorimetric, bpc, ..Default::default() }).unwrap();
     pcf.convert_f32(&fs, sc, &mut exact, dc, false);
+    // A-Studio: same build and conversion.
+    let at = a::Transform::new(asp, adp, a::Intent::RelativeColorimetric, bpc).unwrap();
+    let mut a_out = vec![0u8; n * dc];
+    let a_mt = time(|| at.convert_u8(&src, sc, &mut a_out, dc, false));
+    let a_st = one.install(|| time(|| at.convert_u8(&src, sc, &mut a_out, dc, false)));
+    let (amax, amean, a999) = err(&a_out[..m * dc], &exact);
     let (pmax, pmean, p999) = err(&pc_out[..m * dc], &exact);
     let (mmax, mmean, m999) = err(&mx_out[..m * dc], &exact);
     println!("{name} (24 MP, bpc {bpc})");
     println!("  build ms      pc {pc_build:8.1}   mox {mx_build:8.1}");
-    println!("  1 thread ms   pc {pc_st:8.1}   mox {mx_st:8.1}");
-    println!("  all cores ms  pc {pc_mt:8.1}   mox {mx_mt:8.1}");
-    println!("  error vs exact (8-bit steps): pc max {pmax} mean {pmean:.3} p99.9 {p999}   mox max {mmax} mean {mmean:.3} p99.9 {m999}");
+    println!("  1 thread ms   astudio {a_st:8.1}   pc {pc_st:8.1}   mox {mx_st:8.1}   astudio/mox {:.2}", a_st / mx_st);
+    println!("  all cores ms  astudio {a_mt:8.1}   pc {pc_mt:8.1}   mox {mx_mt:8.1}   astudio/mox {:.2}", a_mt / mx_mt);
+    println!("  error vs exact (8-bit steps): astudio max {amax} mean {amean:.3} p99.9 {a999}   pc max {pmax} mean {pmean:.3} p99.9 {p999}   mox max {mmax} mean {mmean:.3} p99.9 {m999}");
 }
 
 fn main() {
