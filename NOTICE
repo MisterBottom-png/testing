@@ -23,7 +23,9 @@ Third-party material
 - JetBrains Mono (assets/fonts/JetBrainsMono-*.ttf) - Copyright 2020 The JetBrains Mono Project
   Authors; SIL Open Font License 1.1. See assets/fonts/OFL-JetBrainsMono.txt.
 - SCOWL English word list (assets/dict/en_US-scowl-50.txt.gz) - Copyright 2000-2018 Kevin Atkinson
-  and the SCOWL contributors; SCOWL licence. See assets/dict/LICENSE-SCOWL.txt.
+  and the SCOWL contributors; SCOWL licence. Includes data derived from WordNet (Copyright 1997 by
+  Princeton University) and Ispell/VarCon (Copyright 1993 Geoff Kuenning); their notices are in
+  assets/dict/LICENSE-SCOWL.txt.
 - The synthetic coated CMYK profile (crates/color/profiles/photocraft-coated-cmyk.icc) - CC0-1.0.
   See crates/color/profiles/LICENSE-CC0-1.0.txt.
 
