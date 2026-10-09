@@ -8,7 +8,7 @@
 use astudio_color::{Color, PixelFormat};
 use astudio_doc::TextLayer;
 use astudio_doc::text::AntiAlias;
-use astudio_geom::pixel::{Affine, Rect};
+use astudio_geom::pixel::{Affine, Rect, TILE_SIZE};
 use astudio_raster::Surface;
 
 use crate::FontDb;
@@ -21,16 +21,41 @@ pub use crate::layer::FAUX_ITALIC_DEG;
 pub const FAUX_BOLD_RADIUS: f32 = 0.018;
 /// Largest raster we produce (pixels), as a guard against absurd sizes.
 const MAX_PIXELS: u64 = 256 * 1024 * 1024;
-/// Most memory the rasterizer's working buffers (premultiplied `f32` samples and coverage) take at
-/// once (P2-08 review, P2-18). A layer whose buffers would be larger is drawn in horizontal bands
-/// (P2-19); 1 GiB holds a whole CMYK layer of 44 megapixels, an RGB one of 53.
+/// Most memory the rasterizer's working buffers take at once: premultiplied `f32` samples, plus the
+/// coverage accumulation and its resolved copy (P2-08 review, P2-18). A layer whose buffers would be
+/// larger is drawn in horizontal bands (P2-19); 1 GiB holds a whole RGB layer of 44 megapixels, a
+/// CMYK one of 38.
 const MAX_BUFFER_BYTES: u64 = 1 << 30;
+/// Most memory the drawn layer's tiles may take, counting every 256-pixel tile its ink rectangle
+/// touches (P2-19 review: banding lifted the working-buffer limit, and an absurd transform must
+/// not ask for gigabytes of tiles). 2 GiB holds 536 megapixels of 8-bit RGB, 107 of 32-bit CMYK.
+const MAX_SURFACE_BYTES: u64 = 2 << 30;
+
+/// Working-buffer bytes per pixel of a band with `stride` samples a pixel: the samples, the
+/// coverage accumulation and its resolved copy, `f32` each.
+fn band_pixel_bytes(stride: usize) -> u64 {
+    (stride as u64 + 2) * 4
+}
 
 /// Rows a band of a `w` × `h` raster with `stride` samples a pixel may have so that its working
-/// buffers (samples plus coverage, `f32` each) stay within `budget` bytes; at least one row.
+/// buffers stay within `budget` bytes; at least one row ([`fits`] refuses rows past the limit).
 fn band_rows(w: usize, h: usize, stride: usize, budget: u64) -> usize {
-    let row_bytes = (w as u64).saturating_mul(stride as u64 + 1).saturating_mul(4).max(1);
+    let row_bytes = (w as u64).saturating_mul(band_pixel_bytes(stride)).max(1);
     usize::try_from(budget / row_bytes).unwrap_or(h).clamp(1, h.max(1))
+}
+
+/// A text raster of `rect` in `format` may be drawn: it has pixels, at most [`MAX_PIXELS`] of
+/// them, the tiles it touches take at most [`MAX_SURFACE_BYTES`], and one row of its working
+/// buffers fits in [`MAX_BUFFER_BYTES`].
+fn fits(rect: Rect, format: &PixelFormat) -> bool {
+    let (w, h) = (u64::from(rect.width()), u64::from(rect.height()));
+    if w == 0 || h == 0 || w.saturating_mul(h) > MAX_PIXELS {
+        return false;
+    }
+    let tiles = |a: i32, b: i32| u64::from((b - 1).div_euclid(TILE_SIZE).abs_diff(a.div_euclid(TILE_SIZE))) + 1;
+    let tile_bytes = (TILE_SIZE as u64 * TILE_SIZE as u64).saturating_mul(format.bytes_per_pixel() as u64);
+    let surface = tiles(rect.x0, rect.x1).saturating_mul(tiles(rect.y0, rect.y1)).saturating_mul(tile_bytes);
+    surface <= MAX_SURFACE_BYTES && w.saturating_mul(band_pixel_bytes(format.mode.color_channels() + 1)) <= MAX_BUFFER_BYTES
 }
 
 /// Rendered text: pixels in document space plus the covered rectangle.
@@ -163,8 +188,7 @@ pub fn rasterize_warped(layout: &LayerLayout, transform: &Affine, format: PixelF
 
 /// [`rasterize_warped`], drawing the ink rectangle in horizontal bands whose working buffers
 /// (accumulation and coverage) take at most about `budget` bytes, so a very large text layer draws
-/// rather than coming back empty (P2-18 review, P2-19). The output surface is capped by
-/// [`MAX_PIXELS`].
+/// rather than coming back empty (P2-18 review, P2-19). Layers past [`fits`] come back empty.
 pub(crate) fn rasterize_in_bands(
     layout: &LayerLayout,
     transform: &Affine,
@@ -179,7 +203,7 @@ pub(crate) fn rasterize_in_bands(
     let mut surface = Surface::new(format);
     let n = format.mode.color_channels();
     let stride = n + 1;
-    if w == 0 || h == 0 || (w as u64).saturating_mul(h as u64) > MAX_PIXELS {
+    if !fits(rect, &format) {
         return Rendered { surface, rect: Rect::new(0, 0, 0, 0) };
     }
     let band_rows = band_rows(w, h, stride, budget);
@@ -249,7 +273,23 @@ fn draw_band(
             }
         }
     }
-    surface.write_region(band, &acc);
+    write_inked(surface, band, &acc, stride);
+}
+
+/// Writes a band's pixels (`acc`, `stride` samples each, unpremultiplied) into `surface` tile by
+/// tile, leaving out the tiles the band puts no ink in: they would only hold the surface's
+/// transparent default, and a large layer's empty tiles are then never allocated (P2-19).
+fn write_inked(surface: &mut Surface, band: Rect, acc: &[f32], stride: usize) {
+    let w = band.width() as usize;
+    for tc in band.tiles() {
+        let r = tc.rect().intersect(&band);
+        let (x0, x1) = ((r.x0 - band.x0) as usize, (r.x1 - band.x0) as usize);
+        let rows = || ((r.y0 - band.y0) as usize..(r.y1 - band.y0) as usize).filter_map(|y| acc.get((y * w + x0) * stride..(y * w + x1) * stride));
+        if rows().any(|row| row.chunks_exact(stride).any(|px| px.last().is_some_and(|&a| a > 0.0))) {
+            let data: Vec<f32> = rows().flatten().copied().collect();
+            surface.write_region(r, &data);
+        }
+    }
 }
 
 /// One element of a glyph outline in document space (see [`outlines`]).
@@ -309,7 +349,9 @@ pub fn render_layer(db: &FontDb, layer: &TextLayer, dpi: f32, format: PixelForma
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_BUFFER_BYTES, MAX_PIXELS, band_rows, rect_from_bounds};
+    use super::{MAX_BUFFER_BYTES, MAX_PIXELS, band_rows, fits, rect_from_bounds, write_inked};
+    use astudio_color::PixelFormat;
+    use astudio_raster::Surface;
 
     /// The memory rule for one band (P2-08 review: the pixel cap alone allowed 4 GB; P2-19: layers
     /// past it are drawn in bands, `render_tests::bands_draw_the_same_pixels`).
@@ -317,10 +359,38 @@ mod tests {
     fn bands_are_capped_by_memory() {
         assert_eq!(band_rows(6000, 4000, 4, MAX_BUFFER_BYTES), 4000, "24 MP RGB in one band");
         let rows = band_rows(16_000, 16_000, 4, MAX_BUFFER_BYTES);
-        assert!(rows < 16_000 && 16_000 * rows as u64 * 5 * 4 <= MAX_BUFFER_BYTES, "{rows}");
-        assert_eq!(band_rows(usize::MAX, 2, 4, MAX_BUFFER_BYTES), 1, "at least one row");
+        assert!(rows < 16_000 && 16_000 * rows as u64 * 6 * 4 <= MAX_BUFFER_BYTES, "{rows}");
         assert_eq!(band_rows(10, 0, 4, MAX_BUFFER_BYTES), 1);
-        assert_eq!(band_rows(10, 7, 4, 0), 1);
+        assert_eq!(band_rows(10, 7, 4, 0), 1, "at least one row");
+    }
+
+    /// What may be drawn at all (P2-19 review): the tiles of the drawn layer and one row of the
+    /// working buffers are capped, besides the pixel count.
+    #[test]
+    fn oversized_layers_are_refused() {
+        let rgba8 = PixelFormat::RGBA8;
+        let cmyk32 = PixelFormat { mode: astudio_color::ColorMode::Cmyk, sample: astudio_color::SampleType::F32, alpha: true };
+        assert!(fits(Rect::new(0, 0, 6000, 4000), &rgba8));
+        assert!(fits(Rect::new(-5, -5, 15_000, 15_000), &rgba8), "225 MP of 8-bit RGB draws in bands");
+        assert!(!fits(Rect::new(0, 0, 16_384, 16_384), &cmyk32), "5 GiB of 32-bit CMYK tiles");
+        assert!(!fits(Rect::new(0, 0, 85_000_000, 3), &rgba8), "a thin strip touching 330,000 tiles");
+        assert!(!fits(Rect::new(i32::MIN, 0, i32::MIN + 100_000_000, 2), &rgba8), "one row past the buffer limit");
+        assert!(!fits(Rect::new(i32::MIN, i32::MIN, i32::MAX, i32::MAX), &rgba8));
+        assert!(!fits(Rect::new(0, 0, 0, 10), &rgba8) && !fits(Rect::new(5, 5, 4, 4), &rgba8));
+    }
+
+    /// A band only allocates the tiles it puts ink in (P2-19 review).
+    #[test]
+    fn empty_tiles_of_a_band_are_not_allocated() {
+        let mut s = Surface::new(PixelFormat::RGBA8);
+        let band = Rect::new(-10, 0, 600, 4);
+        let w = band.width() as usize;
+        let mut acc = vec![0.0f32; w * 4 * 4];
+        // One inked pixel at x = 300, inside tile column 1.
+        acc[(2 * w + 310) * 4..(2 * w + 311) * 4].copy_from_slice(&[1.0, 0.0, 0.0, 0.5]);
+        write_inked(&mut s, band, &acc, 4);
+        assert_eq!(s.tile_count(), 1);
+        assert_eq!(s.pixel(300, 2), vec![1.0, 0.0, 0.0, 128.0 / 255.0]);
     }
     use astudio_geom::pixel::Rect;
 

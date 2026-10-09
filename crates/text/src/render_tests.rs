@@ -274,3 +274,15 @@ fn bands_draw_the_same_pixels() {
         }
     }
 }
+
+/// A text layer scaled past the memory caps comes back empty instead of allocating gigabytes
+/// (P2-19 review: banding lifted the old working-buffer limit).
+#[test]
+fn absurdly_scaled_text_comes_back_empty() {
+    let mut e = E;
+    for (sx, sy) in [(20_000.0, 20_000.0), (5.0e6, 0.01)] {
+        let t = TextLayer { transform: Affine { m: [sx, 0.0, 0.0, sy, 0.0, 0.0] }, ..point("W", 12.0) };
+        let (_, r) = e.render(&t, 72.0, PixelFormat { sample: SampleType::F32, ..PixelFormat::RGBA8 });
+        assert!(r.rect.is_empty() && r.surface.tile_count() == 0, "{sx} × {sy}: {:?}", r.rect);
+    }
+}

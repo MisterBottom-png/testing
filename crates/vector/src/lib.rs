@@ -2,8 +2,6 @@
 //!
 //! PhotoCraft's `vector` crate (ported from photocraft@e5e3e39 in P2-19).
 //!
-//! # photocraft-vector
-//!
 //! Rasterization of vector data from `astudio-doc`: paths (with Photoshop path operations),
 //! shape layers (fill + stroke), vector masks, and the inverse direction (tracing a coverage
 //! mask back into a path for "Make Work Path").
