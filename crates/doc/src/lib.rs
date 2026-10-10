@@ -717,8 +717,9 @@ pub struct Document {
     /// are in the vector layers ([`vlayer`]).
     pub vector: Arc<astudio_vdoc::Document>,
     /// Bumped when [`Document::vector`] changes (a symbol, style or swatch), which every vector
-    /// layer's pixels may depend on.
-    pub vector_revision: u64,
+    /// layer's pixels may depend on. A cache key: it compares equal to any other (so a document
+    /// reopens equal to the one saved); compare `.0` to tell two revisions apart.
+    pub vector_revision: vlayer::CacheKey,
     /// Points of the vector space → document pixels, for the artboards and every vector layer
     /// (each adds its own transform). Set when vector art first comes in (the resolution then,
     /// and the artboards' offset); a later change of resolution keeps it, so vector art stays
@@ -762,7 +763,7 @@ impl Document {
             variables: Variables::default(),
             timeline: None,
             vector: Arc::new(vlayer::new_vector_space(size, 72.0, mode)),
-            vector_revision: vlayer::next_revision(),
+            vector_revision: vlayer::CacheKey(vlayer::next_revision()),
             vector_mapping: Affine::scale(1.0),
         }
     }

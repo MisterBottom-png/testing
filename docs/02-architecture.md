@@ -21,7 +21,7 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | L2 | `astudio-ops`, `astudio-paint`, `astudio-algo`, `astudio-vector` | pc same names | P2-19 (`vector`), P2-20 (`ops`, `paint`, `algo`). `vector` (pc shape rasterizer) shrinks as vc render takes over; `ops` is PhotoCraft's undo history (snapshots of the document over shared tiles), the base for P3-03 |
 | L3 | `astudio-compose`, `astudio-gpu` | pc `compose`, `gpu` | P2-19. CPU compositor = reference oracle; wgpu compositor = canvas. `gpu` uses `compose` (shared effect maps and blend rules, CPU fallback), a same-layer edge |
 | L3 | `astudio-render` | vc `render` | P2-14. vello_cpu; draws vector layers into tiles |
-| L3 | `astudio-format` | pc `format` + vc `format` | `.astudio` read/write; `.pcraft` and `.vectorcraft` readers |
+| L3 | `astudio-format` | pc `format` + vc `format` | P3-12: `.pcraft` read/write at the crate root (pc `format`), `.vectorcraft` in `astudio_format::vectorcraft` (vc `format`); `.pcraft` saves vector layers rasterized (docs/05). `.astudio` is P5-01 |
 | L3 | `astudio-svg`, `astudio-pdf`, `astudio-eps`, `astudio-cad`, `astudio-metafile` | vc same names | P2-15. Inside L3, `eps` uses `render` (TIFF previews) and `metafile` (metafile previews), VectorCraft's order; each has a cargo-fuzz target |
 | L4 | `astudio-io`, `astudio-tools` | pc `io`, vc `tools` (pc tools live in its engine and ui) | P3-11 (`tools`); P3-14 (`io`) |
 | L5 | `astudio-engine` | pc `engine` + vc `engine` | One command registry, one undo history, one guard |

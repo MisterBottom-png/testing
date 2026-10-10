@@ -14,6 +14,7 @@ astudio-color = { path = "../color" }
 astudio-vdoc = { path = "../vdoc" }
 astudio-render = { path = "../render" }
 astudio-svg = { path = "../svg" }
+astudio-format = { path = "../format" }
 image = { workspace = true }
 serde_json = { workspace = true }
 kurbo = { workspace = true }

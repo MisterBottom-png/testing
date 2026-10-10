@@ -209,7 +209,7 @@ proptest! {
                 let seen = drawn.entry((id, vl.revision)).or_insert_with(|| (vl.node.clone(), vl.transform));
                 prop_assert!(*seen.0 == *vl.node && seen.1 == vl.transform, "one revision, two different drawings: {:?}", steps);
             }
-            let space = spaces.entry(cur.vector_revision).or_insert_with(|| (cur.vector.artboards.clone(), cur.vector_mapping, cur.vector.swatches.len()));
+            let space = spaces.entry(cur.vector_revision.0).or_insert_with(|| (cur.vector.artboards.clone(), cur.vector_mapping, cur.vector.swatches.len()));
             prop_assert!(space.0 == cur.vector.artboards && space.1 == cur.vector_mapping && space.2 == cur.vector.swatches.len(), "one vector revision, two spaces: {:?}", steps);
         }
     }

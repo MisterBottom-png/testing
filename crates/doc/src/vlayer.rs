@@ -51,6 +51,18 @@ pub fn next_revision() -> u64 {
     NEXT_REVISION.fetch_add(1, Ordering::Relaxed)
 }
 
+/// A cache key, such as [`Document::vector_revision`]: it compares equal to every other, since it
+/// says which state a cache was drawn for, not what the document holds, so two copies of a
+/// document read from one file are equal (P3-12). Compare `.0` to tell keys apart.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CacheKey(pub u64);
+
+impl PartialEq for CacheKey {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 /// The identity transform.
 const IDENTITY: Affine = Affine { m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] };
 
@@ -197,7 +209,7 @@ impl Document {
                 if let Some(a) = Arc::make_mut(&mut self.vector).artboards.first_mut() {
                     a.rect = rect;
                 }
-                self.vector_revision = next_revision();
+                self.vector_revision = CacheKey(next_revision());
                 self.vector_mapping = Affine::scale(points_to_pixels(dpi));
             }
         }
@@ -307,7 +319,7 @@ impl Document {
             // New nodes move the id counter, a rename the title: only a change to what is drawn
             // makes every vector layer redraw.
             if !space.draws_like(&self.vector) {
-                self.vector_revision = next_revision();
+                self.vector_revision = CacheKey(next_revision());
             }
             self.vector = Arc::new(space);
         }

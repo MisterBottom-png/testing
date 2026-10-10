@@ -228,6 +228,9 @@ What this means as crates are ported:
   "the HEIF decoder failed" error (tests in `crates/heif/src/lib.rs`). The web build cannot catch
   panics (wasm32 aborts), so it must not enable the `heif` feature until heic-rs is fixed. No
   A-Studio app enables `heif` yet; that choice is task P7-08.
+- **The `.pcraft` format (P3-12):** `blake3` 1.8 (tile and blob hashes, its pure-Rust build;
+  CC0-1.0 OR Apache-2.0) and `ruzstd` 0.9 (zstd tiles; MIT), as in PhotoCraft. `blake3` brings
+  `cpufeatures` 0.3 while the PDF reader's `aes` and `sha2` use 0.2, listed in `deny.toml`.
 - **Benchmarks only (P2-20):** `criterion` 0.5 without default features is a dev-dependency of
   `astudio-compose` for its benchmark (`cargo bench -p astudio-compose`), as in PhotoCraft; it and
   what it pulls in (clap, ciborium, regex, walkdir and others) ship in nothing.

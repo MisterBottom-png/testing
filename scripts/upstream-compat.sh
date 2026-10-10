@@ -6,7 +6,7 @@
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
 # re-exports the A-Studio crate, then type-checks the whole workspace (every crate, test and
-# benchmark) and builds the desktop app. A compile error means an A-Studio crate lost something an
+# benchmark) and builds the desktop app (PhotoCraft: see pc_not_yet below). A compile error means an A-Studio crate lost something an
 # app uses.
 #
 # Usage: scripts/upstream-compat.sh [--test] [photocraft|vectorcraft]
@@ -71,7 +71,7 @@ shim photocraft raster raster 'pub use astudio_raster::*;'
 shim photocraft doc doc 'pub use astudio_doc::*;'
 shim photocraft raw raw 'pub use astudio_raw::*;'
 printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
-for c in vector compose gpu paint ops algo; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
+for c in vector compose gpu paint ops algo format; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
 
 copy vectorcraft
 # VectorCraft's geom root = astudio_geom's root (kurbo names, paths, shapes, ...).
@@ -83,6 +83,7 @@ shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
 shim vectorcraft pathops pathops 'pub use astudio_pathops::*;'
 shim vectorcraft trace trace 'pub use astudio_trace::*;'
 shim vectorcraft tools tools 'pub use astudio_tools::*;'
+shim vectorcraft format format 'pub use astudio_format::vectorcraft::*;'
 shim vectorcraft brush vbrush 'pub use astudio_vbrush::*;'
 shim vectorcraft plugins plugins 'pub use astudio_plugins::*;'
 # Engine and UI tests read the example plug-in from the plugins crate's fixtures.
@@ -96,19 +97,36 @@ for c in svg pdf eps cad metafile; do shim vectorcraft "$c" "$c" "pub use astudi
 shim vectorcraft text text 'pub use astudio_text::*;'
 printf '\n[features]\ntest-fonts = ["astudio-text/test-fonts"]\n' >> "$out/vectorcraft/src-copy/crates/text/Cargo.toml"
 
+# PhotoCraft crates that can't build against the merged document yet: they match on every layer
+# kind, and astudio-doc has one more (Vector layers, P3-01). Each leaves this list when it is
+# ported (io: P3-14; engine: P3-15; automation, ui-egui and the apps: P4), and the app build
+# returns when the list is empty.
+pc_not_yet="photocraft-io photocraft-engine photocraft-automation photocraft-ui-egui photocraft photocraft-cli photocraft-web"
+scope() {
+  printf -- '--workspace'
+  if [ "$1" = photocraft ]; then
+    for c in $pc_not_yet; do printf -- ' --exclude %s' "$c"; done
+  fi
+}
+
 status=0
 for app in $apps; do
   dir="$out/$app"
   echo "== $app $(git -C "upstream/$app" rev-parse --short HEAD) against the A-Studio crates"
   # The upstream Cargo.lock is kept, so every other dependency stays at its pinned version.
-  if ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo check --workspace --all-targets --quiet ) \
-    && ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo build -p "$app" --quiet ); then
-    echo "$app: builds against the A-Studio crates"
+  # shellcheck disable=SC2046 # scope's words are crate names, split on purpose.
+  if ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo check $(scope "$app") --all-targets --quiet ) \
+    && { [ "$app" = photocraft ] || ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo build -p "$app" --quiet ); }; then
+    if [ "$app" = photocraft ]; then
+      echo "$app: builds against the A-Studio crates (all but, until ported: $pc_not_yet)"
+    else
+      echo "$app: builds against the A-Studio crates"
+    fi
   else
     echo "$app: FAILED to build against the A-Studio crates"; status=1; continue
   fi
   if [ "$TEST" = 1 ]; then
-    ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo test --workspace --no-fail-fast ) > "$dir/test.log" 2>&1 && rc=0 || rc=$?
+    ( cd "$dir/src-copy" && CARGO_TARGET_DIR="$root/$dir/target" cargo test $(scope "$app") --no-fail-fast ) > "$dir/test.log" 2>&1 && rc=0 || rc=$?
     { grep -E '^test result:' "$dir/test.log" || true; } | awk '{p+=$4; f+=$6} END {printf "tests passed %d, failed %d\n", p, f}'
     echo "$app cargo test exit code: $rc (full output: $dir/test.log)"
     [ "$rc" = 0 ] || status=1
