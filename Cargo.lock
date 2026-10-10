@@ -259,6 +259,7 @@ dependencies = [
  "astudio-geom",
  "astudio-raster",
  "astudio-vdoc",
+ "proptest",
  "serde",
  "serde_json",
 ]

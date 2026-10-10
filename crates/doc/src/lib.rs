@@ -1,7 +1,8 @@
 //! # astudio-doc (L1)
 //!
-//! The pixel document model (PhotoCraft's `doc`, P2-16): pure data, no rendering, no UI. The
-//! Vector layer content (an `astudio-vdoc` tree) joins in P3-01.
+//! The document model: PhotoCraft's `doc` (P2-16), pure data, no rendering, no UI, with a Vector
+//! layer kind holding VectorCraft nodes and the document's vector space (artboards, swatches,
+//! styles, symbols; [`vlayer`], P3-01).
 //!
 //! Layer order: inside every group (and the root), `children[0]` is the **bottom** layer, matching
 //! compositing order and the PSD file order. UIs display the list reversed.
@@ -22,11 +23,14 @@ pub mod effects;
 pub mod mode;
 pub mod pattern;
 pub mod slices;
+#[cfg(test)]
+mod tests_vector;
 pub mod text;
 pub mod text_styles;
 pub mod variables;
 pub mod vector;
 pub mod video;
+pub mod vlayer;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -52,6 +56,7 @@ pub use vector::{
     ClippingPath, FillRule, Knot, LineCap, LineJoin, LiveShape, NamedPath, Path, PathOp, ShapeLayer, ShapeStroke, StrokeAlign, Subpath, VectorMask,
 };
 pub use video::{Timeline, VideoData, VideoSource};
+pub use vlayer::VectorLayer;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -445,6 +450,8 @@ pub enum LayerContent {
     Text(TextLayer),
     Shape(ShapeLayer),
     Smart(SmartObject),
+    /// VectorCraft nodes drawn into tiles (P3-01).
+    Vector(VectorLayer),
 }
 
 impl LayerContent {
@@ -457,6 +464,7 @@ impl LayerContent {
             LayerContent::Text(_) => "Type",
             LayerContent::Shape(_) => "Shape",
             LayerContent::Smart(_) => "Smart Object",
+            LayerContent::Vector(_) => "Vector",
         }
     }
 }
@@ -562,6 +570,7 @@ impl Layer {
             LayerContent::Text(t) => t.cache.as_ref(),
             LayerContent::Shape(s) => s.cache.as_ref(),
             LayerContent::Smart(s) => s.cache.as_ref(),
+            LayerContent::Vector(v) => v.cache.as_ref(),
             _ => None,
         }
     }
@@ -703,6 +712,10 @@ pub struct Document {
     pub variables: Variables,
     /// Window › Timeline (None until a video timeline is created).
     pub timeline: Option<Timeline>,
+    /// The vector space: VectorCraft's artboards (in points), swatches, styles, symbols, images,
+    /// patterns and node ids, shared by every vector layer. Its `layers` stay empty; the nodes
+    /// are in the vector layers ([`vlayer`]).
+    pub vector: Arc<astudio_vdoc::Document>,
 }
 
 /// Where a layer lives in the tree: indices from the root down.
@@ -740,6 +753,7 @@ impl Document {
             slices: Slices::default(),
             variables: Variables::default(),
             timeline: None,
+            vector: Arc::new(vlayer::new_vector_space(size, 72.0, mode)),
         }
     }
 

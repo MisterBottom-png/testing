@@ -14,7 +14,7 @@ A-Studio keeps that scheme. The checker in `xtask/` enforces it on the target cr
 | L0 standalone | `astudio-psd`, `astudio-raw`, `astudio-tablet` | pc same names | P2-11 (psd, raw). No workspace deps; `tablet` keeps the only `unsafe` |
 | L0 | `astudio-codecs`, `astudio-heif` | pc same names | P2-11. Flat image formats; `codecs` uses `heif` (HEIC photos, no workspace deps of its own) behind its `heif` feature, a same-layer edge |
 | L1 | `astudio-vdoc` | vc `doc` | Vector node tree, appearance, symbols, swatches |
-| L1 | `astudio-doc` | pc `doc` + Vector layer | P2-16 (pc `doc`: layer stack, text-layer model). `LayerContent::Vector` holding an `astudio-vdoc` tree joins in P3-01 (vdoc before doc inside L1) |
+| L1 | `astudio-doc` | pc `doc` + Vector layer | P2-16 (pc `doc`: layer stack, text-layer model). P3-01: `LayerContent::Vector` holds top-level VectorCraft nodes; `Document::vector` (an `astudio-vdoc` document with no layers) holds what they share: artboards, swatches, styles, symbols, images, node ids. `vector_view` / `edit_vector` give VectorCraft code the whole vector document (vdoc before doc inside L1) |
 | L2 | `astudio-text` | vc `text` + ports from pc `text` | See `06-text-engine.md` |
 | L2 | `astudio-plugins` | pc+vc `plugins` | One wasmi host; one plug-in ABI with filter and live-effect entry points. Needs only L0 and L1 crates; sits below `astudio-effects` inside L2 |
 | L2 | `astudio-pathops`, `astudio-trace`, `astudio-effects`, `astudio-vbrush` | vc `pathops`, `trace`, `effects`, `brush` | P2-14 (pathops, effects, vbrush). Inside L2, `effects` may use `plugins`, `pathops` and `text`; `trace` may use `pathops` (VectorCraft's order) |
