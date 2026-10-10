@@ -61,6 +61,8 @@ pub const INTRA_LAYER: &[(&str, &str)] = &[
     // Effects outline strokes and text, and combine shapes (VectorCraft's order, P2-14).
     ("astudio-effects", "astudio-pathops"),
     ("astudio-effects", "astudio-text"),
+    // Image Trace builds compound shapes with pathops (VectorCraft's order, P3-10).
+    ("astudio-trace", "astudio-pathops"),
     // EPS reuses the renderer's TIFF writer for previews and opens Windows metafile previews
     // (VectorCraft's order, P2-15).
     ("astudio-eps", "astudio-render"),
