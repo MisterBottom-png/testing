@@ -45,8 +45,9 @@ pub struct History {
     undo: VecDeque<HistoryState>,
     redo: Vec<HistoryState>,
     pub max_states: usize,
-    /// Pixel memory budget in bytes for the current document plus the tiles only history holds
-    /// (0 = unlimited). [`History::trim`] drops the oldest states beyond it.
+    /// Memory budget in bytes for the current document plus what only history holds: pixel
+    /// tiles and vector art (nodes, the vector space and its images; P3-03), each shared part
+    /// counted once (0 = unlimited). [`History::trim`] drops the oldest states beyond it.
     pub max_bytes: usize,
     /// Label of the step that produced the current document.
     current_label: String,
@@ -206,7 +207,8 @@ impl History {
     }
 }
 
-/// Bytes of the pixel tiles of `doc` (layers, masks, alpha channels) not already in `seen`.
+/// Bytes of the pixel tiles of `doc` (layers, masks, alpha channels) and of its vector art
+/// (P3-03) not already in `seen`.
 fn tile_bytes(doc: &Document, seen: &mut HashSet<usize>) -> usize {
     let mut add = |s: &astudio_doc::Surface| s.tiles().filter(|(_, t)| seen.insert(Arc::as_ptr(t) as usize)).map(|(_, t)| t.bytes().len()).sum::<usize>();
     let mut n = 0;
@@ -221,7 +223,7 @@ fn tile_bytes(doc: &Document, seen: &mut HashSet<usize>) -> usize {
     for c in doc.channels.iter().chain(&doc.quick_mask) {
         n += add(&c.surface);
     }
-    n
+    n.saturating_add(doc.vector_bytes(seen))
 }
 
 #[cfg(test)]

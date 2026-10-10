@@ -26,8 +26,9 @@
 //! stay as they are; the vector space's artboards are VectorCraft's. Joining the two in one
 //! Artboards panel is UI work (P4-01).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use astudio_vdoc::node::Node;
 use astudio_vdoc::{Document as VectorDocument, NodeId};
@@ -39,6 +40,16 @@ const MAX_SIDE: u32 = 300_000;
 
 /// What a layer is called when its node has no name.
 const UNNAMED: &str = "Layer";
+
+/// Revisions are handed out from one counter, so no two states of any layer (or of the vector
+/// space) share one: after an undo, a cache keyed on a revision can never be taken for another
+/// state's pixels (P3-03).
+static NEXT_REVISION: AtomicU64 = AtomicU64::new(1);
+
+/// A revision no layer or space has had.
+pub fn next_revision() -> u64 {
+    NEXT_REVISION.fetch_add(1, Ordering::Relaxed)
+}
 
 /// The identity transform.
 const IDENTITY: Affine = Affine { m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] };
@@ -55,7 +66,7 @@ pub struct VectorLayer {
     /// After the document's vector mapping, pixels → document pixels (`[a c e; b d f]`, column
     /// vectors, like every PhotoCraft transform).
     pub transform: Affine,
-    /// Bumped on every change of `node` or `transform`.
+    /// New (from [`next_revision`]) on every change of `node` or `transform`.
     pub revision: u64,
     pub cache: Option<Surface>,
     /// The (`revision`, [`Document::vector_revision`]) the cache was drawn at.
@@ -65,7 +76,7 @@ pub struct VectorLayer {
 impl VectorLayer {
     /// A vector layer for `node` with no extra transform.
     pub fn new(node: Arc<Node>) -> Self {
-        Self { node, transform: IDENTITY, revision: 1, cache: None, cache_revision: (0, 0) }
+        Self { node, transform: IDENTITY, revision: next_revision(), cache: None, cache_revision: (0, 0) }
     }
 
     /// The cached pixels, if they are up to date for a document at `vector_revision`.
@@ -75,7 +86,7 @@ impl VectorLayer {
 
     /// Marks the cached pixels stale.
     pub fn touch(&mut self) {
-        self.revision = self.revision.wrapping_add(1);
+        self.revision = next_revision();
     }
 }
 
@@ -177,7 +188,7 @@ impl Document {
                 if let Some(a) = Arc::make_mut(&mut self.vector).artboards.first_mut() {
                     a.rect = rect;
                 }
-                self.vector_revision = self.vector_revision.wrapping_add(1);
+                self.vector_revision = next_revision();
                 self.vector_mapping = Affine::scale(points_to_pixels(dpi));
             }
         }
@@ -287,7 +298,7 @@ impl Document {
             // New nodes move the id counter, a rename the title: only a change to what is drawn
             // makes every vector layer redraw.
             if !space.draws_like(&self.vector) {
-                self.vector_revision = self.vector_revision.wrapping_add(1);
+                self.vector_revision = next_revision();
             }
             self.vector = Arc::new(space);
         }
@@ -402,6 +413,47 @@ impl Document {
             }
         }
     }
+}
+
+impl Document {
+    /// Approximate memory of this document's vector art not already counted in `seen` (pointers
+    /// of shared parts): the vector space's images and symbols once, every node subtree once, so
+    /// undo states sharing unchanged art count it once (P3-03, the history's memory budget).
+    pub fn vector_bytes(&self, seen: &mut HashSet<usize>) -> usize {
+        let mut n = 0usize;
+        if seen.insert(Arc::as_ptr(&self.vector) as usize) {
+            for img in self.vector.images.values() {
+                if seen.insert(Arc::as_ptr(&img.bytes) as usize) {
+                    n = n.saturating_add(img.bytes.len());
+                }
+            }
+            for s in &self.vector.symbols {
+                n = n.saturating_add(node_bytes(&s.art, seen));
+            }
+        }
+        for (_, vl) in self.vector_layers() {
+            n = n.saturating_add(node_bytes(&vl.node, seen));
+        }
+        n
+    }
+}
+
+/// Approximate memory of `node`'s subtree, skipping subtrees already in `seen`.
+fn node_bytes(node: &Arc<Node>, seen: &mut HashSet<usize>) -> usize {
+    if !seen.insert(Arc::as_ptr(node) as usize) {
+        return 0;
+    }
+    let mut n = std::mem::size_of::<Node>();
+    if let astudio_vdoc::node::NodeKind::Path { path, .. } = &node.kind {
+        let anchors: usize = path.subpaths.iter().map(|s| s.anchors.len()).sum();
+        n = n.saturating_add(anchors.saturating_mul(std::mem::size_of::<astudio_geom::Anchor>()));
+    }
+    if let Some(children) = node.children() {
+        for c in children {
+            n = n.saturating_add(node_bytes(c, seen));
+        }
+    }
+    n
 }
 
 /// Inserts `layer` just above (`above`) or below the layer `next_to`, in that layer's group; at

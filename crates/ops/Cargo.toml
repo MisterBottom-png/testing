@@ -10,5 +10,10 @@ publish = false
 [dependencies]
 astudio-doc = { path = "../doc" }
 
+[dev-dependencies]
+proptest = { workspace = true }
+astudio-vdoc = { path = "../vdoc" }
+astudio-geom = { path = "../geom" }
+
 [lints]
 workspace = true
