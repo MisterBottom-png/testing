@@ -232,15 +232,16 @@ impl PatternImage {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     /// A float buffer of the wrong size gives an empty tile instead of stopping the app (P2-20
     /// review: this asserted).
     #[test]
     fn mismatched_float_buffer_gives_an_invalid_tile() {
-        let t = super::GrayTile::from_f32(4, 4, &[0.5; 15]);
+        let t = GrayTile::from_f32(4, 4, &[0.5; 15]);
         assert!(!t.is_valid());
-        assert!(super::GrayTile::from_f32(2, 2, &[0.5; 4]).is_valid());
+        assert!(GrayTile::from_f32(2, 2, &[0.5; 4]).is_valid());
     }
-    use super::*;
 
     #[test]
     fn base64_round_trip() {
