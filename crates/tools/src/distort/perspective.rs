@@ -548,6 +548,11 @@ impl PerspectiveGrid {
     pub fn lines(&self, plane: Plane) -> Vec<(Point, Point)> {
         let Some(h) = self.homography(plane) else { return vec![] };
         let d = self.domain(plane);
+        // A grid read from a file may be invalid: these loops only end for a positive cell and
+        // a finite domain (P3-11 review).
+        if !(self.cell.is_finite() && self.cell > 0.0 && d.width().is_finite() && d.height().is_finite()) {
+            return vec![];
+        }
         let mut out = vec![];
         let step = |len: f64| {
             let mut s = self.cell;
@@ -1298,6 +1303,19 @@ mod tests {
 
     fn grid(kind: u8) -> PerspectiveGrid {
         PerspectiveGrid::preset(kind, Rect::new(0.0, 0.0, 800.0, 600.0))
+    }
+
+    /// P3-11 review: a grid with a zero, negative or non-finite cell (read from a file) draws no
+    /// lines instead of looping forever.
+    #[test]
+    fn an_invalid_cell_draws_no_lines() {
+        for cell in [0.0, -5.0, f64::NAN, f64::INFINITY] {
+            let g = PerspectiveGrid { cell, ..grid(2) };
+            for plane in [Plane::Left, Plane::Right, Plane::Ground] {
+                assert!(g.lines(plane).is_empty(), "{cell} {plane:?}");
+            }
+        }
+        assert!(!grid(2).lines(Plane::Ground).is_empty());
     }
 
     #[test]

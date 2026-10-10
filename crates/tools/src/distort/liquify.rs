@@ -324,6 +324,11 @@ impl Dabber {
             return;
         }
         let len = a.distance(b);
+        // P3-11 review: two far-apart samples (a script or a damaged file) must not stamp dabs
+        // without end.
+        if !len.is_finite() {
+            return;
+        }
         if len < 1e-12 {
             if self.holds {
                 self.dabs.push(self.dab(b, pb));
@@ -332,7 +337,7 @@ impl Dabber {
             return;
         }
         let mut s = self.spacing - self.carry;
-        while s <= len {
+        while s <= len && self.dabs.len() <= MAX_DABS {
             let t = s / len;
             self.dabs.push(self.dab(a.lerp(b, t), pa + (pb - pa) * t));
             s += self.spacing;
@@ -381,7 +386,10 @@ fn subdivide(sp: &mut SubPath, prm: &LiquifyParams, c: Point, spacing: f64) {
             continue;
         }
         let len = cub.arclen(1e-3);
-        let k = (len / spacing).ceil() as usize;
+        // At most as many new anchors as the cap leaves room for (a huge segment under the brush
+        // would insert hundreds of millions; P3-11 review).
+        let room = MAX_ANCHORS.saturating_sub(sp.anchors.len()).saturating_add(1);
+        let k = if (len / spacing).is_finite() { ((len / spacing).ceil() as usize).min(room) } else { room };
         if k <= 1 {
             seg += 1;
             continue;
@@ -821,6 +829,24 @@ mod tests {
 
     fn prm(kind: LiquifyKind) -> LiquifyParams {
         LiquifyParams { intensity: 1.0, ..LiquifyParams::new(kind) }
+    }
+
+    /// P3-11 review: samples far apart (from a script or a damaged file) end with at most
+    /// MAX_DABS dabs instead of stamping without end.
+    #[test]
+    fn far_apart_samples_stamp_a_bounded_number_of_dabs() {
+        let d = dabs(&[Point::new(0.0, 0.0), Point::new(1e308, 0.0), Point::new(-1e308, 0.0)], 10.0);
+        assert!(d.len() <= MAX_DABS + 3, "{}", d.len());
+        let d = dabs(&[Point::new(0.0, 0.0), Point::new(1e12, 0.0)], 0.5);
+        assert!(d.len() <= MAX_DABS + 3, "{}", d.len());
+    }
+
+    /// P3-11 review: a huge segment under the brush gets at most MAX_ANCHORS anchors.
+    #[test]
+    fn a_huge_segment_is_subdivided_within_the_anchor_cap() {
+        let mut sp = SubPath::new(vec![Anchor::corner(Point::new(-1e9, 0.0)), Anchor::corner(Point::new(1e9, 0.0))], false);
+        subdivide(&mut sp, &prm(LiquifyKind::Bloat), Point::ZERO, 1.0);
+        assert!(sp.anchors.len() <= MAX_ANCHORS + 2, "{}", sp.anchors.len());
     }
 
     #[test]

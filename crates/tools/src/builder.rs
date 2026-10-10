@@ -382,9 +382,16 @@ pub fn hatch(path: &BezPath, gap: f64) -> BezPath {
         y1 = y1.max(a.y.max(c.y));
     }
     let gap = gap.max((y1 - y0) / 400.0).max(1e-6);
-    let mut y = (y0 / gap).floor() * gap + gap * 0.5;
+    let start = (y0 / gap).floor() * gap + gap * 0.5;
+    if !(start.is_finite() && y1.is_finite() && gap.is_finite()) {
+        return out;
+    }
+    // Counted, not stepped until `y1`: at huge coordinates `y += gap` stops changing `y` (P3-11
+    // review). At most 400 lines plus the rounding at both ends.
+    let steps = ((y1 - start) / gap).ceil().clamp(0.0, 402.0) as usize;
     let mut xs: Vec<f64> = vec![];
-    while y < y1 {
+    for i in 0..steps {
+        let y = start + i as f64 * gap;
         xs.clear();
         for (a, c) in &edges {
             if (a.y <= y) != (c.y <= y) {
@@ -396,7 +403,6 @@ pub fn hatch(path: &BezPath, gap: f64) -> BezPath {
             out.move_to(unrot(Point::new(pair[0], y)));
             out.line_to(unrot(Point::new(pair[1], y)));
         }
-        y += gap;
     }
     out
 }
@@ -926,6 +932,23 @@ mod tests {
         assert!(t.cache.map.erased_edges(&t.touched).is_empty(), "which goes with the regions");
         // Two regions (mesh + outline each) and the drag's trail, all red.
         assert_eq!(colors(&t.overlays(&cx)), [HIGHLIGHT_RED; 5]);
+    }
+
+    /// P3-11 review: hatching nearly flat art at a huge coordinate ends (stepping by `gap` no
+    /// longer moved `y` there).
+    #[test]
+    fn hatch_ends_at_huge_coordinates() {
+        let mut p = BezPath::new();
+        p.move_to(Point::new(0.0, 1e17));
+        p.line_to(Point::new(100.0, 1e17));
+        p.line_to(Point::new(100.0, 1e17 + 1.0));
+        p.close_path();
+        let _ = hatch(&p, 1e-6);
+        let mut q = BezPath::new();
+        q.move_to(Point::new(0.0, f64::NAN));
+        q.line_to(Point::new(1.0, 1.0));
+        q.close_path();
+        let _ = hatch(&q, 1.0);
     }
 
     #[test]

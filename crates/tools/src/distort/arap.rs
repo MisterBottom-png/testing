@@ -42,15 +42,20 @@ impl BandMatrix {
         i * (self.bw + 1) + (j + self.bw - i)
     }
     /// Add `v` at (i, j) (and implicitly (j, i)); diagonal entries are added once.
+    /// Entries outside the band or the matrix are ignored (P3-11 review: this asserted).
     pub fn add(&mut self, i: usize, j: usize, v: f64) {
         let (i, j) = if i >= j { (i, j) } else { (j, i) };
-        debug_assert!(i - j <= self.bw, "outside band");
+        if i - j > self.bw || i >= self.n {
+            return;
+        }
         let k = self.idx(i, j);
-        self.a[k] += v;
+        if let Some(a) = self.a.get_mut(k) {
+            *a += v;
+        }
     }
     pub fn get(&self, i: usize, j: usize) -> f64 {
         let (i, j) = if i >= j { (i, j) } else { (j, i) };
-        if i - j > self.bw { 0.0 } else { self.a[self.idx(i, j)] }
+        if i - j > self.bw || i >= self.n { 0.0 } else { self.a.get(self.idx(i, j)).copied().unwrap_or(0.0) }
     }
     /// In-place Cholesky factorisation (L·Lᵀ). Returns false if the matrix isn't positive definite.
     pub fn factor(&mut self) -> bool {
@@ -639,6 +644,16 @@ mod tests {
     use super::*;
     use astudio_geom::shapes;
 
+    /// P3-11 review: entries outside the band or the matrix are ignored, not a panic.
+    #[test]
+    fn out_of_band_entries_are_ignored() {
+        let mut m = BandMatrix::new(4, 1);
+        m.add(3, 0, 1.0);
+        m.add(10, 9, 1.0);
+        m.add(1, 1, 2.0);
+        assert_eq!(m.get(1, 1), 2.0);
+        assert_eq!(m.get(10, 10), 0.0);
+    }
     #[test]
     fn band_cholesky_solves_spd_systems() {
         // Tridiagonal [4 1; 1 4 1; ...] vs a dense reference.
