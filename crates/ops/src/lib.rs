@@ -165,23 +165,24 @@ impl History {
         self.redo.clear();
     }
 
-    /// Approximate unique pixel bytes held by history (tiles not shared with `current`).
+    /// Approximate unique bytes held by history: pixel tiles and vector art not shared with
+    /// `current`.
     pub fn unique_bytes(&self, current: &Document) -> usize {
         let mut seen = HashSet::new();
         tile_bytes(current, &mut seen);
         self.undo.iter().chain(self.redo.iter()).map(|s| tile_bytes(&s.doc, &mut seen)).sum()
     }
 
-    /// Pixel bytes of `current` plus the tiles only history holds (what [`History::trim`]
-    /// bounds by [`History::max_bytes`]).
+    /// Bytes of `current` (pixel tiles and vector art) plus what only history holds (what
+    /// [`History::trim`] bounds by [`History::max_bytes`]).
     pub fn pixel_bytes(&self, current: &Document) -> usize {
         let mut seen = HashSet::new();
         let own = tile_bytes(current, &mut seen);
         self.undo.iter().chain(self.redo.iter()).fold(own, |n, s| n.saturating_add(tile_bytes(&s.doc, &mut seen)))
     }
 
-    /// Keep pixel memory within [`History::max_bytes`]: the current document's tiles plus the
-    /// tiles only history holds (newest states first). The oldest undo states that don't fit are
+    /// Keep memory within [`History::max_bytes`]: the current document's pixel tiles and vector
+    /// art plus what only history holds (newest states first). The oldest undo states that don't fit are
     /// dropped; the most recent one is always kept so the last step can be undone. Returns how
     /// many states were dropped.
     pub fn trim(&mut self, current: &Document) -> usize {

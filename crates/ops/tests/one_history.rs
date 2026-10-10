@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use astudio_doc::{Color, ColorMode, Document, Layer, SampleType, Size};
+use astudio_doc::{Affine, Color, ColorMode, Document, Layer, LayerContent, LayerId, SampleType, Size};
 use astudio_geom::{PathData, Rect};
 use astudio_ops::{History, LayerTarget};
 use astudio_vdoc::node::{LayerColor, Node};
@@ -36,6 +36,10 @@ enum Step {
     ReorderVector,
     DropSwatch,
     Resolution { dpi: u16 },
+    GroupTopVector,
+    RemoveTopVector,
+    DuplicateVector,
+    MoveVector { dx: i8 },
     Undo,
     Redo,
 }
@@ -51,6 +55,10 @@ fn step() -> impl Strategy<Value = Step> {
         Just(Step::ReorderVector),
         Just(Step::DropSwatch),
         (36u16..1200).prop_map(|dpi| Step::Resolution { dpi }),
+        Just(Step::GroupTopVector),
+        Just(Step::RemoveTopVector),
+        Just(Step::DuplicateVector),
+        any::<i8>().prop_map(|dx| Step::MoveVector { dx }),
         Just(Step::Undo),
         Just(Step::Undo),
         Just(Step::Redo),
@@ -102,55 +110,107 @@ fn edit(d: &mut Document, s: &Step) {
             v.swatches.pop();
         }),
         Step::Resolution { dpi } => d.set_resolution(f32::from(dpi)),
+        Step::GroupTopVector => {
+            if let Some(i) = d.layers.iter().rposition(|l| matches!(l.content, LayerContent::Vector(_))) {
+                let l = d.layers.remove(i);
+                d.layers.insert(i, Layer::group("Group", vec![l]));
+            }
+        }
+        Step::RemoveTopVector => d.edit_vector(|v| {
+            if let Some(last) = v.layers.last().map(|n| n.id) {
+                v.remove(last).unwrap();
+            }
+        }),
+        Step::DuplicateVector => {
+            if let Some(l) = d.layers.iter().find(|l| matches!(l.content, LayerContent::Vector(_))) {
+                let copy = l.duplicate();
+                d.layers.push(copy);
+            }
+        }
+        Step::MoveVector { dx } => {
+            if let Some(LayerContent::Vector(vl)) = d.layers.iter_mut().map(|l| &mut l.content).find(|c| matches!(c, LayerContent::Vector(_))) {
+                let t = vl.transform.mul(&Affine::translate(f64::from(dx), 0.0));
+                vl.set_transform(t);
+            }
+        }
         Step::Undo | Step::Redo => {}
     }
 }
 
+/// The layers a state targets: here, its top layer.
+fn target(d: &Document) -> LayerTarget {
+    LayerTarget { active: d.layers.last().map(|l| l.id), selected: d.layers.last().map(|l| vec![l.id]).unwrap_or_default() }
+}
+
 proptest! {
+    /// Any mix of pixel and vector edits undoes and redoes to exactly the documents (and targeted
+    /// layers) it went through, with the history trimmed to a memory budget and a state count;
+    /// one layer revision never stands for two drawings, one vector revision never for two
+    /// vector spaces.
     #[test]
-    fn mixed_pixel_and_vector_edits_undo_and_redo_exactly(steps in proptest::collection::vec(step(), 1..40)) {
-        let mut h = History::new(1000);
+    fn mixed_pixel_and_vector_edits_undo_and_redo_exactly(
+        steps in proptest::collection::vec(step(), 1..40),
+        budget_kb in prop_oneof![Just(0usize), 1usize..3000],
+        max_states in 2usize..60,
+    ) {
+        let mut h = History::new(max_states);
+        h.max_bytes = budget_kb * 1024;
         let mut cur = Arc::new(base());
-        // The reference: the documents passed through, and those undone.
-        let mut past: Vec<Document> = Vec::new();
-        let mut future: Vec<Document> = Vec::new();
-        // Every (layer id, revision) seen in any state, with the node it drew.
-        let mut drawn: HashMap<(astudio_doc::LayerId, u64), Arc<Node>> = HashMap::new();
+        let mut cur_target = LayerTarget::default();
+        // The reference: the states passed through and those undone, each with its target.
+        let mut past: Vec<(Document, LayerTarget)> = Vec::new();
+        let mut future: Vec<(Document, LayerTarget)> = Vec::new();
+        let mut drawn: HashMap<(LayerId, u64), (Arc<Node>, Affine)> = HashMap::new();
+        let mut spaces: HashMap<u64, (Vec<astudio_vdoc::Artboard>, Affine, usize)> = HashMap::new();
         for s in &steps {
             match s {
                 Step::Undo => {
                     let got = h.undo(cur.clone());
                     prop_assert_eq!(got.is_some(), !past.is_empty());
-                    if let (Some((d, _)), Some(want)) = (got, past.pop()) {
-                        future.push((*cur).clone());
+                    if let (Some((d, t)), Some((want, want_t))) = (got, past.pop()) {
+                        future.push(((*cur).clone(), cur_target.clone()));
                         cur = d;
+                        cur_target = t;
                         prop_assert!(*cur == want, "undo after {:?}", steps);
+                        prop_assert_eq!(&cur_target, &want_t);
                     }
                 }
                 Step::Redo => {
                     let got = h.redo(cur.clone());
                     prop_assert_eq!(got.is_some(), !future.is_empty());
-                    if let (Some((d, _)), Some(want)) = (got, future.pop()) {
-                        past.push((*cur).clone());
+                    if let (Some((d, t)), Some((want, want_t))) = (got, future.pop()) {
+                        past.push(((*cur).clone(), cur_target.clone()));
                         cur = d;
+                        cur_target = t;
                         prop_assert!(*cur == want, "redo after {:?}", steps);
+                        prop_assert_eq!(&cur_target, &want_t);
                     }
                 }
                 edit_step => {
                     let before = cur.clone();
                     let mut d = (*cur).clone();
                     edit(&mut d, edit_step);
-                    past.push((*before).clone());
+                    past.push(((*before).clone(), cur_target.clone()));
                     future.clear();
+                    cur_target = target(&d);
                     cur = Arc::new(d);
-                    h.record(format!("{edit_step:?}"), before, LayerTarget::default());
+                    h.record(format!("{edit_step:?}"), before, cur_target.clone());
+                    if past.len() > max_states {
+                        past.remove(0);
+                    }
+                    let dropped = h.trim(&cur);
+                    past.drain(..dropped.min(past.len()));
+                    prop_assert_eq!(h.past_len(), past.len());
+                    prop_assert!(h.max_bytes == 0 || !past.is_empty(), "the last step stays undoable");
                 }
             }
             prop_assert_eq!(cur.vector_view().layers.len(), cur.vector_layers().len());
             for (id, vl) in cur.vector_layers() {
-                let seen = drawn.entry((id, vl.revision)).or_insert_with(|| vl.node.clone());
-                prop_assert!(**seen == *vl.node, "one revision, two different drawings: {:?}", steps);
+                let seen = drawn.entry((id, vl.revision)).or_insert_with(|| (vl.node.clone(), vl.transform));
+                prop_assert!(*seen.0 == *vl.node && seen.1 == vl.transform, "one revision, two different drawings: {:?}", steps);
             }
+            let space = spaces.entry(cur.vector_revision).or_insert_with(|| (cur.vector.artboards.clone(), cur.vector_mapping, cur.vector.swatches.len()));
+            prop_assert!(space.0 == cur.vector.artboards && space.2 == cur.vector.swatches.len(), "one vector revision, two spaces: {:?}", steps);
         }
     }
 }
@@ -175,8 +235,13 @@ fn the_memory_budget_counts_vector_art() {
     // state's art in full would be about 25 times the current art.
     let current = cur.vector_bytes(&mut std::collections::HashSet::new());
     assert!(held < 2 * current, "history {held} bytes, current art {current}");
-    // A budget below what history holds drops the oldest states, keeping one undo.
-    h.max_bytes = h.pixel_bytes(&cur) / 2;
-    assert!(h.trim(&cur) > 0);
-    assert!(h.past_len() >= 1 && h.undo(cur.clone()).is_some());
+    // A budget between the current document and the current document plus history's art drops
+    // some of the oldest states and keeps the newer ones: only the vector art is over it (the
+    // pixel tiles are all shared, so a pixels-only count would drop nothing).
+    let own = h.pixel_bytes(&cur) - held;
+    h.max_bytes = own + held / 2;
+    let dropped = h.trim(&cur);
+    assert!(dropped > 0 && h.past_len() > 1, "dropped {dropped}, kept {}", h.past_len());
+    assert!(h.pixel_bytes(&cur) <= h.max_bytes);
+    assert!(h.undo(cur.clone()).is_some());
 }

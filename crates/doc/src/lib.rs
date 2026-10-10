@@ -762,7 +762,7 @@ impl Document {
             variables: Variables::default(),
             timeline: None,
             vector: Arc::new(vlayer::new_vector_space(size, 72.0, mode)),
-            vector_revision: 0,
+            vector_revision: vlayer::next_revision(),
             vector_mapping: Affine::scale(1.0),
         }
     }
