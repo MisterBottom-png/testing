@@ -587,9 +587,15 @@ dependencies = [
 name = "astudio-tools"
 version = "0.0.1"
 dependencies = [
- "astudio-doc",
+ "astudio-color",
  "astudio-geom",
+ "astudio-pathops",
+ "astudio-text",
  "astudio-vdoc",
+ "image",
+ "kurbo",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
