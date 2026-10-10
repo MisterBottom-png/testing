@@ -2,12 +2,12 @@
 
 use crate::Raster;
 
-/// Average colour (straight RGBA) of each of `cols` × `rows` tiles covering `img`, row by row.
-/// Transparent pixels count by their alpha, so a tile over transparency fades out.
 /// Most tiles one mosaic gives (P3-10 review: 65535 × 65535 asked for 17 GB).
 pub const MAX_TILES: u64 = 1 << 22;
 
-/// A mosaic of more than [`MAX_TILES`] tiles, or of an inconsistent raster, is empty.
+/// Average colour (straight RGBA) of each of `cols` × `rows` tiles covering `img`, row by row.
+/// Transparent pixels count by their alpha, so a tile over transparency fades out. A mosaic of
+/// more than [`MAX_TILES`] tiles, or of an inconsistent raster, is empty.
 pub fn mosaic(img: &Raster, cols: u32, rows: u32) -> Vec<[u8; 4]> {
     let (cols, rows) = (cols.max(1), rows.max(1));
     let tiles = u64::from(cols) * u64::from(rows);

@@ -111,8 +111,8 @@ impl Raster {
         limits.max_image_width = Some(MAX_SIDE);
         limits.max_image_height = Some(MAX_SIDE);
         limits.max_alloc = Some(MAX_DECODE_BYTES);
-        let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| TraceError::Decode(e.to_string()))?;
-        reader.limits(limits.clone());
+        // The header alone (no pixels are read), so an oversized image is named as such.
+        let reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| TraceError::Decode(e.to_string()))?;
         let (w, h) = reader.into_dimensions().map_err(|e| TraceError::Decode(e.to_string()))?;
         if w == 0 || h == 0 {
             return Err(TraceError::Empty);
@@ -136,9 +136,10 @@ impl Raster {
         }
         out
     }
-    /// The pixel at `(x, y)`; transparent black outside the raster.
+    /// The pixel at `(x, y)`; transparent black outside the raster or for a raster whose data
+    /// doesn't match its size (whose index arithmetic could overflow).
     pub fn pixel(&self, x: u32, y: u32) -> [u8; 4] {
-        if x >= self.width || y >= self.height {
+        if x >= self.width || y >= self.height || !self.is_consistent() {
             return [0; 4];
         }
         let i = (y as usize * self.width as usize + x as usize) * 4;

@@ -324,9 +324,11 @@ fn bmp_header(w: i32, h: i32) -> Vec<u8> {
 /// buffer is made.
 #[test]
 fn oversized_images_are_refused_before_decoding() {
-    for (w, h) in [(40_000, 10), (20_000, 20_000), (100_000, 100_000)] {
-        assert!(Raster::decode(&bmp_header(w, h)).is_err(), "{w} x {h}");
+    for (w, h) in [(40_000, 10), (20_000, 20_000)] {
+        assert!(matches!(Raster::decode(&bmp_header(w, h)), Err(TraceError::TooLarge)), "{w} x {h}");
     }
+    // Past 65,535 a side the BMP reader refuses the header itself.
+    assert!(Raster::decode(&bmp_header(100_000, 100_000)).is_err());
     let small = Raster::from_fn(3, 2, |x, _| [x as u8 * 80, 0, 0, 255]);
     let back = Raster::decode(&small.encode_png()).unwrap();
     assert_eq!(back, small);
@@ -345,6 +347,8 @@ fn mismatched_sizes_do_not_crash() {
     assert!(trace(&broken, &TraceParams::default()).paths.is_empty());
     assert!(crate::mosaic::mosaic(&broken, 4, 4).is_empty());
     assert_eq!(broken.pixel(10, 10), [0; 4]);
+    let huge = Raster { width: u32::MAX, height: u32::MAX, rgba: vec![] };
+    assert_eq!(huge.pixel(u32::MAX - 1, u32::MAX - 1), [0; 4], "no index overflow");
     let mut labels = vec![0u16; 7];
     crate::quantize::denoise(&mut labels, 3, 3, 4);
 }
