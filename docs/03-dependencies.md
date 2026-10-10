@@ -228,6 +228,9 @@ What this means as crates are ported:
   "the HEIF decoder failed" error (tests in `crates/heif/src/lib.rs`). The web build cannot catch
   panics (wasm32 aborts), so it must not enable the `heif` feature until heic-rs is fixed. No
   A-Studio app enables `heif` yet; that choice is task P7-08.
+- **Benchmarks only (P2-20):** `criterion` 0.5 without default features is a dev-dependency of
+  `astudio-compose` for its benchmark (`cargo bench -p astudio-compose`), as in PhotoCraft; it and
+  what it pulls in (clap, ciborium, regex, walkdir and others) ship in nothing.
 - **Advisory exception:** `paste` is unmaintained (RUSTSEC-2024-0436, no vulnerability); it is a
   build-time macro that `exr` (EXR images in `astudio-codecs`) uses through `pulp`, and `rav1e`
   (the optional AVIF encoder) directly.

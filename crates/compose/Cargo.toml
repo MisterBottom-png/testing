@@ -19,6 +19,12 @@ rayon = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
+criterion = { workspace = true }
+astudio-paint = { path = "../paint" }
+
+[[bench]]
+name = "compose"
+harness = false
 
 [lints]
 workspace = true

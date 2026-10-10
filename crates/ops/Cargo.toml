@@ -1,0 +1,14 @@
+[package]
+name = "astudio-ops"
+description = "A-Studio: undo and redo history (whole-document snapshots over shared tiles)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+astudio-doc = { path = "../doc" }
+
+[lints]
+workspace = true
