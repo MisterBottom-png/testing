@@ -25,7 +25,8 @@ pixel-and-vector editor. Read `docs/00-decisions.md` and `docs/02-architecture.m
   AGPL code (Krita, GIMP, Inkscape, lib2geom). Ideas from them are fine; code is not. Test programs
   count as code. Allowed by the owner: the PDF reader's built-in data (Adobe's CMap tables, Foxit
   fallback fonts; D9) and filter names, option names, slider ranges and defaults that match
-  Photoshop's dialogs (D10).
+  Photoshop's dialogs, and Image Trace option names and ranges that match Illustrator's (D10).
+  Built-in preset names are always A-Studio's own.
 - **No ArtCraft marks** in shipped files (`scripts/rebrand-scan.sh --shipped`). Plain-text credit only.
 - **Assets.** Every new file under `assets/` gets a row in `ASSETS.md` in the same commit, with its
   licence text beside it. The small bundled UI fonts (Inter, JetBrains Mono, Source Sans 3, Source Serif 4; SIL OFL, owner

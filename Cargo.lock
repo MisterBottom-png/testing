@@ -597,8 +597,12 @@ name = "astudio-trace"
 version = "0.0.1"
 dependencies = [
  "astudio-geom",
- "astudio-raster",
- "astudio-vdoc",
+ "astudio-pathops",
+ "image",
+ "kurbo",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

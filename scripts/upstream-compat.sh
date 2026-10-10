@@ -81,6 +81,7 @@ shim vectorcraft color color 'pub use astudio_color::vector::*;'
 shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
 # VectorCraft's pathops, brush, plugins, effects and render = the A-Studio crates (P2-14).
 shim vectorcraft pathops pathops 'pub use astudio_pathops::*;'
+shim vectorcraft trace trace 'pub use astudio_trace::*;'
 shim vectorcraft brush vbrush 'pub use astudio_vbrush::*;'
 shim vectorcraft plugins plugins 'pub use astudio_plugins::*;'
 # Engine and UI tests read the example plug-in from the plugins crate's fixtures.
