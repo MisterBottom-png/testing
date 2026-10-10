@@ -71,7 +71,7 @@ shim photocraft raster raster 'pub use astudio_raster::*;'
 shim photocraft doc doc 'pub use astudio_doc::*;'
 shim photocraft raw raw 'pub use astudio_raw::*;'
 printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
-for c in vector compose gpu paint ops algo; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
+for c in vector compose gpu paint ops algo format; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
 
 copy vectorcraft
 # VectorCraft's geom root = astudio_geom's root (kurbo names, paths, shapes, ...).
@@ -83,6 +83,7 @@ shim vectorcraft doc vdoc 'pub use astudio_vdoc::*;'
 shim vectorcraft pathops pathops 'pub use astudio_pathops::*;'
 shim vectorcraft trace trace 'pub use astudio_trace::*;'
 shim vectorcraft tools tools 'pub use astudio_tools::*;'
+shim vectorcraft format format 'pub use astudio_format::vectorcraft::*;'
 shim vectorcraft brush vbrush 'pub use astudio_vbrush::*;'
 shim vectorcraft plugins plugins 'pub use astudio_plugins::*;'
 # Engine and UI tests read the example plug-in from the plugins crate's fixtures.

@@ -1,6 +1,6 @@
 [package]
 name = "astudio-format"
-description = "A-Studio: The .astudio format; readers for .pcraft and .vectorcraft"
+description = "A-Studio: .pcraft (PhotoCraft) and .vectorcraft (VectorCraft) read and write; .astudio comes in P5-01"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,6 +13,19 @@ astudio-color = { path = "../color" }
 astudio-raster = { path = "../raster" }
 astudio-vdoc = { path = "../vdoc" }
 astudio-doc = { path = "../doc" }
+astudio-codecs = { path = "../codecs" }
+serde = { workspace = true }
+# `unbounded_depth` only makes Deserializer::disable_recursion_limit available: the .pcraft
+# reader turns the limit off after its own linear depth check (store.rs).
+serde_json = { workspace = true, features = ["unbounded_depth"] }
+thiserror = { workspace = true }
+flate2 = { workspace = true }
+blake3 = { version = "1.8", default-features = false, features = ["pure"] }
+ruzstd = "0.9"
+
+[dev-dependencies]
+proptest = { workspace = true }
+astudio-testkit = { path = "../testkit" }
 
 [lints]
 workspace = true

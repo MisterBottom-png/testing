@@ -32,41 +32,9 @@ pub mod strategies;
 /// testkit does).
 pub use astudio_svg as svg;
 
-/// What the importer tests use of VectorCraft's `format` crate (its `base64_decode`, copied from
-/// vectorcraft@8b036df crates/format/src/lib.rs); becomes a re-export once that crate is ported.
-pub mod format {
-    const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    /// Decode standard base64 (whitespace ignored); `None` on bad input.
-    pub fn base64_decode(s: &str) -> Option<Vec<u8>> {
-        let val = |c: u8| B64.iter().position(|&b| b == c).map(|p| p as u32);
-        let clean: Vec<u8> = s.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
-        if !clean.len().is_multiple_of(4) {
-            return None;
-        }
-        let mut out = Vec::with_capacity(clean.len() / 4 * 3);
-        for c in clean.chunks(4) {
-            let mut n = 0u32;
-            let mut pad = 0;
-            for &b in c {
-                n <<= 6;
-                if b == b'=' {
-                    pad += 1;
-                } else {
-                    n |= val(b)?;
-                }
-            }
-            out.push((n >> 16) as u8);
-            if pad < 2 {
-                out.push((n >> 8) as u8);
-            }
-            if pad < 1 {
-                out.push(n as u8);
-            }
-        }
-        Some(out)
-    }
-}
+/// VectorCraft's `format` crate (astudio-format's `vectorcraft` module, P3-12), so tests can save
+/// and load `.vectorcraft` without their own dependency (as VectorCraft's testkit does).
+pub use astudio_format::vectorcraft as format;
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "testkit";

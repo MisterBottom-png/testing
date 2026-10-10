@@ -1,5 +1,5 @@
-//! Structural invariants for documents (vc `invariants`; the session, native-format and SVG
-//! round-trip checks come with the engine, P3-02, and the format crate).
+//! Structural invariants for documents (vc `invariants`; the native-format round trip since
+//! P3-12; the session and SVG round-trip checks come with the engine, P3-16).
 
 use std::collections::HashSet;
 
@@ -54,6 +54,54 @@ pub fn check_document(doc: &Document) -> Result<(), String> {
         if doc.node(id).is_none() {
             return Err(format!("walked id {id} not found by lookup"));
         }
+    }
+    Ok(())
+}
+
+/// `.vectorcraft` save → load → the JSON of the document and of what loaded, without `images`: a
+/// save keeps only the images in use, which must come back byte for byte.
+fn native_roundtrip(doc: &Document) -> Result<(Value, Value), String> {
+    let bytes = astudio_format::vectorcraft::save(doc, false);
+    let back = astudio_format::vectorcraft::load(&bytes).map_err(|e| format!("load: {e}"))?;
+    if let Some(k) = back.images.iter().find(|(k, b)| doc.images.get(*k).map(|d| &d.bytes) != Some(&b.bytes)).map(|(k, _)| k) {
+        return Err(format!("native round trip changed image `{k}`"));
+    }
+    let mut lost = None;
+    back.walk(|n| {
+        if let NodeKind::Image(im) = &n.kind
+            && doc.images.contains_key(&im.key)
+            && !back.images.contains_key(&im.key)
+        {
+            lost = Some(im.key.clone());
+        }
+    });
+    if let Some(k) = lost {
+        return Err(format!("native round trip lost image `{k}`, which is in use"));
+    }
+    let strip = |mut v: Value| {
+        if let Some(o) = v.as_object_mut() {
+            o.remove("images");
+        }
+        v
+    };
+    Ok((strip(doc_json(doc)), strip(doc_json(&back))))
+}
+
+/// `.vectorcraft` save → load must reproduce the document (numbers compared to 1e-12 relative —
+/// see [`check_native_roundtrip_exact`] for the bit-exact version).
+pub fn check_native_roundtrip(doc: &Document) -> Result<(), String> {
+    let (a, b) = native_roundtrip(doc)?;
+    if !json_approx_eq(&a, &b, 1e-12) {
+        return Err(format!("native round trip differs:\n{}", first_diff(&a, &b, "$")));
+    }
+    Ok(())
+}
+
+/// Bit-exact `.vectorcraft` round trip (every f64 must survive).
+pub fn check_native_roundtrip_exact(doc: &Document) -> Result<(), String> {
+    let (a, b) = native_roundtrip(doc)?;
+    if a != b {
+        return Err(format!("native round trip differs:\n{}", first_diff(&a, &b, "$")));
     }
     Ok(())
 }

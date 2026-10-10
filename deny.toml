@@ -44,6 +44,9 @@ skip = [
   { crate = "base64@0.22.1", reason = "krilla 0.8 (PDF export); usvg 0.48 uses base64 0.23" },
   { crate = "harfrust@0.12.0", reason = "usvg 0.48 (SVG import); astudio-text uses harfrust 0.13" },
   { crate = "imagesize@0.14.0", reason = "krilla 0.8 (PDF export); usvg 0.48 uses imagesize 0.15" },
+  # The .pcraft format (astudio-format, P3-12): blake3 1.8 uses cpufeatures 0.3; the PDF reader's
+  # decryption (aes, sha2) uses 0.2.
+  { crate = "cpufeatures@0.2.17", reason = "aes and sha2 (astudio-pdf decryption); blake3 1.8 (astudio-format) uses cpufeatures 0.3" },
   # The GPU compositor (astudio-gpu, P2-19): wgpu 30's own crates, pairs also in PhotoCraft's lock file.
   { crate = "bit-set@0.8.0", reason = "proptest (tests only); naga 30 (wgpu's shader compiler) uses bit-set 0.10" },
   { crate = "bit-vec@0.8.0", reason = "bit-set 0.8 (proptest, tests only); bit-set 0.10 (naga) uses bit-vec 0.9" },

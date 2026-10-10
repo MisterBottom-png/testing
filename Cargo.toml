@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz", "crates/plugins/example", "crates/svg/fuzz", "crates/pdf/fuzz", "crates/eps/fuzz", "crates/cad/fuzz", "crates/metafile/fuzz"]
+exclude = ["crates/format/fuzz", "crates/codecs/fuzz", "crates/raw/fuzz", "crates/psd/fuzz", "crates/plugins/example", "crates/svg/fuzz", "crates/pdf/fuzz", "crates/eps/fuzz", "crates/cad/fuzz", "crates/metafile/fuzz"]
 resolver = "3"
 members = [
     "crates/geom",
