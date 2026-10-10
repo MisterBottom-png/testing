@@ -13,6 +13,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
 | D8 | Colour engine | One A-Studio engine: PhotoCraft `cms` at the core, VectorCraft's colour layer on top, new safe fast paths; default CMYK PhotoCraft Coated | Owner, 8 October 2026 |
 | D9 | Third-party data the PDF reader builds in | Allowed: Adobe's published CMap tables (BSD-3-Clause) and the Foxit/PDFium fallback fonts (BSD) | Owner, 9 October 2026 |
+| D10 | Filters whose settings match Photoshop's | Allowed: filter names, option names, slider ranges and default values that match Photoshop's dialogs; the filter code stays our own | Owner, 10 October 2026 |
 
 ## D1 Fork
 
@@ -111,3 +112,16 @@ Decided by the owner on 9 October 2026, during P2-15 (the VectorCraft importers)
 - Not changed: the clean-room rule stays as it is for everything else (no code, icons, presets,
   profiles, shaders or screenshots from Adobe products), and the bundled UI fonts stay the four in
   `assets/fonts`.
+
+## D10 Filter settings that match Photoshop's
+
+Decided by the owner on 10 October 2026, during P2-20 (PhotoCraft's `algo` crate).
+
+- About 50 filters ported from PhotoCraft (the Filter Gallery, Render › Tree, Flame and Picture
+  Frame, and similar) use Photoshop's filter names, option names, slider ranges and default
+  values, so they feel the same as in Photoshop. Allowed.
+- Reason: these are compatibility facts (what a dialog offers and where it starts), not code,
+  preset files or other data taken from an Adobe product. The drawing code is PhotoCraft's own.
+- Not changed: the clean-room rule stays as it is for everything else (no code, icons, presets,
+  profiles, shaders or screenshots from Adobe products). Built-in brush presets carry A-Studio's
+  own names and groups, not Photoshop's (owner, same day).
