@@ -716,6 +716,9 @@ pub struct Document {
     /// patterns and node ids, shared by every vector layer. Its `layers` stay empty; the nodes
     /// are in the vector layers ([`vlayer`]).
     pub vector: Arc<astudio_vdoc::Document>,
+    /// Bumped when [`Document::vector`] changes (a symbol, style or swatch), which every vector
+    /// layer's pixels may depend on.
+    pub vector_revision: u64,
 }
 
 /// Where a layer lives in the tree: indices from the root down.
@@ -754,6 +757,7 @@ impl Document {
             variables: Variables::default(),
             timeline: None,
             vector: Arc::new(vlayer::new_vector_space(size, 72.0, mode)),
+            vector_revision: 0,
         }
     }
 

@@ -1,21 +1,30 @@
 //! Vector layers and the document's vector space (P3-01).
 //!
-//! A-Studio's document is PhotoCraft's layer stack plus a **Vector** layer kind. A vector layer
-//! holds VectorCraft nodes: usually one top-level VectorCraft layer, as `.vectorcraft` files open
-//! with one A-Studio layer per top-level layer (`docs/05-file-format.md`). Everything those nodes
-//! refer to by id or name lives once per document, in [`Document::vector`]: the artboards (in
+//! A-Studio's document is PhotoCraft's layer stack plus a **Vector** layer kind. Each vector layer
+//! holds one top-level VectorCraft node, normally a VectorCraft layer, so a `.vectorcraft` file
+//! opens as one A-Studio layer per top-level layer (`docs/05-file-format.md`). Everything those
+//! nodes refer to by id or name lives once per document, in [`Document::vector`]: the artboards (in
 //! points), swatches and swatch groups, graphic, character and paragraph styles, symbols, images,
 //! patterns, text threads and the node-id counter. Its own `layers` list stays empty; the nodes
 //! are in the layers of the stack.
 //!
 //! VectorCraft code works on a whole `astudio_vdoc::Document`. [`Document::vector_view`] assembles
-//! one (the space plus every vector layer's nodes, bottom to top), and [`Document::edit_vector`]
-//! lends one out for editing and hands each node back to the layer it came from, so edits across
-//! layers (threaded text, moving art from one layer to another) keep working.
+//! one (the space plus every vector layer's node, bottom to top through groups), and
+//! [`Document::edit_vector`] lends one out for editing and maps the result back onto the stack, so
+//! edits across layers (threaded text, moving art, reordering layers) behave as in VectorCraft.
+//!
+//! Who owns what:
+//! - A layer's **name and visibility** are the A-Studio layer's; the node mirrors them in both
+//!   directions (the view takes them from the layer, an edit's result gives them back).
+//! - Its **opacity, blend mode, mask and effects** are the A-Studio layer's and act on the layer's
+//!   pixels, like any layer's; the node's own opacity and blend act inside the art.
+//! - The **pixels** come from VectorCraft's renderer (task P3-09), cached per
+//!   ([`VectorLayer::revision`], [`Document::vector_revision`]): a change to the node redraws that
+//!   layer, a change to the shared space (a symbol, a style, a swatch) redraws every vector layer.
 //!
 //! The PhotoCraft artboards (a top-level group with [`crate::Group::artboard`], as in PSD files)
 //! stay as they are; the vector space's artboards are VectorCraft's. Joining the two in one
-//! Artboards panel is UI work (P4).
+//! Artboards panel is UI work (P4-01).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -23,38 +32,44 @@ use std::sync::Arc;
 use astudio_vdoc::node::Node;
 use astudio_vdoc::{Document as VectorDocument, NodeId};
 
-use crate::{Affine, ColorMode, Document, Layer, LayerContent, LayerId, SampleType, Size, Surface};
+use crate::{Affine, ColorMode, Document, Layer, LayerContent, LayerId, LayerPath, SampleType, Size, Surface};
 
 /// Most pixels on a side of a document opened from a vector document (PhotoCraft's canvas limit).
 const MAX_SIDE: u32 = 300_000;
 
-/// A layer holding VectorCraft nodes. The nodes are in points; `transform` maps them to the
-/// document's pixels. `cache` holds the last rendered pixels: [`Layer::surface`] returns them
-/// even when stale (the editor shows the old pixels until the renderer catches up); they are up
-/// to date while `cache_revision == revision`. Rendering lives in a higher-layer crate.
+/// What a layer is called when its node has no name.
+const UNNAMED: &str = "Layer";
+
+/// The identity transform.
+const IDENTITY: Affine = Affine { m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] };
+
+/// A layer holding one top-level VectorCraft node. The node is in points; it is drawn at
+/// `points × resolution / 72` pixels, then through `transform` (as the `.astudio` format stores
+/// it), so the art follows the document's resolution. `cache` holds the last rendered pixels:
+/// [`Layer::surface`] returns them even when stale (the editor shows the old pixels until the
+/// renderer catches up); see [`VectorLayer::fresh_cache`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorLayer {
-    /// Top-level VectorCraft nodes, bottom first (a `.vectorcraft` file's `layers` array).
-    pub nodes: Vec<Arc<Node>>,
-    /// Points → pixels (`[a c e; b d f]`, column vectors, like every PhotoCraft transform).
+    pub node: Arc<Node>,
+    /// After the resolution scale, pixels → document pixels (`[a c e; b d f]`, column vectors,
+    /// like every PhotoCraft transform).
     pub transform: Affine,
-    /// Bumped on every change of `nodes` or `transform`.
+    /// Bumped on every change of `node` or `transform`.
     pub revision: u64,
     pub cache: Option<Surface>,
-    pub cache_revision: u64,
+    /// The (`revision`, [`Document::vector_revision`]) the cache was drawn at.
+    pub cache_revision: (u64, u64),
 }
 
 impl VectorLayer {
-    /// A vector layer at `resolution_dpi`: 1 pt = dpi / 72 px, origin at the top left. A
-    /// non-finite or non-positive resolution (from a damaged file) counts as 72 dpi.
-    pub fn new(nodes: Vec<Arc<Node>>, resolution_dpi: f32) -> Self {
-        let k = points_to_pixels(resolution_dpi);
-        Self { nodes, transform: Affine { m: [k, 0.0, 0.0, k, 0.0, 0.0] }, revision: 1, cache: None, cache_revision: 0 }
+    /// A vector layer for `node` with no extra transform.
+    pub fn new(node: Arc<Node>) -> Self {
+        Self { node, transform: IDENTITY, revision: 1, cache: None, cache_revision: (0, 0) }
     }
 
-    /// The cached pixels, if they are up to date.
-    pub fn fresh_cache(&self) -> Option<&Surface> {
-        self.cache.as_ref().filter(|_| self.cache_revision == self.revision)
+    /// The cached pixels, if they are up to date for a document at `vector_revision`.
+    pub fn fresh_cache(&self, vector_revision: u64) -> Option<&Surface> {
+        self.cache.as_ref().filter(|_| self.cache_revision == (self.revision, vector_revision))
     }
 
     /// Marks the cached pixels stale.
@@ -63,25 +78,67 @@ impl VectorLayer {
     }
 }
 
-/// Pixels per point at `resolution_dpi` (72 dpi for a damaged resolution).
+/// A usable resolution: 72 dpi for a damaged one (non-finite or not positive).
+fn sane_dpi(resolution_dpi: f32) -> f32 {
+    if resolution_dpi.is_finite() && resolution_dpi > 0.0 { resolution_dpi } else { 72.0 }
+}
+
+/// Pixels per point at `resolution_dpi`.
 fn points_to_pixels(resolution_dpi: f32) -> f64 {
-    let dpi = if resolution_dpi.is_finite() && resolution_dpi > 0.0 { resolution_dpi } else { 72.0 };
-    f64::from(dpi) / 72.0
+    f64::from(sane_dpi(resolution_dpi)) / 72.0
+}
+
+/// The canvas of `size` pixels at `resolution_dpi`, in points: a new document's artboard.
+fn canvas_artboard(size: Size, resolution_dpi: f32) -> astudio_geom::Rect {
+    let k = points_to_pixels(resolution_dpi);
+    astudio_geom::Rect::new(0.0, 0.0, f64::from(size.width) / k, f64::from(size.height) / k)
 }
 
 /// The vector space of a new document of `size` pixels at `resolution_dpi`: one artboard covering
 /// the canvas and the default swatches and graphic styles of `mode`, no layers.
 pub fn new_vector_space(size: Size, resolution_dpi: f32, mode: ColorMode) -> VectorDocument {
-    let k = points_to_pixels(resolution_dpi);
     let vmode = if mode == ColorMode::Cmyk { astudio_vdoc::ColorMode::Cmyk } else { astudio_vdoc::ColorMode::Rgb };
-    let mut v = VectorDocument::new_with_mode(f64::from(size.width) / k, f64::from(size.height) / k, vmode);
+    let r = canvas_artboard(size, resolution_dpi);
+    let mut v = VectorDocument::new_with_mode(r.width(), r.height(), vmode);
     v.layers.clear();
     v
 }
 
+/// A new A-Studio layer for `node`, with the node's name and visibility.
+fn layer_for(node: Arc<Node>, transform: Affine) -> Layer {
+    let name = node.name.clone().unwrap_or_else(|| UNNAMED.into());
+    let visible = node.visible;
+    let mut layer = Layer::new(name, LayerContent::Vector(VectorLayer { transform, ..VectorLayer::new(node) }));
+    layer.visible = visible;
+    layer
+}
+
+/// `node` with the name and visibility of `layer` (the same node when they already match).
+fn node_as_layer_says(node: &Arc<Node>, layer: &Layer) -> Arc<Node> {
+    let name_differs = node.name.as_deref().unwrap_or(UNNAMED) != layer.name;
+    if !name_differs && node.visible == layer.visible {
+        return node.clone();
+    }
+    let mut n = (**node).clone();
+    if name_differs {
+        n.name = Some(layer.name.clone());
+    }
+    n.visible = layer.visible;
+    Arc::new(n)
+}
+
+/// The largest node id in `nodes` and their subtrees (0 for none).
+fn max_id(nodes: &[Arc<Node>]) -> u64 {
+    let mut max = 0;
+    for n in nodes {
+        n.walk(&mut |c| max = max.max(c.id.0));
+    }
+    max
+}
+
 impl Document {
     /// A document opened from a VectorCraft document at `resolution_dpi`: one Vector layer per
-    /// top-level layer (bottom first, with its name and visibility), the canvas covering every
+    /// top-level node (bottom first, with its name and visibility), the canvas covering every
     /// artboard, and the artboards, swatches, styles and the rest in [`Document::vector`].
     pub fn from_vector(mut v: VectorDocument, resolution_dpi: f32, depth: SampleType) -> Self {
         let k = points_to_pixels(resolution_dpi);
@@ -94,35 +151,35 @@ impl Document {
         let (x0, y0) = if x0.is_finite() && y0.is_finite() { (x0, y0) } else { (0.0, 0.0) };
         let mode = if v.color_mode == astudio_vdoc::ColorMode::Cmyk { ColorMode::Cmyk } else { ColorMode::Rgb };
         let mut d = Document::new(v.title.clone(), Size::new(side(w), side(h)), mode, depth);
-        d.resolution_dpi = if resolution_dpi.is_finite() && resolution_dpi > 0.0 { resolution_dpi } else { 72.0 };
-        let transform = Affine { m: [k, 0.0, 0.0, k, -x0 * k, -y0 * k] };
-        for node in std::mem::take(&mut v.layers) {
-            let name = node.name.clone().unwrap_or_else(|| "Layer".into());
-            let visible = node.visible;
-            let mut layer = Layer::new(name, LayerContent::Vector(VectorLayer { transform, ..VectorLayer::new(vec![node], resolution_dpi) }));
-            layer.visible = visible;
-            d.layers.push(layer);
-        }
+        d.resolution_dpi = sane_dpi(resolution_dpi);
+        let transform = Affine::translate(-x0 * k, -y0 * k);
+        let nodes = std::mem::take(&mut v.layers);
+        v.reserve_ids(max_id(&nodes).saturating_add(1));
+        d.layers = nodes.into_iter().map(|node| layer_for(node, transform)).collect();
         d.vector = Arc::new(v);
         d
     }
 
-    /// The whole vector document: the vector space with every vector layer's nodes, bottom to top
-    /// through groups (what `.vectorcraft` Save As and the VectorCraft exporters write).
-    /// Nodes that share an id with an earlier one (a duplicated layer not edited since) get fresh
-    /// ids in the copy.
-    pub fn vector_view(&self) -> VectorDocument {
-        let mut v = (*self.vector).clone();
-        let mut seen: HashSet<NodeId> = HashSet::new();
-        for (_, vl) in self.vector_layers() {
-            for node in &vl.nodes {
-                let mut dup = false;
-                node.walk(&mut |n| dup |= !seen.insert(n.id));
-                let node = if dup { Arc::new(v.reid(node)) } else { node.clone() };
-                v.layers.push(node);
+    /// Sets the resolution. The vector art follows it (it is in points); a vector space still on
+    /// its first artboard, the canvas, gets the canvas at the new resolution.
+    pub fn set_resolution(&mut self, resolution_dpi: f32) {
+        let dpi = sane_dpi(resolution_dpi);
+        let old = canvas_artboard(self.size, self.resolution_dpi);
+        if let [only] = self.vector.artboards.as_slice()
+            && only.rect == old
+        {
+            let rect = canvas_artboard(self.size, dpi);
+            if let Some(a) = Arc::make_mut(&mut self.vector).artboards.first_mut() {
+                a.rect = rect;
             }
+            self.vector_revision = self.vector_revision.wrapping_add(1);
         }
-        v
+        self.resolution_dpi = dpi;
+    }
+
+    /// Points → document pixels for `layer`: the resolution scale, then its transform.
+    pub fn vector_transform(&self, layer: &VectorLayer) -> Affine {
+        layer.transform.mul(&Affine::scale(points_to_pixels(self.resolution_dpi)))
     }
 
     /// The vector layers, bottom to top through groups.
@@ -136,119 +193,215 @@ impl Document {
             .collect()
     }
 
-    /// Runs `f` on the whole vector document (see [`Document::vector_view`]), then gives every
-    /// top-level node back to the layer it came from. A new VectorCraft layer `f` added becomes a
-    /// new Vector layer just above the layer of the node before it (at the bottom of the stack when
-    /// it comes first); other new top-level art joins the layer of the node before it (a new layer
-    /// when there is none). A layer left without nodes is removed. Layers whose nodes changed get a new revision. Nodes that
-    /// share an id with an earlier one (a duplicated layer) get fresh ids first, since VectorCraft
-    /// needs every id once.
-    pub fn edit_vector<R>(&mut self, f: impl FnOnce(&mut VectorDocument) -> R) -> R {
-        self.give_duplicate_nodes_fresh_ids();
-        let before: Vec<(LayerId, Vec<Arc<Node>>)> = self.vector_layers().into_iter().map(|(id, vl)| (id, vl.nodes.clone())).collect();
-        let owner: HashMap<NodeId, LayerId> = before.iter().flat_map(|(id, nodes)| nodes.iter().map(move |n| (n.id, *id))).collect();
-        let resolution = self.resolution_dpi;
-        let space = Arc::make_mut(&mut self.vector);
-        space.layers = before.iter().flat_map(|(_, nodes)| nodes.iter().cloned()).collect();
-        let out = f(space);
-        let after = std::mem::take(&mut space.layers);
-
-        // Who gets each node: its old layer, else the layer of the node before it, else new layers.
-        let mut owned: HashMap<LayerId, Vec<Arc<Node>>> = HashMap::new();
-        // New A-Studio layers: their nodes and the layer they go above (None = the bottom).
-        let mut new_layers: Vec<(Option<LayerId>, Layer)> = Vec::new();
-        let mut current: Option<LayerId> = None;
-        for node in after {
-            if let Some(&id) = owner.get(&node.id) {
-                current = Some(id);
-                owned.entry(id).or_default().push(node);
-                continue;
-            }
-            let joins = (!node.is_layer()).then_some(current).flatten();
-            if let Some(id) = joins {
-                owned.entry(id).or_default().push(node);
-                continue;
-            }
-            let name = node.name.clone().unwrap_or_else(|| "Layer".into());
-            let visible = node.visible;
-            let mut layer = Layer::new(name, LayerContent::Vector(VectorLayer::new(vec![node], resolution)));
-            layer.visible = visible;
-            let above = current;
-            current = Some(layer.id);
-            new_layers.push((above, layer));
-        }
-        let mut emptied: HashSet<LayerId> = HashSet::new();
-        for (id, old) in &before {
-            let nodes = owned.remove(id).unwrap_or_default();
-            if nodes.is_empty() {
-                emptied.insert(*id);
-                continue;
-            }
-            let same = nodes.len() == old.len() && nodes.iter().zip(old).all(|(a, b)| Arc::ptr_eq(a, b));
-            if !same && let Some(LayerContent::Vector(vl)) = self.layer_mut(*id).map(|l| &mut l.content) {
-                vl.nodes = nodes;
-                vl.touch();
-            }
-        }
-        // In order, so a run of new layers stacks the way `f` left them.
-        for (above, layer) in new_layers {
-            insert_above(&mut self.layers, above, layer);
-        }
-        if !emptied.is_empty() {
-            remove_layers(&mut self.layers, &emptied);
-        }
-        out
+    /// Every vector layer with its node as the layer names and shows it, bottom to top.
+    fn vector_layer_nodes(&self) -> Vec<(LayerId, Arc<Node>)> {
+        self.walk()
+            .into_iter()
+            .filter_map(|(_, _, l)| match &l.content {
+                LayerContent::Vector(v) => Some((l.id, node_as_layer_says(&v.node, l))),
+                _ => None,
+            })
+            .collect()
     }
 
-    /// Re-ids every vector node (with its subtree) whose id an earlier node already has.
-    fn give_duplicate_nodes_fresh_ids(&mut self) {
-        let mut seen: HashSet<NodeId> = HashSet::new();
-        let mut redo: Vec<(LayerId, usize)> = Vec::new();
-        for (id, vl) in self.vector_layers() {
-            for (i, node) in vl.nodes.iter().enumerate() {
-                let mut dup = false;
-                node.walk(&mut |n| dup |= !seen.insert(n.id));
-                if dup {
-                    redo.push((id, i));
+    /// The whole vector document: the vector space with every vector layer's node, bottom to top
+    /// through groups, named and shown as its layer is (what `.vectorcraft` Save As and the
+    /// VectorCraft exporters write). Nodes whose ids clash with an older layer's (a duplicated
+    /// layer not edited since) get fresh ids in the copy.
+    pub fn vector_view(&self) -> VectorDocument {
+        let mut v = (*self.vector).clone();
+        let nodes: Vec<Arc<Node>> = self.vector_layer_nodes().into_iter().map(|(_, n)| n).collect();
+        v.reserve_ids(max_id(&nodes).saturating_add(1));
+        let keep = self.layers_keeping_ids();
+        v.layers = nodes;
+        for (i, keeps) in keep.into_iter().enumerate() {
+            if keeps {
+                continue;
+            }
+            if let Some(node) = v.layers.get(i).cloned() {
+                let fresh = Arc::new(v.reid(&node));
+                if let Some(slot) = v.layers.get_mut(i) {
+                    *slot = fresh;
                 }
             }
         }
-        for (id, i) in redo {
-            let Some(node) = self.vector_layers().into_iter().find(|(l, _)| *l == id).and_then(|(_, vl)| vl.nodes.get(i).cloned()) else { continue };
-            let fresh = Arc::new(Arc::make_mut(&mut self.vector).reid(&node));
-            if let Some(LayerContent::Vector(vl)) = self.layer_mut(id).map(|l| &mut l.content)
-                && let Some(slot) = vl.nodes.get_mut(i)
+        v
+    }
+
+    /// For each vector layer (bottom to top), whether it keeps its node ids: false when one of
+    /// them is an older layer's (the smaller layer id), so a duplicate takes the new ids wherever
+    /// it sits in the stack.
+    fn layers_keeping_ids(&self) -> Vec<bool> {
+        let layers = self.vector_layers();
+        let mut by_age: Vec<usize> = (0..layers.len()).collect();
+        by_age.sort_by_key(|&i| layers.get(i).map(|(id, _)| id.0));
+        let mut first_claim: HashMap<NodeId, usize> = HashMap::new();
+        for &i in &by_age {
+            if let Some((_, vl)) = layers.get(i) {
+                vl.node.walk(&mut |n| {
+                    first_claim.entry(n.id).or_insert(i);
+                });
+            }
+        }
+        (0..layers.len())
+            .map(|i| {
+                let mut keeps = true;
+                if let Some((_, vl)) = layers.get(i) {
+                    vl.node.walk(&mut |n| keeps &= first_claim.get(&n.id) == Some(&i));
+                }
+                keeps
+            })
+            .collect()
+    }
+
+    /// Runs `f` on the whole vector document (see [`Document::vector_view`]), then maps the result
+    /// back onto the stack:
+    /// - every node goes back to its layer, which takes the node's name and visibility;
+    /// - the vector layers keep the places they hold in the stack (between pixel layers, inside
+    ///   groups) and are shuffled among them into the order `f` left the nodes in;
+    /// - a new top-level node becomes a new Vector layer just above the layer of the node before
+    ///   it (just below the next one when it comes first; at the top of the stack in a document
+    ///   without vector layers);
+    /// - the layer of a node `f` removed is removed.
+    ///
+    /// Layers whose node changed get a new revision; a change to the shared space (anything but
+    /// the nodes) bumps [`Document::vector_revision`]. Clashing node ids (a duplicated layer) are
+    /// renewed first, and the id counter raised above every id in the layers (art from another
+    /// document), since VectorCraft needs every id once.
+    pub fn edit_vector<R>(&mut self, f: impl FnOnce(&mut VectorDocument) -> R) -> R {
+        self.renew_clashing_ids();
+        let before = self.vector_layer_nodes();
+        let mut space = (*self.vector).clone();
+        space.layers = before.iter().map(|(_, n)| n.clone()).collect();
+        space.fix_next_id();
+        let out = f(&mut space);
+        let after = std::mem::take(&mut space.layers);
+        if space != *self.vector {
+            self.vector = Arc::new(space);
+            self.vector_revision = self.vector_revision.wrapping_add(1);
+        }
+        self.apply_vector_order(&before, after);
+        out
+    }
+
+    /// Maps the top-level nodes an edit left (`after`, bottom to top) onto the stack that held
+    /// `before` (see [`Document::edit_vector`]).
+    fn apply_vector_order(&mut self, before: &[(LayerId, Arc<Node>)], after: Vec<Arc<Node>>) {
+        let owner: HashMap<NodeId, LayerId> = before.iter().map(|(id, n)| (n.id, *id)).collect();
+        let mut kept: HashSet<LayerId> = HashSet::new();
+        // Each node with the layer it belongs to (None = a new layer).
+        let entries: Vec<(Option<LayerId>, Arc<Node>)> = after
+            .into_iter()
+            .map(|n| {
+                let id = owner.get(&n.id).copied().filter(|id| kept.insert(*id));
+                (id, n)
+            })
+            .collect();
+
+        let gone: HashSet<LayerId> = before.iter().map(|(id, _)| *id).filter(|id| !kept.contains(id)).collect();
+        if !gone.is_empty() {
+            remove_layers(&mut self.layers, &gone);
+        }
+
+        // Shuffle the kept layers among the places vector layers hold, into the new order.
+        let slots: Vec<LayerPath> = self.walk().into_iter().filter(|(_, _, l)| matches!(l.content, LayerContent::Vector(_))).map(|(p, _, _)| p).collect();
+        let mut taken: HashMap<LayerId, Layer> = HashMap::new();
+        for path in &slots {
+            if let Some(slot) = self.layer_at_mut(path) {
+                let layer = std::mem::replace(slot, Layer::group("", Vec::new()));
+                taken.insert(layer.id, layer);
+            }
+        }
+        let order = entries.iter().filter_map(|(id, n)| id.map(|id| (id, n)));
+        for (path, (id, node)) in slots.iter().zip(order) {
+            let Some(mut layer) = taken.remove(&id) else { continue };
+            if let LayerContent::Vector(vl) = &mut layer.content
+                && !Arc::ptr_eq(&vl.node, node)
             {
-                *slot = fresh;
+                vl.node = node.clone();
+                vl.touch();
+            }
+            layer.name = node.name.clone().unwrap_or_else(|| UNNAMED.into());
+            layer.visible = node.visible;
+            if let Some(slot) = self.layer_at_mut(path) {
+                *slot = layer;
+            }
+        }
+
+        // New layers: above the layer of the node before them; a run before the first kept
+        // layer goes below it; with no vector layer at all, at the top of the stack.
+        let mut prev: Option<LayerId> = None;
+        let mut leading: Vec<Layer> = Vec::new();
+        for (id, node) in entries {
+            match id {
+                Some(id) => {
+                    if prev.is_none() {
+                        let mut below = id;
+                        for l in leading.drain(..).rev() {
+                            let lid = l.id;
+                            insert_next_to(&mut self.layers, below, l, false);
+                            below = lid;
+                        }
+                    }
+                    prev = Some(id);
+                }
+                None => {
+                    let l = layer_for(node, IDENTITY);
+                    match prev {
+                        Some(p) => {
+                            let lid = l.id;
+                            insert_next_to(&mut self.layers, p, l, true);
+                            prev = Some(lid);
+                        }
+                        None => leading.push(l),
+                    }
+                }
+            }
+        }
+        self.layers.extend(leading);
+    }
+
+    /// Gives every vector layer whose node ids clash with an older layer's fresh ones, from the
+    /// vector space's counter (raised first above every id in the layers).
+    fn renew_clashing_ids(&mut self) {
+        let layers: Vec<(LayerId, Arc<Node>)> = self.vector_layers().into_iter().map(|(id, vl)| (id, vl.node.clone())).collect();
+        let nodes: Vec<Arc<Node>> = layers.iter().map(|(_, n)| n.clone()).collect();
+        let max = max_id(&nodes);
+        if max >= self.vector.peek_next_id() {
+            Arc::make_mut(&mut self.vector).reserve_ids(max.saturating_add(1));
+        }
+        let keep = self.layers_keeping_ids();
+        for ((id, node), keeps) in layers.into_iter().zip(keep) {
+            if keeps {
+                continue;
+            }
+            let fresh = Arc::new(Arc::make_mut(&mut self.vector).reid(&node));
+            if let Some(LayerContent::Vector(vl)) = self.layer_mut(id).map(|l| &mut l.content) {
+                vl.node = fresh;
                 vl.touch();
             }
         }
     }
 }
 
-/// Inserts `layer` just above the layer `above` (in that layer's group), or at the bottom of the
-/// stack when `above` is None or gone.
-fn insert_above(layers: &mut Vec<Layer>, above: Option<LayerId>, layer: Layer) {
-    fn rec(layers: &mut Vec<Layer>, above: LayerId, layer: Layer) -> Option<Layer> {
-        if let Some(i) = layers.iter().position(|l| l.id == above) {
-            layers.insert(i + 1, layer);
+/// Inserts `layer` just above (`above`) or below the layer `next_to`, in that layer's group; at
+/// the top of the stack when `next_to` is gone.
+fn insert_next_to(layers: &mut Vec<Layer>, next_to: LayerId, layer: Layer, above: bool) {
+    fn rec(layers: &mut Vec<Layer>, next_to: LayerId, layer: Layer, above: bool) -> Option<Layer> {
+        if let Some(i) = layers.iter().position(|l| l.id == next_to) {
+            layers.insert(if above { i + 1 } else { i }, layer);
             return None;
         }
         let mut layer = layer;
         for l in layers.iter_mut() {
             if let Some(ch) = l.children_mut() {
-                layer = rec(ch, above, layer)?;
+                layer = rec(ch, next_to, layer, above)?;
             }
         }
         Some(layer)
     }
-    let left = match above {
-        Some(id) => rec(layers, id, layer),
-        None => Some(layer),
-    };
-    if let Some(layer) = left {
-        let at = if above.is_none() { 0 } else { layers.len() };
-        layers.insert(at, layer);
+    if let Some(layer) = rec(layers, next_to, layer, above) {
+        layers.push(layer);
     }
 }
 
