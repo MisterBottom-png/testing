@@ -28,6 +28,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("astudio-plugins", Class::Layer(2)),
     ("astudio-effects", Class::Layer(2)),
     ("astudio-paint", Class::Layer(2)),
+    ("astudio-ops", Class::Layer(2)),
     ("astudio-vector", Class::Layer(2)),
     ("astudio-algo", Class::Layer(2)),
     ("astudio-trace", Class::Layer(2)),
