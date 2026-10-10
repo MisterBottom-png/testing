@@ -1103,6 +1103,81 @@ fn default_graphic_styles() -> Vec<GraphicStyle> {
 }
 
 impl Document {
+    /// Whether `self` and `other` draw their layers the same: every field the renderer may read
+    /// is equal; bookkeeping (the id counter, title, units, guides, grid, views, saved
+    /// selections, the last view, metadata, export and print settings, slices, assets) may
+    /// differ. A-Studio caches each vector layer's pixels until this changes (P3-01). Written as
+    /// one full destructuring, so a new field has to be sorted into one group or the other.
+    pub fn draws_like(&self, other: &Self) -> bool {
+        let Document {
+            version: _,
+            title: _,
+            template: _,
+            units: _,
+            color_mode,
+            artboards,
+            layers,
+            swatches,
+            swatch_groups,
+            graphic_styles,
+            char_styles,
+            para_styles,
+            text_threads,
+            symbols,
+            guides: _,
+            views: _,
+            saved_selections: _,
+            grid: _,
+            raster_effects_ppi,
+            images,
+            patterns,
+            pattern_edit,
+            mask_edit,
+            next_id: _,
+            unknown,
+            page_isolate,
+            page_knockout,
+            spot_use_lab,
+            setup,
+            paste_remembers_layers: _,
+            metadata: _,
+            raster_effects,
+            last_view: _,
+            color_profiles,
+            export_settings: _,
+            extra,
+            slices: _,
+            slices_clip_to_artboard: _,
+            print_setup: _,
+            assets: _,
+            puppet,
+        } = self;
+        *color_mode == other.color_mode
+            && *artboards == other.artboards
+            && *layers == other.layers
+            && *swatches == other.swatches
+            && *swatch_groups == other.swatch_groups
+            && *graphic_styles == other.graphic_styles
+            && *char_styles == other.char_styles
+            && *para_styles == other.para_styles
+            && *text_threads == other.text_threads
+            && *symbols == other.symbols
+            && raster_effects_ppi.to_bits() == other.raster_effects_ppi.to_bits()
+            && *images == other.images
+            && *patterns == other.patterns
+            && *pattern_edit == other.pattern_edit
+            && *mask_edit == other.mask_edit
+            && *unknown == other.unknown
+            && *page_isolate == other.page_isolate
+            && *page_knockout == other.page_knockout
+            && *spot_use_lab == other.spot_use_lab
+            && *setup == other.setup
+            && *raster_effects == other.raster_effects
+            && *color_profiles == other.color_profiles
+            && *extra == other.extra
+            && *puppet == other.puppet
+    }
+
     /// Make the next id allocated at least `next`: ids handed out outside the layer tree (such
     /// as an importer's opacity mask and pattern art), which [`Document::fix_next_id`] doesn't see.
     pub fn reserve_ids(&mut self, next: u64) {
