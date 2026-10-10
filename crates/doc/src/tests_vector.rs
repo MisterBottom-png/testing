@@ -267,6 +267,13 @@ fn resolution_changes_keep_vector_art_in_place() {
     assert_eq!(v.size, size);
     v.set_resolution(f32::NAN);
     assert_eq!(v.resolution_dpi, 72.0);
+    // P3-01 third review: with its layers gone, the document's own artboards still decide the
+    // mapping, so new art lines up with them.
+    let mapping = v.vector_mapping;
+    v.layers.clear();
+    v.set_resolution(300.0);
+    assert_eq!(v.vector_mapping, mapping);
+    assert_eq!(v.vector.artboards, boards);
 }
 
 /// P3-01 re-review 1: drawing a path redraws its layer only; the id counter moving (and the

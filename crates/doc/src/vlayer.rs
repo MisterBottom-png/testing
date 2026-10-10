@@ -163,9 +163,9 @@ impl Document {
 
     /// Sets the resolution (Image Size without resampling, a file's resolution on import). Vector
     /// art and artboards keep their place in pixels, like the pixel layers. A document without
-    /// vector layers takes the new resolution for the art to come: its vector mapping becomes
-    /// that resolution's scale, and a vector space still on its first artboard, the canvas, gets
-    /// the canvas at the new resolution.
+    /// vector layers whose space is still on its first artboard, the canvas, takes the new
+    /// resolution for the art to come: the canvas at that resolution, and its scale as the vector
+    /// mapping. Otherwise the mapping stays, so artboards and art to come keep lining up.
     pub fn set_resolution(&mut self, resolution_dpi: f32) {
         let dpi = sane_dpi(resolution_dpi);
         if self.vector_layers().is_empty() {
@@ -178,8 +178,8 @@ impl Document {
                     a.rect = rect;
                 }
                 self.vector_revision = self.vector_revision.wrapping_add(1);
+                self.vector_mapping = Affine::scale(points_to_pixels(dpi));
             }
-            self.vector_mapping = Affine::scale(points_to_pixels(dpi));
         }
         self.resolution_dpi = dpi;
     }
