@@ -26,21 +26,34 @@ pub const DEFAULT_ANGLE: f64 = 45.0;
 const MAX_LEN: f64 = 4.0e6;
 
 /// The built-in presets: (name, kind, horizon height as a fraction of the artboard height from
-/// the top). The ground line sits at 78 % of the height in all of them.
+/// the top). The ground line sits at 78 % of the height in all of them. A-Studio's own names
+/// (owner, 10 October 2026: built-in preset names are never Adobe's; P3-11 clean-room audit).
 pub const BUILTINS: [(&str, u8, f64); 8] = [
-    ("[1P-Normal View]", 1, 0.42),
-    ("[1P-Low View]", 1, 0.66),
-    ("[1P-High View]", 1, 0.12),
-    ("[2P-Normal View]", 2, 0.42),
-    ("[2P-Low View]", 2, 0.66),
-    ("[2P-High View]", 2, 0.12),
-    ("[3P-Normal View]", 3, 0.42),
-    ("[3P-Low View]", 3, 0.66),
+    ("One-Point, Eye Level", 1, 0.42),
+    ("One-Point, Low", 1, 0.66),
+    ("One-Point, High", 1, 0.12),
+    ("Two-Point, Eye Level", 2, 0.42),
+    ("Two-Point, Low", 2, 0.66),
+    ("Two-Point, High", 2, 0.12),
+    ("Three-Point, Eye Level", 3, 0.42),
+    ("Three-Point, Low", 3, 0.66),
 ];
 
-/// Is `name` a built-in preset's (any case)?
+/// The names VectorCraft gave the presets, in [`BUILTINS`] order: still accepted, so files and
+/// scripts that name them keep working.
+const OLD_BUILTINS: [&str; 8] =
+    ["[1P-Normal View]", "[1P-Low View]", "[1P-High View]", "[2P-Normal View]", "[2P-Low View]", "[2P-High View]", "[3P-Normal View]", "[3P-Low View]"];
+
+/// The built-in preset `name` names (any case; VectorCraft's names accepted).
+fn builtin_entry(name: &str) -> Option<&'static (&'static str, u8, f64)> {
+    let name = name.trim();
+    let i = BUILTINS.iter().position(|b| b.0.eq_ignore_ascii_case(name)).or_else(|| OLD_BUILTINS.iter().position(|o| o.eq_ignore_ascii_case(name)))?;
+    BUILTINS.get(i)
+}
+
+/// Is `name` a built-in preset's (any case; VectorCraft's names accepted)?
 pub fn is_builtin(name: &str) -> bool {
-    BUILTINS.iter().any(|b| b.0.eq_ignore_ascii_case(name.trim()))
+    builtin_entry(name).is_some()
 }
 
 /// The first artboard of `doc` (a Letter page without one).
@@ -147,7 +160,7 @@ pub struct GridDefinition {
 }
 
 impl Default for GridDefinition {
-    /// [2P-Normal View] on a Letter page.
+    /// The two-point eye-level preset on a Letter page.
     fn default() -> Self {
         PerspectiveGrid::normal(2, LETTER).definition()
     }
@@ -226,9 +239,10 @@ impl GridDefinition {
 }
 
 impl PerspectiveGrid {
-    /// The built-in preset `name` (any case) fitted to `ab`.
+    /// The built-in preset `name` (any case; VectorCraft's names accepted, the grid takes the new
+    /// one) fitted to `ab`.
     pub fn builtin(name: &str, ab: Rect) -> Option<Self> {
-        let &(name, kind, horizon) = BUILTINS.iter().find(|b| b.0.eq_ignore_ascii_case(name.trim()))?;
+        let &(name, kind, horizon) = builtin_entry(name)?;
         let mut g = Self::preset(kind, ab);
         let ground = g.origin[1];
         g.horizon = ab.y0 + horizon * ab.height().max(1.0);
@@ -396,6 +410,20 @@ mod tests {
     use serde_json::json;
 
     const AB: Rect = Rect::new(0.0, 0.0, 800.0, 600.0);
+
+    /// Owner decision (10 October 2026): the presets carry A-Studio's own names; VectorCraft's
+    /// bracketed names still resolve to the same grids (the grid then carries the new name).
+    #[test]
+    fn presets_have_own_names_and_old_ones_still_work() {
+        for (old, new) in OLD_BUILTINS.iter().zip(BUILTINS.iter().map(|b| b.0)) {
+            assert!(!BUILTINS.iter().any(|b| b.0.eq_ignore_ascii_case(old)), "{old}");
+            assert!(is_builtin(old) && is_builtin(new) && is_builtin(&old.to_lowercase()));
+            let (a, b) = (PerspectiveGrid::builtin(old, LETTER), PerspectiveGrid::builtin(new, LETTER));
+            assert!(a.is_some() && a == b, "{old} = {new}");
+            assert_eq!(b.map(|g| g.name), Some(new.to_string()));
+        }
+        assert!(!is_builtin("[4P-Normal View]"));
+    }
 
     #[test]
     fn the_station_point_places_the_vanishing_points() {

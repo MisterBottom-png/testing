@@ -1,4 +1,4 @@
-//! The tool catalogue: ids, labels, shortcuts and toolbar groups (Illustrator's Advanced toolbar order).
+//! The tool catalogue: ids, labels, shortcuts and toolbar groups (grouped as vector editors' toolbars usually are).
 
 use serde::Serialize;
 
