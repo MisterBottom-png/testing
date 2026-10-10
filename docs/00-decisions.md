@@ -13,7 +13,7 @@ Settled on 8 October 2026. Change one only by editing this file in its own commi
 | D7 | Platforms | Windows only (D6 is kept for the P1 go/no-go result) | Owner, 8 October 2026 |
 | D8 | Colour engine | One A-Studio engine: PhotoCraft `cms` at the core, VectorCraft's colour layer on top, new safe fast paths; default CMYK PhotoCraft Coated | Owner, 8 October 2026 |
 | D9 | Third-party data the PDF reader builds in | Allowed: Adobe's published CMap tables (BSD-3-Clause) and the Foxit/PDFium fallback fonts (BSD) | Owner, 9 October 2026 |
-| D10 | Filters whose settings match Photoshop's | Allowed: filter names, option names, slider ranges and default values that match Photoshop's dialogs; the filter code stays our own | Owner, 10 October 2026 |
+| D10 | Filters and tools whose settings match Photoshop's or Illustrator's | Allowed: filter names, option names, slider ranges and default values that match Photoshop's dialogs, and option names and ranges that match Illustrator's Image Trace panel; the code stays our own; built-in preset names are A-Studio's own | Owner, 10 October 2026 |
 
 ## D1 Fork
 
@@ -125,3 +125,8 @@ Decided by the owner on 10 October 2026, during P2-20 (PhotoCraft's `algo` crate
 - Not changed: the clean-room rule stays as it is for everything else (no code, icons, presets,
   profiles, shaders or screenshots from Adobe products). Built-in brush presets carry A-Studio's
   own names and groups, not Photoshop's (owner, same day).
+- Extended by the owner the same day, during P3-10 (VectorCraft's Image Trace): the Image Trace
+  panel's option names and 0–100 slider ranges (Mode, Paths, Corners, Noise, Method, Ignore
+  White, Snap Curves to Lines and the like) may match Illustrator's, for the same reason. Its
+  twelve built-in presets, which carried Illustrator's preset names, get A-Studio's own names;
+  the old names stay accepted when a file or script names them, so older work keeps opening.
