@@ -168,13 +168,16 @@ fn shared_space_changes_mark_every_vector_layer_stale() {
     d.edit_vector(|_| ());
     assert_eq!(d.vector_revision, snapshot.vector_revision);
     assert!(Arc::ptr_eq(&d.vector, &snapshot.vector));
-    assert_eq!(d.vector_layers().iter().map(|(_, l)| l.revision).collect::<Vec<_>>(), [1, 1, 1]);
+    assert_eq!(
+        d.vector_layers().iter().map(|(_, l)| l.revision).collect::<Vec<_>>(),
+        snapshot.vector_layers().iter().map(|(_, l)| l.revision).collect::<Vec<_>>()
+    );
 
     let fresh = |d: &Document| d.vector_layers().iter().filter(|(_, l)| l.fresh_cache(d.vector_revision).is_some()).count();
     for (_, l) in d.layers.iter_mut().map(|l| (l.id, l)) {
         if let LayerContent::Vector(vl) = &mut l.content {
             vl.cache = Some(crate::Surface::new(crate::PixelFormat::RGBA8));
-            vl.cache_revision = (vl.revision, 0);
+            vl.cache_revision = (vl.revision, snapshot.vector_revision);
         }
     }
     assert_eq!(fresh(&d), 3);
@@ -183,7 +186,7 @@ fn shared_space_changes_mark_every_vector_layer_stale() {
         let art = Arc::new(square(v, 5.0));
         v.symbols[0].art = art;
     });
-    assert!(d.vector_revision > snapshot.vector_revision);
+    assert_ne!(d.vector_revision, snapshot.vector_revision);
     assert_eq!(fresh(&d), 0, "every vector layer redraws");
     assert!(!snapshot.vector.swatches.is_empty(), "the snapshot keeps its own space");
 }
@@ -281,14 +284,17 @@ fn resolution_changes_keep_vector_art_in_place() {
 #[test]
 fn adding_a_path_redraws_only_its_layer() {
     let mut d = Document::from_vector(sample(), 72.0, SampleType::U8);
+    let before: Vec<u64> = d.vector_layers().iter().map(|(_, l)| l.revision).collect();
+    let space = d.vector_revision;
     d.edit_vector(|v| {
         let parent = v.layers[0].id;
         let s = square(v, 3.0);
         v.insert(Some(parent), 0, s).unwrap();
         v.title = "Renamed".into();
     });
-    assert_eq!(d.vector_revision, 0);
-    assert_eq!(d.vector_layers().iter().map(|(_, l)| l.revision).collect::<Vec<_>>(), [2, 1, 1]);
+    assert_eq!(d.vector_revision, space);
+    let after: Vec<u64> = d.vector_layers().iter().map(|(_, l)| l.revision).collect();
+    assert!(after[0] != before[0] && after[1..] == before[1..], "{before:?} -> {after:?}");
     assert_eq!(d.vector.title, "Renamed", "the change is kept all the same");
 }
 
@@ -540,4 +546,47 @@ proptest::proptest! {
             }
         }
     }
+}
+
+/// P3-03 review: counting the memory of vector art walks the tree with a loop, so a very deep
+/// group chain (built and dropped on a large stack; P3-07 limits nesting itself) is counted on a
+/// small stack without overflowing it. Recursion here overflowed before.
+#[test]
+fn memory_of_deeply_nested_art_is_counted_without_recursion() {
+    let big = std::thread::Builder::new().stack_size(512 << 20);
+    big.spawn(|| {
+        let mut node = Node::group(NodeId(1), Vec::new());
+        for i in 2..100_000u64 {
+            node = Node::group(NodeId(i), vec![Arc::new(node)]);
+        }
+        let mut d = Document::new("Deep", Size::new(10, 10), ColorMode::Rgb, SampleType::U8);
+        d.layers.push(Layer::new("Deep", LayerContent::Vector(VectorLayer::new(Arc::new(node)))));
+        let d = Arc::new(d);
+        let shared = d.clone();
+        let small = std::thread::Builder::new().stack_size(64 << 10);
+        let bytes = small.spawn(move || shared.vector_bytes(&mut HashSet::new())).unwrap().join().unwrap();
+        assert!(bytes >= 99_999 * std::mem::size_of::<Node>());
+    })
+    .unwrap()
+    .join()
+    .unwrap();
+}
+
+/// P3-03 review: every document starts at its own vector revision, so a vector layer copied
+/// from another document never counts its cache as fresh in the new one.
+#[test]
+fn documents_start_at_their_own_vector_revision() {
+    let a = Document::new("A", Size::new(10, 10), ColorMode::Rgb, SampleType::U8);
+    let b = Document::new("B", Size::new(10, 10), ColorMode::Rgb, SampleType::U8);
+    assert_ne!(a.vector_revision, b.vector_revision);
+    let mut vl = VectorLayer::new(Arc::new(Node::group(NodeId(1), Vec::new())));
+    vl.cache = Some(crate::Surface::new(crate::PixelFormat::RGBA8));
+    vl.cache_revision = (vl.revision, a.vector_revision);
+    assert!(vl.fresh_cache(a.vector_revision).is_some() && vl.fresh_cache(b.vector_revision).is_none());
+    let rev = vl.revision;
+    vl.set_transform(Affine::translate(1.0, 0.0));
+    assert_ne!(vl.revision, rev, "a new transform is a new revision");
+    let rev = vl.revision;
+    vl.set_transform(Affine::translate(1.0, 0.0));
+    assert_eq!(vl.revision, rev, "the same transform is not");
 }

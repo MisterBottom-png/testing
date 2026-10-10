@@ -390,6 +390,9 @@ name = "astudio-ops"
 version = "0.0.1"
 dependencies = [
  "astudio-doc",
+ "astudio-geom",
+ "astudio-vdoc",
+ "proptest",
 ]
 
 [[package]]
