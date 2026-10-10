@@ -28,9 +28,11 @@ const FINE_OMEGA: f32 = 1.7;
 /// Solve `Δv = 0` on `unknown` pixels with Dirichlet values from the known pixels of `v`
 /// (out-of-grid neighbours are ignored, i.e. a Neumann boundary). `v` holds the known values on
 /// entry and the solution on exit. Cascadic multigrid + SOR.
+/// Buffers that don't match `w × h` leave `v` unchanged (P2-20 review: this asserted).
 pub fn solve_membrane(w: usize, h: usize, unknown: &[bool], v: &mut [f32]) {
-    assert_eq!(unknown.len(), w * h);
-    assert_eq!(v.len(), w * h);
+    if Some(unknown.len()) != w.checked_mul(h) || Some(v.len()) != w.checked_mul(h) {
+        return;
+    }
     solve_rec(w, h, unknown, v, 0, &|| false);
 }
 
@@ -215,10 +217,12 @@ fn per_channel(w: usize, h: usize, ch: usize, f: impl Fn(usize) -> Vec<f32> + Sy
 /// `src`/`dst` are interleaved `w × h × ch`; `mask` has `w × h` entries (`true` = healed). Pixels on the
 /// grid edge that are in the mask see a Neumann (free) boundary there, so callers should leave a one
 /// pixel unmasked margin for a fully Dirichlet problem.
+/// Buffers that don't match `w × h` give `dst` unchanged (P2-20 review: this asserted).
 pub fn seamless_clone(w: usize, h: usize, ch: usize, src: &[f32], dst: &[f32], mask: &[bool]) -> Vec<f32> {
-    assert_eq!(src.len(), w * h * ch);
-    assert_eq!(dst.len(), w * h * ch);
-    assert_eq!(mask.len(), w * h);
+    let n = w.checked_mul(h);
+    if Some(src.len()) != n.and_then(|n| n.checked_mul(ch)) || dst.len() != src.len() || Some(mask.len()) != n {
+        return dst.to_vec();
+    }
     per_channel(w, h, ch, |c| {
         let mut hv: Vec<f32> = (0..w * h).map(|i| if mask[i] { 0.0 } else { dst[i * ch + c] - src[i * ch + c] }).collect();
         solve_membrane(w, h, mask, &mut hv);

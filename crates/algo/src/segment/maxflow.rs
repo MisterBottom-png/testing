@@ -72,9 +72,12 @@ impl Graph {
         self.tr_cap[i] = s - t;
     }
 
-    /// Adds an edge `i → j` with capacity `cap` and `j → i` with `rev_cap`.
+    /// Adds an edge `i → j` with capacity `cap` and `j → i` with `rev_cap`. A self-edge carries no
+    /// flow and is left out (P2-20 review: this was only a debug assertion).
     pub fn add_edge(&mut self, i: usize, j: usize, cap: f32, rev_cap: f32) {
-        debug_assert!(i != j);
+        if i == j {
+            return;
+        }
         let a = self.head.len() as u32;
         self.head.push(j as u32);
         self.next.push(self.first[i]);

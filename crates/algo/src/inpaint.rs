@@ -372,8 +372,10 @@ pub fn complete_with(
     p: &CompleteParams,
     ctl: &astudio_raster::Interrupt,
 ) -> Result<Option<Vec<f32>>, astudio_raster::Cancelled> {
-    assert_eq!(img.len(), w * h * ch);
-    assert_eq!(hole.len(), w * h);
+    // Buffers that don't match `w × h` leave nothing to complete (P2-20 review: this asserted).
+    if Some(img.len()) != w.checked_mul(h).and_then(|n| n.checked_mul(ch)) || Some(hole.len()) != w.checked_mul(h) {
+        return Ok(None);
+    }
     let Some((bx0, by0, bx1, by1)) = hole_bbox(w, h, hole) else { return Ok(Some(img.to_vec())) };
     let r = p.patch_radius.max(1);
     let psz = 2 * r + 1;

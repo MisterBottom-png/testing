@@ -68,15 +68,17 @@ impl RgbImage {
     }
     /// Straight RGBA to RGB, compositing transparent pixels over mid gray (so transparency is a
     /// colour the models can separate).
+    /// A buffer of another length than `w × h` is cut or padded with mid gray, so [`Self::at`]
+    /// stays within it (P2-20 review: this was only a debug assertion).
     pub fn from_rgba(px: &[[f32; 4]], w: usize, h: usize) -> Self {
-        debug_assert_eq!(px.len(), w * h);
-        let px = px
+        let mut px: Vec<[f32; 3]> = px
             .iter()
             .map(|p| {
                 let a = p[3].clamp(0.0, 1.0);
                 [0, 1, 2].map(|c| p[c].clamp(0.0, 1.0) * a + 0.5 * (1.0 - a))
             })
             .collect();
+        px.resize(w.saturating_mul(h), [0.5; 3]);
         Self { w, h, px }
     }
     /// Box-average downsampling by an integer `step` (output `ceil(w/step) × ceil(h/step)`).

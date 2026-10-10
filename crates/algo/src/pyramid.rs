@@ -137,8 +137,15 @@ pub fn auto_levels(w: usize, h: usize) -> usize {
 }
 
 /// Blend `images` with per-pixel `weights` (any non-negative values; normalised per level).
+/// Buffers that don't match `w × h` give the first image unchanged (P2-20 review: this asserted).
 pub fn blend(w: usize, h: usize, ch: usize, images: &[&[f32]], weights: &[Vec<f32>], levels: usize) -> Vec<f32> {
-    assert_eq!(images.len(), weights.len());
+    let n = w.checked_mul(h);
+    let sizes_match = images.len() == weights.len()
+        && images.iter().all(|i| Some(i.len()) == n.and_then(|n| n.checked_mul(ch)))
+        && weights.iter().all(|wt| Some(wt.len()) == n);
+    if !sizes_match {
+        return images.first().map(|i| i.to_vec()).unwrap_or_default();
+    }
     let levels = levels.max(1);
     let mut acc: Option<Vec<Level>> = None;
     let mut wsum: Option<Vec<Level>> = None;

@@ -24,9 +24,12 @@ impl GrayTile {
         }
         Self { width, height, data }
     }
-    /// Build from 0..1 floats (`width × height`).
+    /// Build from 0..1 floats (`width × height`). A buffer of another length gives an empty tile,
+    /// which [`GrayTile::is_valid`] rejects (P2-20 review: this asserted).
     pub fn from_f32(width: u32, height: u32, v: &[f32]) -> Self {
-        assert_eq!(v.len(), width as usize * height as usize, "GrayTile size mismatch");
+        if v.len() as u64 != u64::from(width) * u64::from(height) {
+            return Self { width: 0, height: 0, data: Vec::new() };
+        }
         Self { width, height, data: v.iter().map(|&x| q16(x)).collect() }
     }
     #[inline]
@@ -229,6 +232,14 @@ impl PatternImage {
 
 #[cfg(test)]
 mod tests {
+    /// A float buffer of the wrong size gives an empty tile instead of stopping the app (P2-20
+    /// review: this asserted).
+    #[test]
+    fn mismatched_float_buffer_gives_an_invalid_tile() {
+        let t = super::GrayTile::from_f32(4, 4, &[0.5; 15]);
+        assert!(!t.is_valid());
+        assert!(super::GrayTile::from_f32(2, 2, &[0.5; 4]).is_valid());
+    }
     use super::*;
 
     #[test]

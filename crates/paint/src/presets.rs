@@ -1,14 +1,14 @@
 //! Built-in brush presets (our own designs; sampled tips and textures are generated procedurally).
 //!
-//! Grouped like Photoshop's default Brushes panel folders: General, Dry Media, Wet Media and
-//! Special Effects. Every preset is plain [`BrushSettings`] data, so it serialises, journals and
-//! can be edited like any user preset.
+//! In four groups: Basic, Pencil and Chalk, Paint and Ink, and Textures and Effects (A-Studio's
+//! own names, P2-20 clean-room review). Every preset is plain [`BrushSettings`] data, so it
+//! serialises, journals and can be edited like any user preset.
 
 use crate::brush::*;
 use crate::procedural::{bristle_tip, chalk_tip, charcoal_tip, grass_tip, leaf_tip, rake_tip, spatter_tip, sponge_tip, star_tip};
 
 /// Preset groups, in panel order.
-pub const GROUPS: [&str; 4] = ["General", "Dry Media", "Wet Media", "Special Effects"];
+pub const GROUPS: [&str; 4] = ["Basic", "Pencil and Chalk", "Paint and Ink", "Textures and Effects"];
 
 fn preset(group: &str, name: &str, brush: BrushSettings) -> BrushPreset {
     BrushPreset { name: name.to_string(), brush, builtin: true, group: group.to_string() }
@@ -35,23 +35,23 @@ fn paper(seed: u32, depth: f32) -> Texture {
 }
 
 fn general(base: &BrushSettings) -> Vec<BrushPreset> {
-    let g = |n: &str, b: BrushSettings| preset("General", n, b);
+    let g = |n: &str, b: BrushSettings| preset("Basic", n, b);
     vec![
-        g("Hard Round", BrushSettings { size: 30.0, hardness: 1.0, ..base.clone() }),
-        g("Soft Round", BrushSettings { size: 45.0, hardness: 0.0, ..base.clone() }),
-        g("Hard Round Fine", BrushSettings { size: 5.0, hardness: 1.0, spacing: 0.1, ..base.clone() }),
-        g("Soft Round Large", BrushSettings { size: 300.0, hardness: 0.0, spacing: 0.15, ..base.clone() }),
-        g("Hard Round Pressure Size", BrushSettings { size: 30.0, hardness: 1.0, shape_dynamics: size_dyn(pressure()), ..base.clone() }),
-        g("Soft Round Pressure Size", BrushSettings { size: 45.0, hardness: 0.0, shape_dynamics: size_dyn(pressure()), ..base.clone() }),
-        g("Hard Round Pressure Opacity", BrushSettings { size: 30.0, hardness: 1.0, transfer: transfer(pressure(), Dynamic::default()), ..base.clone() }),
-        g("Soft Round Pressure Opacity", BrushSettings { size: 45.0, hardness: 0.0, transfer: transfer(pressure(), Dynamic::default()), ..base.clone() }),
+        g("Round Hard", BrushSettings { size: 30.0, hardness: 1.0, ..base.clone() }),
+        g("Round Soft", BrushSettings { size: 45.0, hardness: 0.0, ..base.clone() }),
+        g("Round Hard, Fine", BrushSettings { size: 5.0, hardness: 1.0, spacing: 0.1, ..base.clone() }),
+        g("Round Soft, Large", BrushSettings { size: 300.0, hardness: 0.0, spacing: 0.15, ..base.clone() }),
+        g("Round Hard, Size by Pressure", BrushSettings { size: 30.0, hardness: 1.0, shape_dynamics: size_dyn(pressure()), ..base.clone() }),
+        g("Round Soft, Size by Pressure", BrushSettings { size: 45.0, hardness: 0.0, shape_dynamics: size_dyn(pressure()), ..base.clone() }),
+        g("Round Hard, Opacity by Pressure", BrushSettings { size: 30.0, hardness: 1.0, transfer: transfer(pressure(), Dynamic::default()), ..base.clone() }),
+        g("Round Soft, Opacity by Pressure", BrushSettings { size: 45.0, hardness: 0.0, transfer: transfer(pressure(), Dynamic::default()), ..base.clone() }),
         g(
-            "Hard Round Pressure Opacity and Flow",
+            "Round Hard, Opacity and Flow by Pressure",
             BrushSettings { size: 30.0, hardness: 0.9, transfer: transfer(pressure(), pressure_min(0.2)), ..base.clone() },
         ),
         g("Airbrush Soft", BrushSettings { size: 80.0, hardness: 0.0, flow: 0.1, spacing: 0.1, build_up: true, build_up_rate: 25.0, ..base.clone() }),
         g(
-            "Airbrush Pressure Flow",
+            "Airbrush, Flow by Pressure",
             BrushSettings {
                 size: 120.0,
                 hardness: 0.0,
@@ -68,7 +68,7 @@ fn general(base: &BrushSettings) -> Vec<BrushPreset> {
 }
 
 fn dry_media(base: &BrushSettings) -> Vec<BrushPreset> {
-    let g = |n: &str, b: BrushSettings| preset("Dry Media", n, b);
+    let g = |n: &str, b: BrushSettings| preset("Pencil and Chalk", n, b);
     vec![
         g("Hard Pencil", BrushSettings { size: 3.0, hardness: 1.0, aliased: true, spacing: 0.1, ..base.clone() }),
         g(
@@ -176,7 +176,7 @@ fn dry_media(base: &BrushSettings) -> Vec<BrushPreset> {
 }
 
 fn wet_media(base: &BrushSettings) -> Vec<BrushPreset> {
-    let g = |n: &str, b: BrushSettings| preset("Wet Media", n, b);
+    let g = |n: &str, b: BrushSettings| preset("Paint and Ink", n, b);
     vec![
         g(
             "Watercolor Wet Edges",
@@ -258,7 +258,7 @@ fn wet_media(base: &BrushSettings) -> Vec<BrushPreset> {
 }
 
 fn special_effects(base: &BrushSettings) -> Vec<BrushPreset> {
-    let g = |n: &str, b: BrushSettings| preset("Special Effects", n, b);
+    let g = |n: &str, b: BrushSettings| preset("Textures and Effects", n, b);
     vec![
         g(
             "Spatter",
@@ -467,7 +467,7 @@ mod tests {
         let order: Vec<usize> = v.iter().filter_map(|p| GROUPS.iter().position(|g| *g == p.group)).collect();
         assert!(order.windows(2).all(|w| w[0] <= w[1]));
         // Pressure variants respond to pressure.
-        let ps = find(&v, "Hard Round Pressure Size").map(|p| p.brush.shape_dynamics.size.control);
+        let ps = find(&v, "Round Hard, Size by Pressure").map(|p| p.brush.shape_dynamics.size.control);
         assert_eq!(ps, Some(Control::PenPressure));
     }
 }

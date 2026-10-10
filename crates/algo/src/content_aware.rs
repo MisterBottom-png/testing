@@ -177,10 +177,9 @@ pub fn fill_with(
     opts: &FillOptions,
     ctl: &astudio_raster::Interrupt,
 ) -> Result<Vec<f32>, astudio_raster::Cancelled> {
-    assert_eq!(img.len(), w * h * ch);
-    assert_eq!(hole.len(), w * h);
-    assert_eq!(source.len(), w * h);
-    if !hole.iter().any(|h| *h) {
+    // Buffers that don't match `w × h` are returned unfilled (P2-20 review: this asserted).
+    let n = w.checked_mul(h);
+    if Some(img.len()) != n.and_then(|n| n.checked_mul(ch)) || Some(hole.len()) != n || Some(source.len()) != n || !hole.iter().any(|h| *h) {
         return Ok(img.to_vec());
     }
     let params = CompleteParams { seed: opts.seed, ..Default::default() };

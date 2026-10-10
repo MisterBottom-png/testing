@@ -35,32 +35,35 @@ struct Tiff<'a> {
 
 impl Tiff<'_> {
     fn u16(&self, o: usize) -> Option<u16> {
-        let s = self.b.get(o..o + 2)?;
+        let s = self.b.get(o..o.checked_add(2)?)?;
         Some(if self.le { u16::from_le_bytes([s[0], s[1]]) } else { u16::from_be_bytes([s[0], s[1]]) })
     }
     fn u32(&self, o: usize) -> Option<u32> {
-        let s = self.b.get(o..o + 4)?;
+        let s = self.b.get(o..o.checked_add(4)?)?;
         let a = [s[0], s[1], s[2], s[3]];
         Some(if self.le { u32::from_le_bytes(a) } else { u32::from_be_bytes(a) })
     }
-    /// Entries of the IFD at `off`: (tag, type, count, value offset field position).
+    /// Entries of the IFD at `off`: (tag, type, count, value offset field position). Offsets and
+    /// counts come from the file, so their sums are checked: `usize` is 32 bits on the web (P2-20
+    /// review).
     fn ifd(&self, off: usize) -> Vec<(u16, u16, u32, usize)> {
         let Some(n) = self.u16(off) else { return Vec::new() };
         (0..n as usize)
             .filter_map(|k| {
-                let e = off + 2 + k * 12;
-                Some((self.u16(e)?, self.u16(e + 2)?, self.u32(e + 4)?, e + 8))
+                let e = off.checked_add(2)?.checked_add(k.checked_mul(12)?)?;
+                Some((self.u16(e)?, self.u16(e.checked_add(2)?)?, self.u32(e.checked_add(4)?)?, e.checked_add(8)?))
             })
             .collect()
     }
     fn data_at(&self, typ: u16, count: u32, field: usize) -> Option<usize> {
         let size = match typ {
-            1 | 2 | 6 | 7 => 1,
+            1 | 2 | 6 | 7 => 1usize,
             3 | 8 => 2,
             4 | 9 | 11 => 4,
             5 | 10 | 12 => 8,
             _ => return None,
-        } * count as usize;
+        }
+        .checked_mul(usize::try_from(count).ok()?)?;
         if size <= 4 { Some(field) } else { self.u32(field).map(|v| v as usize) }
     }
     fn number(&self, typ: u16, count: u32, field: usize) -> Option<f64> {
@@ -69,11 +72,11 @@ impl Tiff<'_> {
             3 => self.u16(at).map(f64::from),
             4 => self.u32(at).map(f64::from),
             5 => {
-                let (n, d) = (self.u32(at)?, self.u32(at + 4)?);
+                let (n, d) = (self.u32(at)?, self.u32(at.checked_add(4)?)?);
                 (d != 0).then(|| n as f64 / d as f64)
             }
             10 => {
-                let (n, d) = (self.u32(at)? as i32, self.u32(at + 4)? as i32);
+                let (n, d) = (self.u32(at)? as i32, self.u32(at.checked_add(4)?)? as i32);
                 (d != 0).then(|| n as f64 / d as f64)
             }
             _ => None,
@@ -84,7 +87,7 @@ impl Tiff<'_> {
             return None;
         }
         let at = self.data_at(typ, count, field)?;
-        let s = self.b.get(at..at + count as usize)?;
+        let s = self.b.get(at..at.checked_add(usize::try_from(count).ok()?)?)?;
         let s = String::from_utf8_lossy(s).trim_end_matches('\0').trim().to_string();
         (!s.is_empty()).then_some(s)
     }
