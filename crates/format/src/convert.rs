@@ -22,20 +22,20 @@ fn too_deep() -> FormatError {
     FormatError::LimitExceeded(format!("layer groups nested deeper than {MAX_GROUP_DEPTH}"))
 }
 
-/// Refuses to save a document the loader would reject for its group nesting.
 /// `.pcraft` saves a vector layer as the pixels drawn for it: refuse a layer whose pixels are not
 /// drawn, or are stale, rather than saving it empty or out of date (P3-12 review). The Save As
 /// command draws every vector layer first (P3-09, P3-15).
 pub(crate) fn check_vector_layers_drawn(doc: &Document) -> Result<()> {
     for (id, vl) in doc.vector_layers() {
         if vl.fresh_cache(doc.vector_revision.0).is_none() {
-            let name = doc.layer(id).map_or("", |l| l.name.as_str());
+            let name = doc.layer(id).map(|l| l.name.as_str()).filter(|n| !n.is_empty()).unwrap_or("unnamed");
             return Err(FormatError::Unsupported(format!("vector layer \"{name}\" is not drawn yet (.pcraft saves vector layers as their drawn pixels)")));
         }
     }
     Ok(())
 }
 
+/// Refuses to save a document the loader would reject for its group nesting.
 pub(crate) fn check_nesting(layers: &[Layer]) -> Result<()> {
     // Bounded recursion: it stops at the first layer past the limit.
     fn too_deep_at(layers: &[Layer], depth: usize) -> bool {
