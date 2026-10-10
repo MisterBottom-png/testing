@@ -49,7 +49,7 @@ pub fn blob(seed: u8, n: usize) -> Arc<Vec<u8>> {
 pub fn rich_doc(mode: ColorMode, depth: SampleType) -> Document {
     let hdr = depth == SampleType::F32;
     let mut d = Document::with_background("Rich", Size::new(300, 280), mode, depth, Color::WHITE);
-    d.resolution_dpi = 300.0;
+    d.set_resolution(300.0);
     d.icc_profile = Some(blob(1, 500));
     let pf = d.pixel_format();
 

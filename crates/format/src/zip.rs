@@ -206,7 +206,12 @@ impl<'a> ZipReader<'a> {
         if e.uncompressed > max {
             return Err(FormatError::LimitExceeded(format!("zip entry `{}` is {} bytes (max {max})", e.name, e.uncompressed)));
         }
-        let raw = &self.bytes[e.data_offset..e.data_offset + e.compressed];
+        // Checked again here: `read` is public and `e` may come from another reader.
+        let raw = e
+            .data_offset
+            .checked_add(e.compressed)
+            .and_then(|end| self.bytes.get(e.data_offset..end))
+            .ok_or_else(|| FormatError::Corrupt(format!("zip entry `{}` lies outside the archive", e.name)))?;
         let data = match e.method {
             0 => raw.to_vec(),
             8 => {

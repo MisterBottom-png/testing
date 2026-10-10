@@ -23,6 +23,19 @@ fn too_deep() -> FormatError {
 }
 
 /// Refuses to save a document the loader would reject for its group nesting.
+/// `.pcraft` saves a vector layer as the pixels drawn for it: refuse a layer whose pixels are not
+/// drawn, or are stale, rather than saving it empty or out of date (P3-12 review). The Save As
+/// command draws every vector layer first (P3-09, P3-15).
+pub(crate) fn check_vector_layers_drawn(doc: &Document) -> Result<()> {
+    for (id, vl) in doc.vector_layers() {
+        if vl.fresh_cache(doc.vector_revision.0).is_none() {
+            let name = doc.layer(id).map_or("", |l| l.name.as_str());
+            return Err(FormatError::Unsupported(format!("vector layer \"{name}\" is not drawn yet (.pcraft saves vector layers as their drawn pixels)")));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn check_nesting(layers: &[Layer]) -> Result<()> {
     // Bounded recursion: it stops at the first layer past the limit.
     fn too_deep_at(layers: &[Layer], depth: usize) -> bool {
@@ -118,8 +131,9 @@ fn layer_m(l: &Layer, fmt: PixelFormat, sink: &mut dyn Sink) -> LayerM {
     let content = match &l.content {
         LayerContent::Raster(s) => ContentM::Raster { surface: surface_m(s, sink) },
         // `.pcraft` holds no vector layers (PhotoCraft can't open them; docs/05-file-format.md):
-        // a vector layer is saved rasterized, from its drawn pixels, keeping the layer's own
-        // properties. Telling the user first is the Save As command's part (P3-01, P3-12).
+        // a vector layer is saved rasterized, from its drawn pixels (fresh: the writer checks
+        // first, `check_vector_layers_drawn`), keeping the layer's own properties. Telling the
+        // user first is the Save As command's part (P3-01, P3-12, P3-15).
         LayerContent::Vector(v) => {
             let empty;
             let surface = match &v.cache {
@@ -548,9 +562,10 @@ impl Loader<'_> {
         } else {
             DocId::fresh()
         };
-        // A `.pcraft` file holds no vector art: the vector space a new document starts with
-        // (Document::new), so a document reopens equal to the one saved.
-        let blank = Document::new("", m.size, m.mode, m.depth);
+        // A `.pcraft` file holds no vector art: the vector space a new document of this size and
+        // resolution starts with (P3-12 review: at 72 dpi a 300-dpi file mapped art 4× too small).
+        let mut blank = Document::new("", m.size, m.mode, m.depth);
+        blank.set_resolution(m.resolution_dpi);
         Ok(Document {
             vector: blank.vector,
             vector_revision: blank.vector_revision,

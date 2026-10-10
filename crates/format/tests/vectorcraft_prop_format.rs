@@ -211,6 +211,14 @@ fn approx_equal_documents_compare_equal() {
     assert!(json_approx_eq(&doc_json(&d), &doc_json(&d), 0.0));
 }
 
+/// The half of `bug_f64_bit_exact_roundtrip` that needs no engine session (P3-12 review).
+#[test]
+fn bug_f64_bit_exact_roundtrip_of_a_new_document() {
+    let mut d = Document::new(126.86291501015239, 214.69463130731182);
+    d.raster_effects_ppi = 0.1 + 0.2;
+    check_native_roundtrip_exact(&d).unwrap();
+}
+
 // Needs a VectorCraft engine session (testkit fixtures::rich_session / session): back on with P3-16.
 #[cfg(any())]
 #[test]
