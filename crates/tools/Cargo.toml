@@ -1,6 +1,6 @@
 [package]
 name = "astudio-tools"
-description = "A-Studio: Tool gestures that emit commands"
+description = "A-Studio: tool state machines (pointer events in, commands and overlays out), from VectorCraft"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,8 +9,16 @@ publish = false
 
 [dependencies]
 astudio-geom = { path = "../geom" }
+astudio-color = { path = "../color" }
 astudio-vdoc = { path = "../vdoc" }
-astudio-doc = { path = "../doc" }
+astudio-pathops = { path = "../pathops" }
+astudio-text = { path = "../text" }
+kurbo = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+image = { workspace = true }
 
 [lints]
 workspace = true
