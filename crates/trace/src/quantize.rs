@@ -277,7 +277,7 @@ fn kmeans_rgb(used: &[(usize, [f64; 3], f64)], k: usize) -> Vec<[f64; 3]> {
 /// Merge 4-connected same-label components smaller than `min_area` pixels into their most common
 /// neighbouring label. Transparent pixels are never relabelled.
 pub fn denoise(labels: &mut [u16], w: usize, h: usize, min_area: usize) {
-    if min_area <= 1 || w == 0 || h == 0 {
+    if min_area <= 1 || w == 0 || h == 0 || w.checked_mul(h) != Some(labels.len()) {
         return;
     }
     let mut seen = vec![false; w * h];

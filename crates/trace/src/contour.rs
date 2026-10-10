@@ -88,8 +88,11 @@ fn label(mask: &[bool], w: usize, h: usize) -> (Vec<u32>, Vec<usize>) {
 }
 
 /// Trace every component of `mask` (row-major, `w × h`).
+/// A mask of another length than `w × h` traces to nothing (P3-10 review: this asserted).
 pub fn trace_mask(mask: &[bool], w: usize, h: usize) -> Vec<Component> {
-    assert_eq!(mask.len(), w * h);
+    if w.checked_mul(h) != Some(mask.len()) || w.checked_add(1).and_then(|vw| vw.checked_mul(h.saturating_add(1))).is_none() {
+        return Vec::new();
+    }
     let (comp, sizes) = label(mask, w, h);
     let vw = w + 1;
     let mut dirs = vec![0u8; vw * (h + 1)];

@@ -278,3 +278,92 @@ fn timing_1000x1000_bw_under_300ms() {
     assert!(!res.paths.is_empty());
     assert!(ms < 300.0, "{ms} ms");
 }
+
+/// Owner decision (10 October 2026): the presets carry A-Studio's own names; VectorCraft's names
+/// still give the same parameters, so files and scripts naming them keep working.
+#[test]
+fn presets_have_own_names_and_old_ones_still_work() {
+    let old = [
+        "High Fidelity Photo",
+        "Low Fidelity Photo",
+        "3 Colors",
+        "6 Colors",
+        "16 Colors",
+        "Shades of Gray",
+        "Black and White Logo",
+        "Sketched Art",
+        "Silhouettes",
+        "Line Art",
+        "Technical Drawing",
+    ];
+    assert_eq!(PRESET_NAMES.len(), old.len() + 1);
+    for (new, old) in PRESET_NAMES.iter().skip(1).zip(old) {
+        assert!(!PRESET_NAMES.iter().any(|n| n.eq_ignore_ascii_case(old)), "{old} is not a preset name");
+        assert_eq!(preset(new), preset(old), "{new} = {old}");
+        assert!(preset(new).is_some());
+    }
+}
+
+/// A bitmap header claiming `w` × `h` pixels, with no pixel data.
+fn bmp_header(w: i32, h: i32) -> Vec<u8> {
+    let mut b = Vec::new();
+    b.extend_from_slice(b"BM");
+    b.extend_from_slice(&54u32.to_le_bytes());
+    b.extend_from_slice(&[0; 4]);
+    b.extend_from_slice(&54u32.to_le_bytes());
+    b.extend_from_slice(&40u32.to_le_bytes());
+    b.extend_from_slice(&w.to_le_bytes());
+    b.extend_from_slice(&h.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes());
+    b.extend_from_slice(&24u16.to_le_bytes());
+    b.extend_from_slice(&[0; 24]);
+    b
+}
+
+/// P3-10 review: an image too large to trace is refused from its header, before any pixel
+/// buffer is made.
+#[test]
+fn oversized_images_are_refused_before_decoding() {
+    for (w, h) in [(40_000, 10), (20_000, 20_000), (100_000, 100_000)] {
+        assert!(Raster::decode(&bmp_header(w, h)).is_err(), "{w} x {h}");
+    }
+    let small = Raster::from_fn(3, 2, |x, _| [x as u8 * 80, 0, 0, 255]);
+    let back = Raster::decode(&small.encode_png()).unwrap();
+    assert_eq!(back, small);
+}
+
+/// P3-10 review: wrong sizes are errors or empty results, not crashes (each of these asserted or
+/// indexed out of bounds before).
+#[test]
+fn mismatched_sizes_do_not_crash() {
+    assert!(matches!(Raster::new(4, 4, vec![0; 10]), Err(TraceError::Size)));
+    assert!(matches!(Raster::new(MAX_SIDE + 1, 1, vec![]), Err(TraceError::TooLarge)));
+    assert!(Raster::new(2, 1, vec![9; 8]).is_ok());
+    assert_eq!(Raster::from_fn(u32::MAX, u32::MAX, |_, _| [0; 4]).width, 0, "too large: empty");
+    assert!(crate::contour::trace_mask(&[true; 5], 3, 3).is_empty());
+    let broken = Raster { width: 50, height: 50, rgba: vec![0; 40] };
+    assert!(trace(&broken, &TraceParams::default()).paths.is_empty());
+    assert!(crate::mosaic::mosaic(&broken, 4, 4).is_empty());
+    assert_eq!(broken.pixel(10, 10), [0; 4]);
+    let mut labels = vec![0u16; 7];
+    crate::quantize::denoise(&mut labels, 3, 3, 4);
+}
+
+/// P3-10 review: a mosaic of absurdly many tiles is refused instead of allocating gigabytes.
+#[test]
+fn mosaic_tiles_are_capped() {
+    let img = Raster::from_fn(8, 4, |x, _| [x as u8 * 30, 0, 0, 255]);
+    assert!(crate::mosaic::mosaic(&img, u32::MAX, u32::MAX).is_empty());
+    assert!(crate::mosaic::mosaic(&img, 65_535, 65_535).is_empty());
+    assert_eq!(crate::mosaic::mosaic(&img, 2048, 2048).len(), 1 << 22);
+}
+
+/// P3-10 review: NaN sliders (from a script or a file) trace with the defaults instead of not
+/// simplifying at all.
+#[test]
+fn nan_sliders_use_the_defaults() {
+    let img = Raster::from_fn(60, 60, |x, y| if (15..45).contains(&x) && (15..45).contains(&y) { BLACK } else { WHITE });
+    let nan = TraceParams { paths: f64::NAN, corners: f64::NAN, ..preset("Crisp Logo").unwrap() };
+    let normal = TraceParams { paths: TraceParams::default().paths, corners: TraceParams::default().corners, ..nan.clone() };
+    assert_eq!(trace(&img, &nan), trace(&img, &normal));
+}

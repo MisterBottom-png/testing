@@ -50,6 +50,28 @@ pub enum TraceError {
     Decode(String),
     #[error("image is empty")]
     Empty,
+    #[error("image is too large to trace (at most {MAX_SIDE} pixels a side and {} megapixels)", MAX_PIXELS / 1_000_000)]
+    TooLarge,
+    #[error("pixel data does not match the image size")]
+    Size,
+}
+
+/// Most pixels on a side of a raster to trace (P3-10 review: decoding had no size cap).
+pub const MAX_SIDE: u32 = 32_768;
+/// Most memory one decoded raster may take (the `image` crate's own default allocation limit,
+/// stated here so an update cannot change it).
+pub const MAX_DECODE_BYTES: u64 = 512 * 1024 * 1024;
+/// Most pixels of a raster to trace: [`MAX_DECODE_BYTES`] of RGBA8. Tracing needs about 17 more
+/// bytes a pixel on top.
+pub const MAX_PIXELS: u64 = MAX_DECODE_BYTES / 4;
+
+/// The byte length of a `width` × `height` RGBA8 raster, when it is within the caps.
+fn rgba_len(width: u32, height: u32) -> Option<usize> {
+    let px = u64::from(width) * u64::from(height);
+    if width > MAX_SIDE || height > MAX_SIDE || px > MAX_PIXELS {
+        return None;
+    }
+    usize::try_from(px * 4).ok()
 }
 
 /// An RGBA8 raster (row-major, top row first).
@@ -61,14 +83,20 @@ pub struct Raster {
 }
 
 impl Raster {
-    /// A raster from RGBA bytes (`width * height * 4` of them).
-    pub fn new(width: u32, height: u32, rgba: Vec<u8>) -> Self {
-        assert_eq!(rgba.len(), width as usize * height as usize * 4, "rgba length must be width*height*4");
-        Self { width, height, rgba }
+    /// A raster from RGBA bytes (`width * height * 4` of them), within [`MAX_SIDE`] and
+    /// [`MAX_PIXELS`].
+    pub fn new(width: u32, height: u32, rgba: Vec<u8>) -> Result<Self, TraceError> {
+        let len = rgba_len(width, height).ok_or(TraceError::TooLarge)?;
+        if rgba.len() != len {
+            return Err(TraceError::Size);
+        }
+        Ok(Self { width, height, rgba })
     }
-    /// A raster whose pixel `(x, y)` is `f(x, y)`.
+    /// A raster whose pixel `(x, y)` is `f(x, y)`; an empty one past [`MAX_SIDE`] or
+    /// [`MAX_PIXELS`].
     pub fn from_fn(width: u32, height: u32, f: impl Fn(u32, u32) -> [u8; 4]) -> Self {
-        let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+        let Some(len) = rgba_len(width, height) else { return Self { width: 0, height: 0, rgba: Vec::new() } };
+        let mut rgba = Vec::with_capacity(len);
         for y in 0..height {
             for x in 0..width {
                 rgba.extend_from_slice(&f(x, y));
@@ -76,14 +104,29 @@ impl Raster {
         }
         Self { width, height, rgba }
     }
-    /// Decode PNG / JPEG / WebP / GIF bytes.
+    /// Decode PNG / JPEG / WebP / GIF / TIFF / BMP bytes, within [`MAX_SIDE`] and [`MAX_PIXELS`]
+    /// (checked before the RGBA copy is made, which can be four times the decoded size).
     pub fn decode(bytes: &[u8]) -> Result<Self, TraceError> {
-        let img = image::load_from_memory(bytes).map_err(|e| TraceError::Decode(e.to_string()))?.to_rgba8();
-        let (w, h) = img.dimensions();
+        let mut limits = image::Limits::default();
+        limits.max_image_width = Some(MAX_SIDE);
+        limits.max_image_height = Some(MAX_SIDE);
+        limits.max_alloc = Some(MAX_DECODE_BYTES);
+        let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| TraceError::Decode(e.to_string()))?;
+        reader.limits(limits.clone());
+        let (w, h) = reader.into_dimensions().map_err(|e| TraceError::Decode(e.to_string()))?;
         if w == 0 || h == 0 {
             return Err(TraceError::Empty);
         }
-        Ok(Self { width: w, height: h, rgba: img.into_raw() })
+        rgba_len(w, h).ok_or(TraceError::TooLarge)?;
+        let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| TraceError::Decode(e.to_string()))?;
+        reader.limits(limits);
+        let img = reader.decode().map_err(|e| TraceError::Decode(e.to_string()))?.to_rgba8();
+        let (w, h) = img.dimensions();
+        Self::new(w, h, img.into_raw())
+    }
+    /// Whether the pixel data matches the size (the fields are public, so a caller can break it).
+    pub fn is_consistent(&self) -> bool {
+        rgba_len(self.width, self.height) == Some(self.rgba.len())
     }
     /// Encode as PNG.
     pub fn encode_png(&self) -> Vec<u8> {
@@ -93,9 +136,16 @@ impl Raster {
         }
         out
     }
+    /// The pixel at `(x, y)`; transparent black outside the raster.
     pub fn pixel(&self, x: u32, y: u32) -> [u8; 4] {
+        if x >= self.width || y >= self.height {
+            return [0; 4];
+        }
         let i = (y as usize * self.width as usize + x as usize) * 4;
-        [self.rgba[i], self.rgba[i + 1], self.rgba[i + 2], self.rgba[i + 3]]
+        match self.rgba.get(i..i + 4) {
+            Some(&[r, g, b, a]) => [r, g, b, a],
+            _ => [0; 4],
+        }
     }
 }
 
@@ -165,40 +215,68 @@ impl Default for TraceParams {
 impl TraceParams {
     /// Maximum distance (px) of polygon vertices from the pixel boundary.
     fn polygon_tolerance(&self) -> f64 {
-        let f = (self.paths / 100.0).clamp(0.0, 1.0);
+        let f = (finite_or_default(self.paths, TraceParams::default().paths) / 100.0).clamp(0.0, 1.0);
         0.55 + 0.75 * (1.0 - f)
     }
     /// Curve fitting tolerance (px).
     fn fit_tolerance(&self) -> f64 {
-        let f = (self.paths / 100.0).clamp(0.0, 1.0);
+        let f = (finite_or_default(self.paths, TraceParams::default().paths) / 100.0).clamp(0.0, 1.0);
         0.2 + 1.6 * (1.0 - f)
     }
     /// Turn angle (degrees) above which a polygon vertex stays a corner.
     fn corner_angle(&self) -> f64 {
-        let c = (self.corners / 100.0).clamp(0.0, 1.0);
+        let c = (finite_or_default(self.corners, TraceParams::default().corners) / 100.0).clamp(0.0, 1.0);
         150.0 - 115.0 * c
     }
 }
 
-/// Built-in preset names in panel order (our own parameter sets).
+/// `v`, or `default` when `v` is NaN or infinite (a slider value from a script or a file).
+fn finite_or_default(v: f64, default: f64) -> f64 {
+    if v.is_finite() { v } else { default }
+}
+
+/// Built-in preset names in panel order: A-Studio's own names for VectorCraft's own parameter
+/// sets (owner, 10 October 2026: preset names are not taken from Adobe's; the panel's option
+/// names and ranges may match, D10).
 pub const PRESET_NAMES: &[&str] = &[
     "Default",
-    "High Fidelity Photo",
-    "Low Fidelity Photo",
-    "3 Colors",
-    "6 Colors",
-    "16 Colors",
-    "Shades of Gray",
-    "Black and White Logo",
-    "Sketched Art",
-    "Silhouettes",
-    "Line Art",
-    "Technical Drawing",
+    "Detailed Photo",
+    "Simple Photo",
+    "Flat, 3 Colors",
+    "Flat, 6 Colors",
+    "Flat, 16 Colors",
+    "Gray Levels",
+    "Crisp Logo",
+    "Sketch",
+    "Solid Shapes",
+    "Outline Drawing",
+    "Precise Drawing",
 ];
 
-/// A built-in preset by name (case-insensitive; `[Default]` is accepted).
+/// The names VectorCraft gave the presets, in [`PRESET_NAMES`] order after "Default": still
+/// accepted, so files and scripts that name them keep working.
+const OLD_PRESET_NAMES: &[&str] = &[
+    "high fidelity photo",
+    "low fidelity photo",
+    "3 colors",
+    "6 colors",
+    "16 colors",
+    "shades of gray",
+    "black and white logo",
+    "sketched art",
+    "silhouettes",
+    "line art",
+    "technical drawing",
+];
+
+/// A built-in preset by name (case-insensitive; `[Default]` and VectorCraft's names are accepted).
 pub fn preset(name: &str) -> Option<TraceParams> {
-    let key = name.trim().trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    let mut key = name.trim().trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    if let Some(i) = OLD_PRESET_NAMES.iter().position(|o| *o == key)
+        && let Some(new) = PRESET_NAMES.get(i + 1)
+    {
+        key = new.to_ascii_lowercase();
+    }
     let d = TraceParams::default();
     let color = |colors: u32, paths: f64, corners: f64, noise: u32, method: Method| TraceParams {
         mode: Mode::Color,
@@ -221,17 +299,17 @@ pub fn preset(name: &str) -> Option<TraceParams> {
     };
     Some(match key.as_str() {
         "default" => d,
-        "high fidelity photo" => color(64, 90.0, 25.0, 4, Method::Overlapping),
-        "low fidelity photo" => color(20, 60.0, 50.0, 12, Method::Overlapping),
-        "3 colors" => color(3, 60.0, 60.0, 20, Method::Abutting),
-        "6 colors" => color(6, 65.0, 60.0, 16, Method::Abutting),
-        "16 colors" => color(16, 70.0, 55.0, 10, Method::Abutting),
-        "shades of gray" => TraceParams { mode: Mode::Grayscale, colors: 8, paths: 60.0, corners: 50.0, noise: 10, method: Method::Overlapping, ..d },
-        "black and white logo" => bw(128, 95.0, 80.0, 8, true),
-        "sketched art" => bw(150, 50.0, 50.0, 100, false),
-        "silhouettes" => bw(200, 40.0, 60.0, 30, false),
-        "line art" => bw(128, 80.0, 70.0, 10, false),
-        "technical drawing" => bw(128, 95.0, 90.0, 4, true),
+        "detailed photo" => color(64, 90.0, 25.0, 4, Method::Overlapping),
+        "simple photo" => color(20, 60.0, 50.0, 12, Method::Overlapping),
+        "flat, 3 colors" => color(3, 60.0, 60.0, 20, Method::Abutting),
+        "flat, 6 colors" => color(6, 65.0, 60.0, 16, Method::Abutting),
+        "flat, 16 colors" => color(16, 70.0, 55.0, 10, Method::Abutting),
+        "gray levels" => TraceParams { mode: Mode::Grayscale, colors: 8, paths: 60.0, corners: 50.0, noise: 10, method: Method::Overlapping, ..d },
+        "crisp logo" => bw(128, 95.0, 80.0, 8, true),
+        "sketch" => bw(150, 50.0, 50.0, 100, false),
+        "solid shapes" => bw(200, 40.0, 60.0, 30, false),
+        "outline drawing" => bw(128, 80.0, 70.0, 10, false),
+        "precise drawing" => bw(128, 95.0, 90.0, 4, true),
         _ => return None,
     })
 }
@@ -272,7 +350,7 @@ fn is_white(c: [u8; 3]) -> bool {
 /// Trace `img` with `params`.
 pub fn trace(img: &Raster, params: &TraceParams) -> TraceResult {
     let (w, h) = (img.width as usize, img.height as usize);
-    if w == 0 || h == 0 {
+    if w == 0 || h == 0 || !img.is_consistent() {
         return TraceResult::default();
     }
     let mut q = quantize(img, params);
