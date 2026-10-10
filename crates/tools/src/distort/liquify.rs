@@ -389,7 +389,15 @@ fn subdivide(sp: &mut SubPath, prm: &LiquifyParams, c: Point, spacing: f64) {
         // At most as many new anchors as the cap leaves room for (a huge segment under the brush
         // would insert hundreds of millions; P3-11 review).
         let room = MAX_ANCHORS.saturating_sub(sp.anchors.len()).saturating_add(1);
-        let k = if (len / spacing).is_finite() { ((len / spacing).ceil() as usize).min(room) } else { room };
+        let pieces = len / spacing;
+        // NaN (broken coordinates): leave the segment alone, as before.
+        let k = if pieces.is_nan() {
+            0
+        } else if pieces.is_finite() {
+            (pieces.ceil() as usize).min(room)
+        } else {
+            room
+        };
         if k <= 1 {
             seg += 1;
             continue;
