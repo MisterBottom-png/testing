@@ -79,9 +79,9 @@ fn a_vector_document_round_trips_through_the_layer_stack() {
     assert_eq!(d.vector.symbols, v.symbols);
     // The canvas covers both artboards at 2 px per point: x 0..900, y -20..400.
     assert_eq!(d.size, Size::new(1800, 840));
-    // The format's transform comes after the resolution scale: here only the artboard offset.
+    // The document maps points to pixels (resolution and artboard offset); layers add nothing.
     let vl = vector_layer(&d.layers[1]);
-    assert_eq!(vl.transform, Affine::translate(0.0, 40.0));
+    assert_eq!(vl.transform, Affine::translate(0.0, 0.0));
     assert_eq!(d.vector_transform(vl).m, [2.0, 0.0, 0.0, 2.0, 0.0, 40.0]);
     assert_eq!(d.vector_view(), v);
 }
@@ -247,18 +247,58 @@ fn an_empty_vector_layer_stays() {
     assert_eq!(names(&d), ["Empty"]);
 }
 
-/// P3-01 review L2: a new document's artboard follows the resolution it is given.
+/// P3-01 review L2 and re-review 2: a new document's artboard and art to come follow the
+/// resolution it is given; once it has vector art, a change of resolution moves nothing in
+/// pixels (art, artboards), like the pixel layers.
 #[test]
-fn the_default_artboard_follows_the_resolution() {
+fn resolution_changes_keep_vector_art_in_place() {
     let mut d = Document::new("Print", Size::new(3000, 1500), ColorMode::Rgb, SampleType::U8);
     d.set_resolution(300.0);
     assert_eq!(d.vector.artboards[0].rect, PtRect::new(0.0, 0.0, 720.0, 360.0));
+    assert_eq!(d.vector_mapping, Affine::scale(300.0 / 72.0), "art to come: 300 dpi");
+
     let mut v = Document::from_vector(sample(), 72.0, SampleType::U8);
     let boards = v.vector.artboards.clone();
-    v.set_resolution(150.0);
+    let place = v.vector_transform(vector_layer(&v.layers[1]));
+    let size = v.size;
+    v.set_resolution(144.0);
     assert_eq!(v.vector.artboards, boards, "a document's own artboards stay");
+    assert_eq!(v.vector_transform(vector_layer(&v.layers[1])), place, "the art stays put in pixels");
+    assert_eq!(v.size, size);
     v.set_resolution(f32::NAN);
     assert_eq!(v.resolution_dpi, 72.0);
+}
+
+/// P3-01 re-review 1: drawing a path redraws its layer only; the id counter moving (and the
+/// title, a bookkeeping field) is no change to what the other layers draw.
+#[test]
+fn adding_a_path_redraws_only_its_layer() {
+    let mut d = Document::from_vector(sample(), 72.0, SampleType::U8);
+    d.edit_vector(|v| {
+        let parent = v.layers[0].id;
+        let s = square(v, 3.0);
+        v.insert(Some(parent), 0, s).unwrap();
+        v.title = "Renamed".into();
+    });
+    assert_eq!(d.vector_revision, 0);
+    assert_eq!(d.vector_layers().iter().map(|(_, l)| l.revision).collect::<Vec<_>>(), [2, 1, 1]);
+    assert_eq!(d.vector.title, "Renamed", "the change is kept all the same");
+}
+
+/// P3-01 re-review 3: two layers with one id (a damaged file) are both kept through a reorder,
+/// and no stand-in is left behind.
+#[test]
+fn layers_sharing_an_id_survive_a_reorder() {
+    let mut d = Document::from_vector(sample(), 72.0, SampleType::U8);
+    let twin = d.layers[1].clone();
+    d.layers.push(twin);
+    d.edit_vector(|v| {
+        let top = v.layers[3].id;
+        v.move_node(top, None, 0).unwrap();
+    });
+    assert_eq!(d.layers.len(), 4);
+    assert!(d.layers.iter().all(|l| l.content.kind_name() == "Vector"), "{:?}", names(&d));
+    assert!(unique(&all_ids(&d.vector_view())));
 }
 
 #[test]
@@ -471,8 +511,12 @@ proptest::proptest! {
                 continue;
             }
             let untouched: Vec<(crate::LayerId, Arc<Node>, u64)> = d.vector_layers().iter().map(|(id, l)| (*id, l.node.clone(), l.revision)).collect();
+            let revision = d.vector_revision;
             apply(&mut direct, e);
             d.edit_vector(|v| apply(v, e));
+            if !matches!(e, Edit::DropSwatch) {
+                proptest::prop_assert_eq!(d.vector_revision, revision, "node edits leave the space's revision: {:?}", e);
+            }
             proptest::prop_assert_eq!(&d.vector_view(), &direct, "after {:?}", e);
             for (_, _, l) in d.walk() {
                 if let LayerContent::Vector(vl) = &l.content {

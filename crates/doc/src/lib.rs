@@ -719,6 +719,11 @@ pub struct Document {
     /// Bumped when [`Document::vector`] changes (a symbol, style or swatch), which every vector
     /// layer's pixels may depend on.
     pub vector_revision: u64,
+    /// Points of the vector space → document pixels, for the artboards and every vector layer
+    /// (each adds its own transform). Set when vector art first comes in (the resolution then,
+    /// and the artboards' offset); a later change of resolution keeps it, so vector art stays
+    /// where it is in pixels, like the pixel layers.
+    pub vector_mapping: Affine,
 }
 
 /// Where a layer lives in the tree: indices from the root down.
@@ -758,6 +763,7 @@ impl Document {
             timeline: None,
             vector: Arc::new(vlayer::new_vector_space(size, 72.0, mode)),
             vector_revision: 0,
+            vector_mapping: Affine::scale(1.0),
         }
     }
 

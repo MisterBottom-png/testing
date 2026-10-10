@@ -26,7 +26,7 @@
 //! stay as they are; the vector space's artboards are VectorCraft's. Joining the two in one
 //! Artboards panel is UI work (P4-01).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use astudio_vdoc::node::Node;
@@ -43,16 +43,17 @@ const UNNAMED: &str = "Layer";
 /// The identity transform.
 const IDENTITY: Affine = Affine { m: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] };
 
-/// A layer holding one top-level VectorCraft node. The node is in points; it is drawn at
-/// `points × resolution / 72` pixels, then through `transform` (as the `.astudio` format stores
-/// it), so the art follows the document's resolution. `cache` holds the last rendered pixels:
+/// A layer holding one top-level VectorCraft node. The node is in points; it is drawn through the
+/// document's [`Document::vector_mapping`], then `transform` ([`Document::vector_transform`]; the
+/// `.astudio` file stores `transform · vector_mapping · scale(72 / resolution)`, its spec's form).
+/// `cache` holds the last rendered pixels:
 /// [`Layer::surface`] returns them even when stale (the editor shows the old pixels until the
 /// renderer catches up); see [`VectorLayer::fresh_cache`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorLayer {
     pub node: Arc<Node>,
-    /// After the resolution scale, pixels → document pixels (`[a c e; b d f]`, column vectors,
-    /// like every PhotoCraft transform).
+    /// After the document's vector mapping, pixels → document pixels (`[a c e; b d f]`, column
+    /// vectors, like every PhotoCraft transform).
     pub transform: Affine,
     /// Bumped on every change of `node` or `transform`.
     pub revision: u64,
@@ -152,34 +153,40 @@ impl Document {
         let mode = if v.color_mode == astudio_vdoc::ColorMode::Cmyk { ColorMode::Cmyk } else { ColorMode::Rgb };
         let mut d = Document::new(v.title.clone(), Size::new(side(w), side(h)), mode, depth);
         d.resolution_dpi = sane_dpi(resolution_dpi);
-        let transform = Affine::translate(-x0 * k, -y0 * k);
+        d.vector_mapping = Affine::translate(-x0 * k, -y0 * k).mul(&Affine::scale(k));
         let nodes = std::mem::take(&mut v.layers);
         v.reserve_ids(max_id(&nodes).saturating_add(1));
-        d.layers = nodes.into_iter().map(|node| layer_for(node, transform)).collect();
+        d.layers = nodes.into_iter().map(|node| layer_for(node, IDENTITY)).collect();
         d.vector = Arc::new(v);
         d
     }
 
-    /// Sets the resolution. The vector art follows it (it is in points); a vector space still on
-    /// its first artboard, the canvas, gets the canvas at the new resolution.
+    /// Sets the resolution (Image Size without resampling, a file's resolution on import). Vector
+    /// art and artboards keep their place in pixels, like the pixel layers. A document without
+    /// vector layers takes the new resolution for the art to come: its vector mapping becomes
+    /// that resolution's scale, and a vector space still on its first artboard, the canvas, gets
+    /// the canvas at the new resolution.
     pub fn set_resolution(&mut self, resolution_dpi: f32) {
         let dpi = sane_dpi(resolution_dpi);
-        let old = canvas_artboard(self.size, self.resolution_dpi);
-        if let [only] = self.vector.artboards.as_slice()
-            && only.rect == old
-        {
-            let rect = canvas_artboard(self.size, dpi);
-            if let Some(a) = Arc::make_mut(&mut self.vector).artboards.first_mut() {
-                a.rect = rect;
+        if self.vector_layers().is_empty() {
+            let old = canvas_artboard(self.size, self.resolution_dpi);
+            if let [only] = self.vector.artboards.as_slice()
+                && only.rect == old
+            {
+                let rect = canvas_artboard(self.size, dpi);
+                if let Some(a) = Arc::make_mut(&mut self.vector).artboards.first_mut() {
+                    a.rect = rect;
+                }
+                self.vector_revision = self.vector_revision.wrapping_add(1);
             }
-            self.vector_revision = self.vector_revision.wrapping_add(1);
+            self.vector_mapping = Affine::scale(points_to_pixels(dpi));
         }
         self.resolution_dpi = dpi;
     }
 
-    /// Points → document pixels for `layer`: the resolution scale, then its transform.
+    /// Points → document pixels for `layer`: the document's vector mapping, then its transform.
     pub fn vector_transform(&self, layer: &VectorLayer) -> Affine {
-        layer.transform.mul(&Affine::scale(points_to_pixels(self.resolution_dpi)))
+        layer.transform.mul(&self.vector_mapping)
     }
 
     /// The vector layers, bottom to top through groups.
@@ -277,44 +284,47 @@ impl Document {
         let out = f(&mut space);
         let after = std::mem::take(&mut space.layers);
         if space != *self.vector {
+            // New nodes move the id counter, a rename the title: only a change to what is drawn
+            // makes every vector layer redraw.
+            if !space.draws_like(&self.vector) {
+                self.vector_revision = self.vector_revision.wrapping_add(1);
+            }
             self.vector = Arc::new(space);
-            self.vector_revision = self.vector_revision.wrapping_add(1);
         }
         self.apply_vector_order(&before, after);
         out
     }
 
     /// Maps the top-level nodes an edit left (`after`, bottom to top) onto the stack that held
-    /// `before` (see [`Document::edit_vector`]).
+    /// `before` (see [`Document::edit_vector`]). Layers are tracked by their place in `before`, not
+    /// by id, so two layers with one id (a damaged file) cannot be mixed up.
     fn apply_vector_order(&mut self, before: &[(LayerId, Arc<Node>)], after: Vec<Arc<Node>>) {
-        let owner: HashMap<NodeId, LayerId> = before.iter().map(|(id, n)| (n.id, *id)).collect();
-        let mut kept: HashSet<LayerId> = HashSet::new();
-        // Each node with the layer it belongs to (None = a new layer).
-        let entries: Vec<(Option<LayerId>, Arc<Node>)> = after
+        let owner: HashMap<NodeId, usize> = before.iter().enumerate().map(|(i, (_, n))| (n.id, i)).collect();
+        let mut kept = vec![false; before.len()];
+        // Each node with the place in `before` of the layer it belongs to (None = a new layer).
+        let entries: Vec<(Option<usize>, Arc<Node>)> = after
             .into_iter()
             .map(|n| {
-                let id = owner.get(&n.id).copied().filter(|id| kept.insert(*id));
-                (id, n)
+                let i = owner.get(&n.id).copied().filter(|&i| kept.get(i).is_some_and(|k| !k));
+                if let Some(k) = i.and_then(|i| kept.get_mut(i)) {
+                    *k = true;
+                }
+                (i, n)
             })
             .collect();
 
-        let gone: HashSet<LayerId> = before.iter().map(|(id, _)| *id).filter(|id| !kept.contains(id)).collect();
-        if !gone.is_empty() {
-            remove_layers(&mut self.layers, &gone);
+        // The places vector layers hold, bottom to top: the same order as `before`.
+        let paths: Vec<LayerPath> = self.walk().into_iter().filter(|(_, _, l)| matches!(l.content, LayerContent::Vector(_))).map(|(p, _, _)| p).collect();
+        // Take every vector layer out (removed ones stay out), then put the kept ones back in
+        // the new order.
+        let mut taken: Vec<Option<Layer>> = Vec::with_capacity(paths.len());
+        for path in &paths {
+            taken.push(self.layer_at_mut(path).map(|slot| std::mem::replace(slot, Layer::group("", Vec::new()))));
         }
-
-        // Shuffle the kept layers among the places vector layers hold, into the new order.
-        let slots: Vec<LayerPath> = self.walk().into_iter().filter(|(_, _, l)| matches!(l.content, LayerContent::Vector(_))).map(|(p, _, _)| p).collect();
-        let mut taken: HashMap<LayerId, Layer> = HashMap::new();
-        for path in &slots {
-            if let Some(slot) = self.layer_at_mut(path) {
-                let layer = std::mem::replace(slot, Layer::group("", Vec::new()));
-                taken.insert(layer.id, layer);
-            }
-        }
-        let order = entries.iter().filter_map(|(id, n)| id.map(|id| (id, n)));
-        for (path, (id, node)) in slots.iter().zip(order) {
-            let Some(mut layer) = taken.remove(&id) else { continue };
+        let mut slots = paths.iter().zip(&kept).filter(|(_, k)| **k).map(|(p, _)| p);
+        let mut ids: Vec<Option<LayerId>> = vec![None; before.len()];
+        for (i, node) in entries.iter().filter_map(|(i, n)| i.map(|i| (i, n))) {
+            let (Some(path), Some(mut layer)) = (slots.next(), taken.get_mut(i).and_then(Option::take)) else { continue };
             if let LayerContent::Vector(vl) = &mut layer.content
                 && !Arc::ptr_eq(&vl.node, node)
             {
@@ -323,10 +333,20 @@ impl Document {
             }
             layer.name = node.name.clone().unwrap_or_else(|| UNNAMED.into());
             layer.visible = node.visible;
+            if let Some(id) = ids.get_mut(i) {
+                *id = Some(layer.id);
+            }
             if let Some(slot) = self.layer_at_mut(path) {
                 *slot = layer;
             }
         }
+        // The places of removed layers: drop them, last first so earlier paths stay valid.
+        let mut gone: Vec<&LayerPath> = paths.iter().zip(&kept).filter(|(_, k)| !**k).map(|(p, _)| p).collect();
+        gone.sort();
+        for path in gone.into_iter().rev() {
+            remove_at(&mut self.layers, path);
+        }
+        let entries: Vec<(Option<LayerId>, Arc<Node>)> = entries.into_iter().map(|(i, n)| (i.and_then(|i| ids.get(i).copied().flatten()), n)).collect();
 
         // New layers: above the layer of the node before them; a run before the first kept
         // layer goes below it; with no vector layer at all, at the top of the stack.
@@ -405,12 +425,15 @@ fn insert_next_to(layers: &mut Vec<Layer>, next_to: LayerId, layer: Layer, above
     }
 }
 
-/// Removes the layers in `ids` from `layers` and every group in it.
-fn remove_layers(layers: &mut Vec<Layer>, ids: &HashSet<LayerId>) {
-    layers.retain(|l| !ids.contains(&l.id));
-    for l in layers.iter_mut() {
-        if let Some(ch) = l.children_mut() {
-            remove_layers(ch, ids);
-        }
+/// Removes the layer at `path`.
+fn remove_at(layers: &mut Vec<Layer>, path: &[usize]) {
+    let Some((last, parent)) = path.split_last() else { return };
+    let mut list = layers;
+    for &i in parent {
+        let Some(ch) = list.get_mut(i).and_then(Layer::children_mut) else { return };
+        list = ch;
+    }
+    if *last < list.len() {
+        list.remove(*last);
     }
 }
