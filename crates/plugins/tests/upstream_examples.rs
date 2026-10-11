@@ -79,3 +79,15 @@ fn a_module_must_implement_exactly_one_abi() {
     .unwrap();
     assert!(matches!(Plugin::load(&both, Limits::default()), Err(Error::Abi(m)) if m.contains("both")));
 }
+
+#[test]
+fn a_vector_plugin_with_a_huge_overlap_is_refused_by_apply_not_a_crash() {
+    // Before the P3-05 review fix this panicked with "attempt to multiply with overflow": the
+    // overlap of a vector manifest went unchecked into the band arithmetic.
+    let manifest = r#"{"id":"x.y","name":"X","kind":"filter","overlap":1073741824,"area":"canvas"}"#;
+    let bytes = wat::parse_str(astudio_plugins::wat::module(manifest, "(i64.const -1)", "", 1)).unwrap();
+    let p = Plugin::load(&bytes, Limits::default()).unwrap();
+    assert_eq!(p.abi(), Abi::Vector);
+    assert!(matches!(p.apply(&red_square(), Rect::new(0, 0, 4, 4), None, &json!({})), Err(Error::Abi(_))));
+    assert!(p.output_area(&red_square(), Rect::new(0, 0, 4, 4), None).is_empty());
+}

@@ -6,9 +6,9 @@ use astudio_geom::pixel::{Rect, TILE_SIZE, TileCoord};
 use astudio_raster::Surface;
 use serde_json::{Value, json};
 
-use crate::manifest::Area;
+use crate::manifest::{Area, MAX_OVERLAP};
 use crate::runtime::{Deadline, Plugin};
-use crate::{Error, Result};
+use crate::{Abi, Error, Result};
 
 /// The `format` argument of `pc_filter`: bits 0–7 the source bit depth (8, 16 or 32), bit 8 set
 /// when the last channel is (straight) alpha, bits 16–23 the colour mode as numbered in the PSD
@@ -72,14 +72,22 @@ fn read_clamped(s: &Surface, rect: Rect, extent: Rect) -> Vec<f32> {
 }
 
 impl Plugin {
+    /// The plug-in's overlap in pixels, never above [`MAX_OVERLAP`].
+    fn overlap(&self) -> i32 {
+        self.manifest().overlap.min(MAX_OVERLAP) as i32
+    }
+
     /// The rectangle a run writes: the layer's content (grown by the plug-in's overlap) or the
-    /// canvas, limited to the selection's bounds.
+    /// canvas, limited to the selection's bounds. Empty for a plug-in that isn't a pixel filter.
     pub fn output_area(&self, surface: &Surface, canvas: Rect, selection: Option<&Surface>) -> Rect {
+        if self.abi() != Abi::Pixel {
+            return Rect::EMPTY;
+        }
         let content = surface.content_bounds();
         let extent = canvas.union(&content);
         let mut area = match self.manifest().area {
             Area::Content if content.is_empty() => Rect::EMPTY,
-            Area::Content => content.inflate(self.manifest().overlap as i32).intersect(&extent),
+            Area::Content => content.inflate(self.overlap()).intersect(&extent),
             Area::Canvas => canvas,
         };
         if let Some(sel) = selection {
@@ -92,6 +100,11 @@ impl Plugin {
     /// returns the new surface. `canvas` is the document bounds; `selection` (coverage in
     /// channel 0) limits and feathers the result, as for built-in filters.
     pub fn apply(&self, surface: &Surface, canvas: Rect, selection: Option<&Surface>, params: &Value) -> Result<Surface> {
+        // Ids are shared by both ABIs: a vector plug-in installed under a pixel filter's id must
+        // fail here, not run on pixels (P3-05 review).
+        if self.abi() != Abi::Pixel {
+            return Err(Error::Abi(format!("{} is not a pixel filter: it runs on objects, not on pixels", self.id())));
+        }
         let resolved = self.manifest().resolve_params(params)?;
         let area = self.output_area(surface, canvas, selection);
         let mut out = surface.clone();
@@ -100,7 +113,7 @@ impl Plugin {
         }
         let fmt = surface.format();
         let n = fmt.channels();
-        let ov = self.manifest().overlap as i32;
+        let ov = self.overlap();
         let extent = canvas.union(&surface.content_bounds());
         // Bands are tile-aligned blocks, one tile row tall and as many tiles wide as fit in
         // `band_bytes`, so each worker can encode its own tiles and the merge is a tile copy.
@@ -108,8 +121,11 @@ impl Plugin {
         // Half the plug-in's memory cap is for the band (the module needs room of its own).
         let room = self.limits().max_memory_bytes / 2;
         let across = (self.limits().band_bytes.min(room) / tile_bytes).clamp(1, 1024) as i32;
-        let in_bytes = ((across * TILE_SIZE + 2 * ov) as usize) * ((TILE_SIZE + 2 * ov) as usize) * n * 4;
-        if in_bytes > room {
+        // `ov` is at most MAX_OVERLAP and `across` at most 1024, so the sides fit easily; the
+        // product is checked anyway.
+        let side = |len: i32| usize::try_from(len.saturating_add(ov.saturating_mul(2))).unwrap_or(usize::MAX);
+        let in_bytes = side(across.saturating_mul(TILE_SIZE)).checked_mul(side(TILE_SIZE)).and_then(|b| b.checked_mul(n * 4));
+        if in_bytes.is_none_or(|b| b > room) {
             return Err(Error::Limit("memory budget (a band does not fit in the plug-in's memory)".into()));
         }
         let mut bands = Vec::new();
@@ -117,9 +133,19 @@ impl Plugin {
         for ty in t0.ty..=t1.ty {
             let mut tx = t0.tx;
             while tx <= t1.tx {
-                let r = Rect::new(tx * TILE_SIZE, ty * TILE_SIZE, (tx + across).min(t1.tx + 1) * TILE_SIZE, (ty + 1) * TILE_SIZE);
+                // Saturating: an area at the edge of the coordinate range must not overflow.
+                let x1 = tx.saturating_add(across).min(t1.tx.saturating_add(1));
+                let r = Rect::new(
+                    tx.saturating_mul(TILE_SIZE),
+                    ty.saturating_mul(TILE_SIZE),
+                    x1.saturating_mul(TILE_SIZE),
+                    ty.saturating_add(1).saturating_mul(TILE_SIZE),
+                );
                 bands.push(r.intersect(&area));
-                tx += across;
+                tx = tx.saturating_add(across);
+                if tx == i32::MAX {
+                    break;
+                }
             }
         }
         let deadline = Deadline::new(self.limits());

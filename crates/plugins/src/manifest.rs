@@ -111,12 +111,22 @@ pub struct Manifest {
     #[serde(default, deserialize_with = "ordered_params", serialize_with = "params_as_object")]
     pub params: Vec<(String, ParamSpec)>,
     /// Pixel filters: pixels of context the filter needs around each output pixel (0 = point
-    /// filter).
-    #[serde(default, skip_serializing_if = "is_zero")]
+    /// filter). Read only for pixel filters ([`Manifest::parse_for`]); always 0 for the others.
+    #[serde(default, skip_deserializing, skip_serializing_if = "is_zero")]
     pub overlap: u32,
-    /// Pixel filters: which pixels the filter is given.
-    #[serde(default, skip_serializing_if = "is_content")]
+    /// Pixel filters: which pixels the filter is given. Read only for pixel filters.
+    #[serde(default, skip_deserializing, skip_serializing_if = "is_content")]
     pub area: Area,
+}
+
+/// The pixel-filter keys of a manifest, read separately: a vector plug-in's manifest ignores them
+/// as VectorCraft does (unknown keys), whatever they hold (P3-05 review).
+#[derive(Deserialize)]
+struct PixelKeys {
+    #[serde(default)]
+    overlap: Value,
+    #[serde(default)]
+    area: Value,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -138,7 +148,16 @@ impl Manifest {
             return Err(Error::Manifest(format!("manifest is {} bytes (limit {MAX_MANIFEST_BYTES})", bytes.len())));
         }
         let text = std::str::from_utf8(bytes).map_err(|_| Error::Manifest("manifest is not UTF-8".into()))?;
-        let man: Manifest = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
+        let mut man: Manifest = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
+        if abi == Abi::Pixel {
+            let keys: PixelKeys = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
+            if !keys.overlap.is_null() {
+                man.overlap = serde_json::from_value(keys.overlap).map_err(|e| Error::Manifest(format!("manifest: `overlap`: {e}")))?;
+            }
+            if !keys.area.is_null() {
+                man.area = serde_json::from_value(keys.area).map_err(|e| Error::Manifest(format!("manifest: `area`: {e}")))?;
+            }
+        }
         man.validate(abi)?;
         Ok(man)
     }
@@ -428,6 +447,23 @@ mod tests {
         }
         assert!(Manifest::parse_for(br#"{"id":"a","name":"x","kind":"filter","params":{"preview":{"type":"bool"}}}"#, Abi::Pixel).is_ok());
         assert!(Manifest::parse(br#"{"id":"a","name":"x","kind":"filter","params":{"layer":{"type":"bool"}}}"#).is_ok());
+        for bad in [r#"{"id":"a","name":"x","kind":"filter","overlap":-1}"#, r#"{"id":"a","name":"x","kind":"filter","area":"whole"}"#] {
+            assert!(Manifest::parse_for(bad.as_bytes(), Abi::Pixel).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn vector_manifests_ignore_the_pixel_keys_as_upstream_does() {
+        // VectorCraft ignores keys it doesn't know; these loaded upstream and must still load,
+        // with the pixel keys at their defaults (P3-05 review).
+        for text in [
+            r#"{"id":"a","name":"x","kind":"filter","overlap":-1}"#,
+            r#"{"id":"a","name":"x","kind":"filter","area":"whole"}"#,
+            r#"{"id":"a","name":"x","kind":"effect","overlap":1073741824,"area":"canvas"}"#,
+        ] {
+            let m = Manifest::parse(text.as_bytes()).unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!((m.overlap, m.area), (0, Area::Content), "{text}");
+        }
         assert!(Manifest::parse(&vec![b' '; MAX_MANIFEST_BYTES + 1]).is_err());
     }
 }
