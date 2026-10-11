@@ -62,17 +62,21 @@ fn changed_pages_are_noticed() {
 }
 
 #[test]
-fn the_legacy_name_is_read_and_plain_pdfs_have_no_editing_data() {
+fn the_legacy_names_are_read_and_plain_pdfs_have_no_editing_data() {
     let r = pdf_with(Some(b"legacy"), false);
     let name = format!("({EDITING_FILE})");
-    let legacy = format!("({LEGACY_EDITING_FILE}){}", " ".repeat(EDITING_FILE.len() - LEGACY_EDITING_FILE.len()));
-    let mut old = r.bytes.clone();
-    // Every place the name is written (/F, /UF and the name tree key).
-    while let Some(at) = old.windows(name.len()).position(|w| w == name.as_bytes()) {
-        old[at..at + legacy.len()].copy_from_slice(legacy.as_bytes());
+    // VectorCraft's name and the one before it (P3-06), written as older apps did. The current
+    // name is the longest, so the old one fits in its place (padded), keeping every offset.
+    for old_name in LEGACY_EDITING_FILES {
+        let legacy = format!("({old_name}){}", " ".repeat(EDITING_FILE.len() - old_name.len()));
+        let mut old = r.bytes.clone();
+        // Every place the name is written (/F, /UF and the name tree key).
+        while let Some(at) = old.windows(name.len()).position(|w| w == name.as_bytes()) {
+            old[at..at + legacy.len()].copy_from_slice(legacy.as_bytes());
+        }
+        let e = editing(&old).unwrap_or_else(|| panic!("{old_name} not found"));
+        assert_eq!((e.data.as_slice(), e.intact), (&b"legacy"[..], true), "{old_name}");
     }
-    let e = editing(&old).unwrap();
-    assert_eq!((e.data.as_slice(), e.intact), (&b"legacy"[..], true));
     // Off, or with no native document given: nothing embedded (the latter warns).
     let plain = export(&doc(), &PdfOptions::default()).unwrap();
     assert_eq!(editing(&plain), None);

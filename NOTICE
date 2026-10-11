@@ -26,7 +26,7 @@ Third-party material
   and the SCOWL contributors; SCOWL licence. Includes data derived from WordNet (Copyright 1997 by
   Princeton University) and Ispell/VarCon (Copyright 1993 Geoff Kuenning); their notices are in
   assets/dict/LICENSE-SCOWL.txt.
-- The synthetic coated CMYK profile (crates/color/profiles/photocraft-coated-cmyk.icc) - CC0-1.0.
+- The synthetic coated CMYK profile (crates/color/profiles/astudio-coated-cmyk.icc) - CC0-1.0.
   See crates/color/profiles/LICENSE-CC0-1.0.txt.
 
 Rust libraries compiled into A-Studio are listed in Cargo.lock under their own licences; release

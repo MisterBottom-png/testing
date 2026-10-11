@@ -13,12 +13,16 @@ use crate::PdfError;
 use crate::lab_spot::find;
 
 /// The embedded file holding the native document (its name among the PDF's attachments).
-pub const EDITING_FILE: &str = "vectorcraft-editing.vectorcraft";
-/// The editing file's name from before the project was renamed: still read.
-pub const LEGACY_EDITING_FILE: &str = "drawcraft-editing.drawcraft";
+pub const EDITING_FILE: &str = "astudio-editing-data.vectorcraft";
+/// The editing file's earlier names, still read: VectorCraft's (P3-06), and its name from before
+/// that project was renamed.
+pub const LEGACY_EDITING_FILES: [&str; 2] = [LEGACY_EDITING_FILE, "drawcraft-editing.drawcraft"];
+/// The name VectorCraft wrote (the first of [`LEGACY_EDITING_FILES`]; VectorCraft's API name).
+pub const LEGACY_EDITING_FILE: &str = "vectorcraft-editing.vectorcraft";
 
-/// The editing file's description: this text, then the hash of the pages.
-const DESCRIPTION: &str = "VectorCraft editing data; page hash ";
+/// The editing file's description: this text, then the hash of the pages (read back by what
+/// follows `hash `, so older descriptions still work).
+const DESCRIPTION: &str = "A-Studio editing data; page hash ";
 /// Stands for the hash while the PDF is written: as long as a hash, so writing the hash over it
 /// keeps every offset.
 const PLACEHOLDER: &str = "0000000000000000";
@@ -111,7 +115,7 @@ fn editing_spec<'a>(node: &Dict<'a>, depth: usize) -> Option<Dict<'a>> {
 fn is_editing_file(spec: &Dict<'_>) -> bool {
     [&b"UF"[..], b"F"].into_iter().filter_map(|k| spec.get::<PdfString<'_>>(k)).any(|name| {
         let name = name.as_bytes();
-        name == EDITING_FILE.as_bytes() || name == LEGACY_EDITING_FILE.as_bytes()
+        name == EDITING_FILE.as_bytes() || LEGACY_EDITING_FILES.iter().any(|old| name == old.as_bytes())
     })
 }
 

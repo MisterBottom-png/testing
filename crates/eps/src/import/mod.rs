@@ -134,7 +134,7 @@ impl Dsc {
 /// operator that raised it and the procedure it ran in (`fault`).
 fn reason(e: &PsError, fault: Option<&Fault>) -> String {
     let what = match e {
-        PsError::Ps("undefined", at) => format!("it uses `{at}`, which VectorCraft's PostScript reader doesn't know"),
+        PsError::Ps("undefined", at) => format!("it uses `{at}`, which A-Studio's PostScript reader doesn't know"),
         PsError::Ps(name, at) => match fault.and_then(|f| f.op) {
             Some(op) if at.is_empty() || at == op => format!("a PostScript error ({name} in `{op}`)"),
             Some(op) => format!("a PostScript error ({name} in `{op}`: {at})"),
@@ -214,7 +214,7 @@ fn import_here(bytes: &[u8]) -> Result<Imported, String> {
     let drew = !out.drawn.is_empty();
     let why = match (&result, drew) {
         (Ok(()), true) => return Ok(finish(out)),
-        (Ok(()), false) => "it draws nothing VectorCraft's PostScript reader can show".to_string(),
+        (Ok(()), false) => "it draws nothing A-Studio's PostScript reader can show".to_string(),
         (Err(e), _) => reason(e, fault.as_ref()),
     };
     if let Some(p) = preview::preview(bytes, ps, frame) {
