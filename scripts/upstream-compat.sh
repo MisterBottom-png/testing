@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Proof that both upstream apps build against A-Studio's merged crates (P2-01 geometry, P2-02 colour,
 # P2-13 vector document, P2-04 text, P2-11 psd/codecs/heif/raw, P2-16 raster/doc, P2-14 pathops/brush/plugins/effects/render,
-# P2-15 svg/pdf/eps/cad/metafile).
+# P2-15 svg/pdf/eps/cad/metafile, P3-05 plugins).
 #
 # Copies upstream/photocraft and upstream/vectorcraft (read-only, never edited) into
 # target/upstream-compat/, swaps each ported upstream crate for a thin crate of the same name that
@@ -72,6 +72,11 @@ shim photocraft doc doc 'pub use astudio_doc::*;'
 shim photocraft raw raw 'pub use astudio_raw::*;'
 printf '\n[features]\ntestgen = ["astudio-raw/testgen"]\n' >> "$out/photocraft/src-copy/crates/raw/Cargo.toml"
 for c in vector compose gpu paint ops algo format; do shim photocraft "$c" "$c" "pub use astudio_$c::*;"; done
+# PhotoCraft's plugins = astudio-plugins, the one host for both ABIs (P3-05); its users' tests read
+# the upstream Invert from the plugins crate's fixtures.
+shim photocraft plugins plugins 'pub use astudio_plugins::*;'
+mkdir -p "$out/photocraft/src-copy/crates/plugins/tests/fixtures"
+cp crates/plugins/tests/fixtures/upstream/invert.wasm "$out/photocraft/src-copy/crates/plugins/tests/fixtures/"
 
 copy vectorcraft
 # VectorCraft's geom root = astudio_geom's root (kurbo names, paths, shapes, ...).
@@ -86,9 +91,10 @@ shim vectorcraft tools tools 'pub use astudio_tools::*;'
 shim vectorcraft format format 'pub use astudio_format::vectorcraft::*;'
 shim vectorcraft brush vbrush 'pub use astudio_vbrush::*;'
 shim vectorcraft plugins plugins 'pub use astudio_plugins::*;'
-# Engine and UI tests read the example plug-in from the plugins crate's fixtures.
-mkdir -p "$out/vectorcraft/src-copy/crates/plugins/tests"
-cp -r crates/plugins/tests/fixtures "$out/vectorcraft/src-copy/crates/plugins/tests/"
+# Engine and UI tests read the example plug-in from the plugins crate's fixtures: the upstream
+# build, with its upstream id (A-Studio's own build carries an A-Studio id, P3-05).
+mkdir -p "$out/vectorcraft/src-copy/crates/plugins/tests/fixtures"
+cp crates/plugins/tests/fixtures/upstream/desaturate.wasm "$out/vectorcraft/src-copy/crates/plugins/tests/fixtures/"
 shim vectorcraft effects effects 'pub use astudio_effects::*;'
 shim vectorcraft render render 'pub use astudio_render::*;'
 # VectorCraft's svg, pdf, eps, cad and metafile = the A-Studio crates (P2-15).

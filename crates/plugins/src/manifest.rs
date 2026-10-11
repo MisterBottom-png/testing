@@ -1,21 +1,24 @@
-//! The plug-in manifest (`vc_manifest`) and parameter schema.
+//! The plug-in manifest (`pc_manifest` or `vc_manifest`) and parameter schema.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{Error, Result};
+use crate::{Abi, Error, Result};
 
 /// Longest manifest the host reads.
 pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 /// Most parameters a plug-in may declare.
 pub const MAX_PARAMS: usize = 64;
+/// Largest neighbourhood (`overlap`) a pixel filter may ask for, in pixels.
+pub const MAX_OVERLAP: u32 = 256;
 
-/// What a plug-in is.
+/// What a plug-in is. A pixel filter ([`Abi::Pixel`]) is always a `filter`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Kind {
-    /// An object filter: reads the selected paths and returns the objects to keep, change or add
-    /// (Object › Plug-ins, `plugin.run`).
+    /// A filter. With the pixel ABI: runs on a layer's pixels (Filter › Plug-ins). With the
+    /// vector ABI, an object filter: reads the selected paths and returns the objects to keep,
+    /// change or add (Object › Plug-ins, `plugin.run`).
     Filter,
     /// A live effect: rewrites one object's geometry each time it is drawn, from its appearance
     /// stack (Effect › Plug-ins, `effect.apply`).
@@ -31,11 +34,22 @@ impl Kind {
     }
 }
 
+/// Which pixels a pixel filter is given.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Area {
+    /// The layer's non-empty pixels (like Invert or Gaussian Blur).
+    #[default]
+    Content,
+    /// The whole canvas, including transparent pixels (like Clouds).
+    Canvas,
+}
+
 /// One declared parameter.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ParamSpec {
-    /// A real number in `min..=max`.
+    /// A real number in `min..=max` (a slider in the dialog).
     Number { min: f64, max: f64, default: f64 },
     /// A whole number in `min..=max`.
     Int {
@@ -78,7 +92,7 @@ impl ParamSpec {
     }
 }
 
-/// The manifest a plug-in returns from `vc_manifest` (UTF-8 JSON).
+/// The manifest a plug-in returns from `pc_manifest` or `vc_manifest` (UTF-8 JSON).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
@@ -96,17 +110,55 @@ pub struct Manifest {
     /// Parameters in declaration (dialog) order; a JSON object `{"name": spec, …}` in the manifest.
     #[serde(default, deserialize_with = "ordered_params", serialize_with = "params_as_object")]
     pub params: Vec<(String, ParamSpec)>,
+    /// Pixel filters: pixels of context the filter needs around each output pixel (0 = point
+    /// filter). Read only for pixel filters ([`Manifest::parse_for`]); always 0 for the others.
+    #[serde(default, skip_deserializing, skip_serializing_if = "is_zero")]
+    pub overlap: u32,
+    /// Pixel filters: which pixels the filter is given. Read only for pixel filters.
+    #[serde(default, skip_deserializing, skip_serializing_if = "is_content")]
+    pub area: Area,
+}
+
+/// The pixel-filter keys of a manifest, read separately: a vector plug-in's manifest ignores them
+/// as VectorCraft does (unknown keys), whatever they hold (P3-05 review).
+#[derive(Deserialize)]
+struct PixelKeys {
+    #[serde(default)]
+    overlap: Value,
+    #[serde(default)]
+    area: Value,
+}
+
+fn is_zero(v: &u32) -> bool {
+    *v == 0
+}
+fn is_content(a: &Area) -> bool {
+    *a == Area::Content
 }
 
 impl Manifest {
-    /// Parses and validates manifest JSON.
+    /// Parses and validates the manifest JSON of an object filter or live effect.
     pub fn parse(bytes: &[u8]) -> Result<Manifest> {
+        Self::parse_for(bytes, Abi::Vector)
+    }
+
+    /// Parses and validates manifest JSON by the rules of the plug-in's `abi`.
+    pub fn parse_for(bytes: &[u8], abi: Abi) -> Result<Manifest> {
         if bytes.len() > MAX_MANIFEST_BYTES {
             return Err(Error::Manifest(format!("manifest is {} bytes (limit {MAX_MANIFEST_BYTES})", bytes.len())));
         }
         let text = std::str::from_utf8(bytes).map_err(|_| Error::Manifest("manifest is not UTF-8".into()))?;
-        let man: Manifest = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
-        man.validate()?;
+        let mut man: Manifest = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
+        if abi == Abi::Pixel {
+            let keys: PixelKeys = serde_json::from_str(text).map_err(|e| Error::Manifest(format!("manifest: {e}")))?;
+            if !keys.overlap.is_null() {
+                man.overlap = serde_json::from_value(keys.overlap).map_err(|e| Error::Manifest(format!("manifest: `overlap`: {e}")))?;
+            }
+            if !keys.area.is_null() {
+                man.area = serde_json::from_value(keys.area).map_err(|e| Error::Manifest(format!("manifest: `area`: {e}")))?;
+            }
+        }
+        man.validate(abi)?;
         Ok(man)
     }
 
@@ -120,10 +172,12 @@ impl Manifest {
             description: String::new(),
             author: String::new(),
             params: Vec::new(),
+            overlap: 0,
+            area: Area::Content,
         }
     }
 
-    fn validate(&self) -> Result<()> {
+    fn validate(&self, abi: Abi) -> Result<()> {
         if !valid_id(&self.id) {
             return Err(Error::Manifest(format!("invalid id {:?}: use 1-64 characters from A-Z a-z 0-9 . _ -", self.id)));
         }
@@ -134,8 +188,16 @@ impl Manifest {
         if self.version.len() > 32 || self.description.len() > 1024 || self.author.len() > 128 {
             return Err(Error::Manifest("`version`, `description` or `author` is too long".into()));
         }
+        if abi == Abi::Pixel {
+            if self.kind != Kind::Filter {
+                return Err(Error::Manifest(format!("a pixel plug-in (pc_*) must be a \"filter\", not {:?}", self.kind.name())));
+            }
+            if self.overlap > MAX_OVERLAP {
+                return Err(Error::Manifest(format!("`overlap` {} exceeds {MAX_OVERLAP}", self.overlap)));
+            }
+        }
         for (k, spec) in &self.params {
-            if !valid_key(k) {
+            if !valid_key(k, abi) {
                 return Err(Error::Manifest(format!("invalid parameter name {k:?}")));
             }
             match spec {
@@ -146,8 +208,18 @@ impl Manifest {
                 }
                 ParamSpec::Int { min, max, .. } if min > max => return Err(Error::Manifest(format!("parameter `{k}`: bad range"))),
                 ParamSpec::Choice { options, default } => {
-                    if options.is_empty() || options.len() > 64 || options.iter().any(|o| o.is_empty() || o.len() > 64 || o.chars().any(char::is_control)) {
-                        return Err(Error::Manifest(format!("parameter `{k}`: choices must be 1-64 non-empty, printable strings")));
+                    // Pixel filters: the parameter notation (`params_notation`) separates choices
+                    // with `|` inside quotes.
+                    let bad = |o: &String| match abi {
+                        Abi::Pixel => o.is_empty() || o.contains(['|', '"']),
+                        Abi::Vector => o.is_empty() || o.len() > 64 || o.chars().any(char::is_control),
+                    };
+                    if options.is_empty() || options.len() > 64 || options.iter().any(bad) {
+                        let what = match abi {
+                            Abi::Pixel => "non-empty strings without | or \"",
+                            Abi::Vector => "non-empty, printable strings",
+                        };
+                        return Err(Error::Manifest(format!("parameter `{k}`: choices must be 1-64 {what}")));
                     }
                     if default.as_ref().is_some_and(|d| !options.contains(d)) {
                         return Err(Error::Manifest(format!("parameter `{k}`: default is not one of the options")));
@@ -157,6 +229,32 @@ impl Manifest {
             }
         }
         Ok(())
+    }
+
+    /// The parameter notation PhotoCraft's command registry and generated dialogs use for pixel
+    /// filters (`{"amount":0..100=50,"mode":"a|b","mono":bool=false}`).
+    pub fn params_notation(&self) -> String {
+        let parts: Vec<String> = self
+            .params
+            .iter()
+            .map(|(k, spec)| match spec {
+                ParamSpec::Number { min, max, default } => format!("\"{k}\":{min}..{max}={default}"),
+                ParamSpec::Int { default, .. } => format!("\"{k}\":int={default}"),
+                ParamSpec::Bool { default } => format!("\"{k}\":bool={default}"),
+                ParamSpec::Choice { options, default } => {
+                    // The dialog's default is the first option, so list the default first.
+                    let mut opts = options.clone();
+                    if let Some(d) = default
+                        && let Some(i) = opts.iter().position(|o| o == d)
+                    {
+                        let d = opts.remove(i);
+                        opts.insert(0, d);
+                    }
+                    format!("\"{k}\":\"{}\"", opts.join("|"))
+                }
+            })
+            .collect();
+        format!("{{{}}}", parts.join(","))
     }
 
     /// The parameters documented the way command and effect parameters are
@@ -263,12 +361,13 @@ pub fn valid_id(id: &str) -> bool {
 }
 
 /// `[A-Za-z0-9_]{1,64}`, not starting with `_` and not a key the commands and dialogs use
-/// themselves.
-fn valid_key(k: &str) -> bool {
-    (1..=64).contains(&k.len())
-        && k.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
-        && !k.starts_with('_')
-        && !matches!(k, "id" | "ids" | "params" | "preview")
+/// themselves (each ABI's own, as upstream).
+fn valid_key(k: &str, abi: Abi) -> bool {
+    let reserved = match abi {
+        Abi::Pixel => matches!(k, "id" | "layer"),
+        Abi::Vector => matches!(k, "id" | "ids" | "params" | "preview"),
+    };
+    (1..=64).contains(&k.len()) && k.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') && !k.starts_with('_') && !reserved
 }
 
 #[cfg(test)]
@@ -288,6 +387,20 @@ mod tests {
         assert_eq!(m.params.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["amount", "mode", "mono", "seed"]);
         assert_eq!(m.params_doc(), r#"{amount: 0..100 (50), mode: "soft"|"hard" (hard), mono: bool (false), seed: int 0..9 (0)}"#);
         assert_eq!(Value::Object(m.defaults()), json!({"amount": 50.0, "mode": "hard", "mono": false, "seed": 0}));
+    }
+
+    #[test]
+    fn parses_a_pixel_filter_manifest() {
+        let text = r#"{"id":"org.example.tone","name":"Tone","version":"1.2","kind":"filter",
+            "params":{"amount":{"type":"number","min":0,"max":100,"default":50},
+                      "mode":{"type":"choice","options":["soft","hard"],"default":"hard"},
+                      "mono":{"type":"bool"},"seed":{"type":"int","min":0,"max":9}},
+            "overlap":2,"area":"canvas"}"#;
+        let m = Manifest::parse_for(text.as_bytes(), Abi::Pixel).unwrap();
+        assert_eq!(m.kind, Kind::Filter);
+        assert_eq!(m.overlap, 2);
+        assert_eq!(m.area, Area::Canvas);
+        assert_eq!(m.params_notation(), r#"{"amount":0..100=50,"mode":"hard|soft","mono":bool=false,"seed":int=0}"#);
     }
 
     #[test]
@@ -323,6 +436,34 @@ mod tests {
             assert!(Manifest::parse(bad.as_bytes()).is_err(), "{bad}");
         }
         assert!(Manifest::parse(&[0xff, 0xfe]).is_err());
+        // Each ABI's own rules (PhotoCraft's for pixel filters).
+        for bad in [
+            r#"{"id":"a","name":"x","kind":"effect"}"#,
+            r#"{"id":"a","name":"x","kind":"filter","overlap":100000}"#,
+            r#"{"id":"a","name":"x","kind":"filter","params":{"layer":{"type":"bool"}}}"#,
+            r#"{"id":"a","name":"x","kind":"filter","params":{"c":{"type":"choice","options":["a|b"]}}}"#,
+        ] {
+            assert!(Manifest::parse_for(bad.as_bytes(), Abi::Pixel).is_err(), "{bad}");
+        }
+        assert!(Manifest::parse_for(br#"{"id":"a","name":"x","kind":"filter","params":{"preview":{"type":"bool"}}}"#, Abi::Pixel).is_ok());
+        assert!(Manifest::parse(br#"{"id":"a","name":"x","kind":"filter","params":{"layer":{"type":"bool"}}}"#).is_ok());
+        for bad in [r#"{"id":"a","name":"x","kind":"filter","overlap":-1}"#, r#"{"id":"a","name":"x","kind":"filter","area":"whole"}"#] {
+            assert!(Manifest::parse_for(bad.as_bytes(), Abi::Pixel).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn vector_manifests_ignore_the_pixel_keys_as_upstream_does() {
+        // VectorCraft ignores keys it doesn't know; these loaded upstream and must still load,
+        // with the pixel keys at their defaults (P3-05 review).
+        for text in [
+            r#"{"id":"a","name":"x","kind":"filter","overlap":-1}"#,
+            r#"{"id":"a","name":"x","kind":"filter","area":"whole"}"#,
+            r#"{"id":"a","name":"x","kind":"effect","overlap":1073741824,"area":"canvas"}"#,
+        ] {
+            let m = Manifest::parse(text.as_bytes()).unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!((m.overlap, m.area), (0, Area::Content), "{text}");
+        }
         assert!(Manifest::parse(&vec![b' '; MAX_MANIFEST_BYTES + 1]).is_err());
     }
 }

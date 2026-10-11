@@ -1,5 +1,6 @@
-//! Desaturate: an example VectorCraft object filter plug-in (plug-in ABI v1, see
-//! `docs/plugins.md`).
+//! Desaturate: an example object filter plug-in (vector plug-in ABI v1, see `docs/plugins.md`).
+//! Ported from VectorCraft's example (vectorcraft@8b036df crates/plugins/example) under an
+//! A-Studio id.
 //!
 //! It reads the selected paths as JSON, moves every colour (solid fills and strokes, gradient
 //! stops, freeform gradient points) towards grey by `amount` percent, keeping each colour in its
@@ -8,11 +9,11 @@
 use serde_json::{Value, json};
 
 const MANIFEST: &str = r#"{
-  "id": "org.vectorcraft.example.desaturate",
+  "id": "astudio.example.desaturate",
   "name": "Desaturate",
   "version": "1.0.0",
   "kind": "filter",
-  "author": "VectorCraft contributors",
+  "author": "A-Studio contributors",
   "description": "Moves the colours of the selected paths towards grey; an example of the plug-in ABI.",
   "params": {
     "amount": {"type": "number", "min": 0, "max": 100, "default": 100}

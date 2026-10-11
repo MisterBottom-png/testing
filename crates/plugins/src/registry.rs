@@ -1,7 +1,10 @@
 //! The process-wide set of installed plug-ins.
 //!
-//! Plug-ins are installed per process, not per document: live effects are drawn from every open
-//! document (and from scratch sessions such as previews), and they must find the same plug-ins.
+//! Plug-ins of both ABIs are installed per process, not per document: live effects are drawn
+//! from every open document, and smart filters, filter previews and effect previews run on
+//! scratch sessions, which must find the same plug-ins. Menus list a plug-in by its
+//! [`Plugin::abi`](crate::Plugin::abi) and kind: Filter › Plug-ins the pixel filters, Object ›
+//! Plug-ins the object filters, Effect › Plug-ins the live effects.
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
