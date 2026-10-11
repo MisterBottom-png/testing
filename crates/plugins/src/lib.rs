@@ -1,34 +1,43 @@
 //! # astudio-plugins (L2)
 //!
-//! VectorCraft's plug-ins (`plugins`, ported from vectorcraft@8b036df in P2-14).
+//! One plug-in host for PhotoCraft's and VectorCraft's plug-ins (P3-05): VectorCraft's `plugins`
+//! (ported from vectorcraft@8b036df in P2-14) with PhotoCraft's (photocraft@e5e3e39: pixel
+//! filters, band-wise apply).
 //!
-//! Sandboxed WebAssembly plug-ins for VectorCraft.
+//! Sandboxed WebAssembly plug-ins for A-Studio.
 //!
-//! A plug-in is a WebAssembly module that implements the VectorCraft plug-in ABI (v1, documented
-//! in `docs/plugins.md`). It runs in [`wasmi`], a pure-Rust interpreter, with:
+//! A plug-in is a WebAssembly module that implements one of the two plug-in ABIs (v1, documented
+//! in `docs/plugins.md`), told apart by its exports ([`Abi`]):
+//!
+//! - a **pixel filter** (`pc_*` exports) runs on a layer's pixels. Pixels are handed over as
+//!   interleaved, normalised `f32` samples in the document's own colour model (bit-depth and
+//!   colour-mode agnostic), in horizontal bands so the copy stays bounded. [`Plugin::apply`] runs
+//!   a filter on an [`astudio_raster::Surface`], blending by the selection;
+//! - an **object filter** or a **live effect** (`vc_*` exports) sees the document as JSON
+//!   ([`objects`]): the selected paths and compound paths with their geometry, fills, strokes
+//!   (gradients included) and opacity. An object filter returns the objects to keep, change or add,
+//!   applied to the document as one edit ([`objects::apply_output`]); a live effect ([`effect`])
+//!   rewrites one object's geometry each time it is drawn, from an appearance stack.
+//!
+//! Every module runs in [`wasmi`], a pure-Rust interpreter, with:
 //!
 //! - **no host imports**: no WASI, file system, network, clock or randomness. A module that
 //!   imports anything is rejected;
 //! - an **instruction budget** (fuel) per call, metered in slices so a wall-clock deadline is
 //!   also enforced (native builds), so infinite loops end with an error;
 //! - a **linear-memory cap**, a **recursion-depth cap** and wasmi's strict module limits;
-//! - a **fresh instance per run**, so no state leaks between calls.
+//! - a **fresh instance per run** (per band for pixel filters), so no state leaks between calls.
 //!
 //! Every failure (malformed module, trap, exhausted budget, bad output) is an [`Error`]; nothing
-//! a module does can panic or hang the host.
-//!
-//! Plug-ins see the document as JSON ([`objects`]): the selected paths and compound paths with
-//! their geometry, fills, strokes (gradients included) and opacity. An **object filter** returns
-//! the objects to keep, change or add, applied to the document as one edit
-//! ([`objects::apply_output`]); a **live effect** ([`effect`]) rewrites one object's geometry each
-//! time it is drawn, from an appearance stack. The process-wide [`registry`] holds the installed
-//! plug-ins.
+//! a module does can panic or hang the host. The process-wide [`registry`] holds the installed
+//! plug-ins of both kinds.
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 /// Layer of this crate in the A-Studio layering table (`xtask/src/table.rs`).
 pub const LAYER: &str = "L2";
 
+mod apply;
 pub mod effect;
 pub mod manifest;
 pub mod objects;
@@ -36,8 +45,9 @@ pub mod registry;
 mod runtime;
 pub mod wat;
 
-pub use manifest::{Kind, Manifest, ParamSpec};
-pub use runtime::{ABI_VERSION, Limits, Plugin};
+pub use apply::format_code;
+pub use manifest::{Area, Kind, Manifest, ParamSpec};
+pub use runtime::{ABI_VERSION, Abi, Limits, Plugin};
 
 /// A plug-in error. Every way a module can misbehave ends here, never in a panic.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

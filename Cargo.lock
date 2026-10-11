@@ -462,7 +462,9 @@ version = "0.0.1"
 dependencies = [
  "astudio-color",
  "astudio-geom",
+ "astudio-raster",
  "astudio-vdoc",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
