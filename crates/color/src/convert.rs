@@ -1,6 +1,6 @@
 //! Colour conversions between the document colour models.
 //!
-//! CMYK ↔ RGB goes through the ICC colour management module (`photocraft-cms`) with the
+//! CMYK ↔ RGB goes through the ICC colour management module ([`crate::cms`]) with the
 //! built-in coated CMYK profile and sRGB (relative colorimetric with black point
 //! compensation, Photoshop's default), so CMYK pixels display and accept painted colours the
 //! way a colour-managed editor does. A document's embedded CMYK profile replaces the built-in
@@ -49,7 +49,9 @@ impl CmykSpace {
     fn build(bytes: &[u8]) -> Option<Arc<CmykSpace>> {
         let p = Profile::parse(bytes).ok().filter(|p| p.color_space == ColorSpace::Cmyk)?;
         let coated = Builtin::CoatedCmyk.profile();
-        if p.content_hash() == coated.content_hash() {
+        // PhotoCraft's edition of the coated profile (another description, the same colours) is
+        // the built-in one too (P3-06).
+        if p.content_hash() == coated.content_hash() || crate::cms::builtin::earlier_edition_of(&p) == Some(Builtin::CoatedCmyk) {
             return None;
         }
         let srgb = Builtin::Srgb.profile();

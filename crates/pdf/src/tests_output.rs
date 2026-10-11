@@ -280,6 +280,15 @@ fn the_output_intent_embeds_its_profile_and_trapped_is_written() {
             1
         );
     }
+    // VectorCraft's name for the profile is written under A-Studio's (P3-06).
+    let r = pdf(&d, json!({"output": {"outputIntent": "VectorCraft Generic CMYK (SWOP-like)"}}));
+    output_intent(&r.bytes, None, |oi| {
+        let text = |k: &[u8]| oi.get::<hayro_syntax::object::String<'_>>(k).map(|s| s.as_bytes().to_vec());
+        assert_eq!(text(b"OutputConditionIdentifier").unwrap(), GENERIC_CMYK.as_bytes());
+        assert_eq!(text(b"Info").unwrap(), GENERIC_CMYK.as_bytes());
+        let profile = oi.get::<Stream<'_>>(b"DestOutputProfile").unwrap();
+        assert_eq!(profile.decoded().unwrap().as_ref(), &*cms::icc_bytes(GENERIC_CMYK).unwrap());
+    });
     // A condition identifier alone (a registered printing condition) names no profile; untrapped
     // output says so.
     let r = pdf(&d, json!({"output": {"outputConditionId": "CGATS TR 001"}}));

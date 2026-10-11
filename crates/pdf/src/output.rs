@@ -390,6 +390,8 @@ fn catalog(set: &PdfSettings, cmyk_profile: &str) -> Option<Catalog> {
     if name.is_empty() && set.standard.is_pdfx() {
         name = cmyk_profile;
     }
+    // A profile's earlier name (VectorCraft's) is written under its current one (P3-06).
+    let name = cms::canonical_name(name);
     let intent = (!name.is_empty() || !id.is_empty()).then(|| {
         let profile = cms::profile(name).and_then(|p| match p.kind {
             ProfileKind::Rgb => Some((p.name, 3)),

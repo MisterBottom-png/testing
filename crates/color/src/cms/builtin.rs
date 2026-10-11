@@ -2,7 +2,7 @@
 //! (primaries, white points, transfer functions) and dedicated to the public domain (CC0-1.0),
 //! so documents that embed them carry no licence obligations. See the crate README.
 
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::cms::Intent;
 use crate::cms::curve::{Curve, srgb_trc};
@@ -131,6 +131,22 @@ impl Builtin {
         // `ALL` lists the variants in declaration order (checked by `all_in_declaration_order`),
         // so the discriminant is the cell index.
         CELLS[self as usize].get_or_init(|| build(self))
+    }
+}
+
+/// The built-in profile `p` is an earlier edition of: the same colours under the description an
+/// earlier version (PhotoCraft) gave it (P3-06). Such a profile is the built-in one.
+pub fn earlier_edition_of(p: &Profile) -> Option<Builtin> {
+    Builtin::ALL.into_iter().zip(OLD_DESCRIPTIONS).find_map(|(b, old)| (old == Some(p.description.as_str()) && p.same_colors(b.profile())).then_some(b))
+}
+
+/// `icc`, or the built-in profile's current bytes when `icc` is an earlier edition of it
+/// ([`earlier_edition_of`]), so a document that carried PhotoCraft's edition is re-saved naming
+/// A-Studio with the same colours. Bytes that don't parse are kept as they are.
+pub fn upgrade_icc(icc: &Arc<Vec<u8>>) -> Arc<Vec<u8>> {
+    match Profile::parse(icc).ok().as_ref().and_then(earlier_edition_of) {
+        Some(b) => b.profile().to_bytes(),
+        None => icc.clone(),
     }
 }
 

@@ -576,7 +576,9 @@ impl Loader<'_> {
             resolution_dpi: m.resolution_dpi,
             mode: m.mode,
             depth: m.depth,
-            icc_profile: self.opt_blob(&m.icc_profile)?,
+            // PhotoCraft's edition of a built-in profile is read as A-Studio's (same colours), so a
+            // re-save names A-Studio (P3-06).
+            icc_profile: self.opt_blob(&m.icc_profile)?.map(|b| astudio_color::cms::builtin::upgrade_icc(&b)),
             layers,
             channels,
             guides: m.guides.clone(),
