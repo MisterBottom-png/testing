@@ -14,7 +14,7 @@ use astudio_color::cms::{Builtin, Intent, Profile, Transform};
 
 #[test]
 fn regen_or_check_coated_cmyk() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/profiles/photocraft-coated-cmyk.icc");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/profiles/astudio-coated-cmyk.icc");
     if std::env::var_os("ASTUDIO_REGEN_PROFILES").is_some() {
         let t = std::time::Instant::now();
         let p = astudio_color::cms::synth::coated_cmyk();

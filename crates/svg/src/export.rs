@@ -409,7 +409,9 @@ const BIG: &str = "x=\"-100000\" y=\"-100000\" width=\"200000\" height=\"200000\
 const MASK: &str = "maskUnits=\"userSpaceOnUse\" color-interpolation=\"sRGB\"";
 /// Attribute of an exported opacity mask listing its options that differ from the defaults
 /// (clipping, not inverted): `noclip`, `invert`.
-pub(crate) const MASK_FLAGS: &str = "data-vectorcraft-mask";
+pub(crate) const MASK_FLAGS: &str = "data-astudio-mask";
+/// The attribute VectorCraft wrote the same options in: still read (P3-06).
+pub(crate) const OLD_MASK_FLAGS: &str = "data-vectorcraft-mask";
 
 /// Turn an object name into a valid, readable XML id.
 pub(crate) fn sanitize_id(name: &str) -> String {
@@ -618,13 +620,7 @@ impl Writer<'_> {
             line(2, "</rdf:RDF>");
         }
         if let Some((bytes, hash)) = native {
-            line(
-                2,
-                &format!(
-                    "<vectorcraft:document xmlns:vectorcraft=\"{EDITING_NS}\" hash=\"{hash}\"><![CDATA[{}]]></vectorcraft:document>",
-                    base64_encode(bytes)
-                ),
-            );
+            line(2, &format!("<astudio:document xmlns:astudio=\"{EDITING_NS}\" hash=\"{hash}\"><![CDATA[{}]]></astudio:document>", base64_encode(bytes)));
         }
         line(1, "</metadata>");
     }

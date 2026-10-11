@@ -275,15 +275,17 @@ fn gradient_stops(g: &usvg::BaseGradient, marks: Option<&[Option<f32>]>) -> Vec<
 /// The options [`crate::export::MASK_FLAGS`] records on exported `<mask>` elements, by mask id:
 /// (clip, invert).
 fn mask_flags(xml: &roxmltree::Document) -> HashMap<String, (bool, bool)> {
-    let attr = crate::export::MASK_FLAGS;
-    if !xml.input_text().contains(attr) {
+    // Ours, then the attribute VectorCraft wrote (P3-06).
+    let attrs = [crate::export::MASK_FLAGS, crate::export::OLD_MASK_FLAGS];
+    if !attrs.iter().any(|a| xml.input_text().contains(a)) {
         return HashMap::new();
     }
     let flags = |n: roxmltree::Node| {
-        let has = |f: &str| n.attribute(attr).is_some_and(|v| v.split_whitespace().any(|x| x == f));
+        let value = attrs.iter().find_map(|a| n.attribute(*a))?;
+        let has = |f: &str| value.split_whitespace().any(|x| x == f);
         Some((n.attribute("id")?.to_string(), (!has("noclip"), has("invert"))))
     };
-    xml.descendants().filter(|n| n.tag_name().name() == "mask" && n.has_attribute(attr)).filter_map(flags).collect()
+    xml.descendants().filter(|n| n.tag_name().name() == "mask").filter_map(flags).collect()
 }
 
 /// Prefix of the ids [`prepass`] gives the elements it has to find again that have none.

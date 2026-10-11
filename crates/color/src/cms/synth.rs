@@ -29,7 +29,9 @@ use crate::cms::math;
 use crate::cms::pipeline::Stage;
 use crate::cms::profile::{ColorSpace, Lut, LutKind, Pcs, Profile, ProfileClass};
 
-pub const DESCRIPTION: &str = "Photocraft Coated CMYK (synthetic, 300% TAC, medium GCR)";
+pub const DESCRIPTION: &str = "A-Studio Coated CMYK (synthetic, 300% TAC, medium GCR)";
+/// The description PhotoCraft gave the same profile; still recognised (P3-06).
+pub const OLD_DESCRIPTION: &str = "Photocraft Coated CMYK (synthetic, 300% TAC, medium GCR)";
 
 /// Parameters of the synthetic profile.
 #[derive(Clone, Debug)]
@@ -443,7 +445,7 @@ pub fn cmyk_profile(p: &CmykParams) -> Profile {
     .with_encoded_bytes()
 }
 
-/// The default coated profile (what `profiles/photocraft-coated-cmyk.icc` contains).
+/// The default coated profile (what `profiles/astudio-coated-cmyk.icc` contains).
 pub fn coated_cmyk() -> Profile {
     cmyk_profile(&CmykParams::default())
 }

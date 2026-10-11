@@ -146,9 +146,10 @@ Where the rest of the gap is:
   engine's built-in profiles store D50 (ICC v4). The other three intents are unchanged; no test
   covered absolute colorimetric (P2-12 adds one: between the built-in D50-white profiles it equals
   relative colorimetric).
-- Built-in profile descriptions still name the upstream apps ("... (Photocraft)", "VectorCraft
-  Generic CMYK (SWOP-like)"). They are written into exported files and used to match profiles
-  again on import, so renaming them is a file-format change: decide with the rebrand work (P3).
+- Built-in profile descriptions name A-Studio since P3-06 ("... (A-Studio)", "A-Studio Coated
+  CMYK", "A-Studio Generic CMYK (SWOP-like)"). The upstream names ("... (Photocraft)", "VectorCraft
+  Generic CMYK (SWOP-like)") stay accepted wherever a profile is looked up by name, so files and
+  settings that name them get the same profile; the coated profile's colour tables are unchanged.
 
 ## Sources
 

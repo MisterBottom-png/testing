@@ -293,6 +293,12 @@ fn editing_data_notices_edits_made_elsewhere() {
     assert!(svg.contains("<![CDATA[") && svg.contains(" hash=\""), "{svg}");
     let e = editing(&svg).unwrap();
     assert!(e.intact && e.data == astudio_svg::base64_encode(b"native bytes"));
+    // A-Studio's namespace; VectorCraft's (same data, inside <metadata>) is still read (P3-06).
+    assert!(svg.contains("<astudio:document xmlns:astudio=\"urn:a-studio:editing\""), "{svg}");
+    let old = svg
+        .replace("astudio:document", "vectorcraft:document")
+        .replace("xmlns:astudio=\"urn:a-studio:editing\"", "xmlns:vectorcraft=\"urn:vectorcraft:editing\"");
+    assert_eq!(editing(&old), Some(e.clone()));
     // Re-indented, with other line endings: still the same picture.
     let reformatted = svg.replace("\n  ", "\r\n\t\t");
     assert!(editing(&reformatted).unwrap().intact);

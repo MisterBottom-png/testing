@@ -20,5 +20,8 @@ fn built_in_presets() {
         assert!(x.settings.standard.is_pdfx() && x.settings.check().is_ok(), "{name}");
     }
     assert_eq!(builtin_preset("default").unwrap().name, DEFAULT_PRESET);
+    // A-Studio's name, and VectorCraft's for the same preset (P3-06).
+    assert_eq!(DEFAULT_PRESET, "A-Studio Default");
+    assert_eq!(builtin_preset("VectorCraft Default").unwrap().name, DEFAULT_PRESET);
     assert!(builtin_preset("Nope").is_none());
 }

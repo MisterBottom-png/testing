@@ -1,5 +1,5 @@
 //! Opacity-mask options survive SVG (M3.87): exported masks list the options that differ from the
-//! defaults in `data-vectorcraft-mask`, and import restores them and the original mask art (without
+//! defaults in `data-astudio-mask`, and import restores them and the original mask art (without
 //! the backdrop rectangle and inverting filter that draw the options in SVG).
 // Integration tests: unwrapping and panicking on failure is fine here, unlike in shipped code (AGENTS.md › Robustness).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -35,13 +35,17 @@ fn an_inverted_unclipped_mask_round_trips() {
     for (clip, invert, attr) in [(false, true, Some("noclip invert")), (true, true, Some("invert")), (false, false, Some("noclip")), (true, false, None)] {
         let s = export(&masked(clip, invert), &ExportOptions::default());
         match attr {
-            Some(a) => assert!(s.contains(&format!("data-vectorcraft-mask=\"{a}\"")), "{s}"),
-            None => assert!(!s.contains("data-vectorcraft-mask"), "{s}"),
+            Some(a) => assert!(s.contains(&format!("data-astudio-mask=\"{a}\"")), "{s}"),
+            None => assert!(!s.contains("data-astudio-mask"), "{s}"),
         }
         let (back, warnings) = import_with_report(&s).unwrap();
         assert!(warnings.is_empty(), "{warnings:?}");
         let [m] = &masks(&back)[..] else { panic!("one masked object: {s}") };
         assert_eq!((m.clip, m.invert), (clip, invert), "{s}");
+        // The attribute VectorCraft wrote is still read (P3-06).
+        let (old, _) = import_with_report(&s.replace("data-astudio-mask", "data-vectorcraft-mask")).unwrap();
+        let [o] = &masks(&old)[..] else { panic!("one masked object") };
+        assert_eq!((o.clip, o.invert), (clip, invert));
         // The original art: one white rectangle, no backdrop and no filter group around it.
         assert!(m.art.path_data().is_some(), "{:?}", m.art.kind);
         let b = m.art.geometric_bounds().unwrap();

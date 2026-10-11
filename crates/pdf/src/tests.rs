@@ -68,7 +68,7 @@ fn metadata_creator_and_title() {
     let mut d = doc(100.0, 100.0);
     d.title = "Poster".into();
     let s = uncompressed(&d);
-    assert!(s.contains("VectorCraft"));
+    assert!(s.contains("A-Studio") && !s.contains("VectorCraft"), "creator and producer name A-Studio (P3-06)");
     assert!(s.contains("Poster"));
 }
 

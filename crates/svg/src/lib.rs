@@ -48,7 +48,7 @@
 //!   artboard, its user units being CSS pixels of it (96 per inch). The document's units follow the
 //!   unit of the root `width` (pixels when it has none).
 //! * `<mask>` imports as a luminance opacity mask; a mask we exported keeps its options and art
-//!   (its `data-vectorcraft-mask="noclip invert"` lists the options that differ from clipping and
+//!   (its `data-astudio-mask="noclip invert"` lists the options that differ from clipping and
 //!   not inverted). Nested clip paths (`<clipPath clip-path>`) are clip groups in clip groups.
 //! * Filters that are a Gaussian blur, a drop shadow (`feDropShadow` or the usual chains of offset,
 //!   blur, flood or colour matrix, composite and merge), a glow or a feather (as we export them)
@@ -338,7 +338,9 @@ pub fn export_full(doc: &Document, opts: &ExportOptions, native: Option<&[u8]>) 
 }
 
 /// The XML namespace of the editing data [`ExportOptions::preserve_editing`] embeds.
-pub const EDITING_NS: &str = "urn:vectorcraft:editing";
+pub const EDITING_NS: &str = "urn:a-studio:editing";
+/// The namespace VectorCraft wrote the same data in: still read (P3-06).
+pub const OLD_EDITING_NS: &str = "urn:vectorcraft:editing";
 
 /// The native document an SVG carries ([`ExportOptions::preserve_editing`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -353,12 +355,13 @@ pub struct Editing {
 
 /// The native document an SVG carries, if any, and whether the SVG was edited since.
 pub fn editing(svg: &str) -> Option<Editing> {
-    if !svg.contains(EDITING_NS) {
+    if !svg.contains(EDITING_NS) && !svg.contains(OLD_EDITING_NS) {
         return None;
     }
     let opts = usvg::roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() };
     let xml = usvg::roxmltree::Document::parse_with_options(svg, opts).ok()?;
-    let el = xml.descendants().find(|n| n.tag_name().namespace() == Some(EDITING_NS) && n.tag_name().name() == "document")?;
+    let ours = |ns: Option<&str>| ns == Some(EDITING_NS) || ns == Some(OLD_EDITING_NS);
+    let el = xml.descendants().find(|n| ours(n.tag_name().namespace()) && n.tag_name().name() == "document")?;
     let data: String = el.children().filter_map(|c| c.text()).flat_map(|t| t.chars().filter(|c| !c.is_whitespace())).collect();
     if data.is_empty() {
         return None;
