@@ -74,7 +74,7 @@ mod print;
 mod settings;
 mod syntax;
 
-pub use editing::{EDITING_FILE, Editing, LEGACY_EDITING_FILES, editing, editing_with};
+pub use editing::{EDITING_FILE, Editing, LEGACY_EDITING_FILE, LEGACY_EDITING_FILES, editing, editing_with};
 pub use encrypt::Encryption;
 pub use export::{export, export_with_report, page_areas};
 pub use import::{import, import_with_report};

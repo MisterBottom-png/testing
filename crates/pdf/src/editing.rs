@@ -16,7 +16,9 @@ use crate::lab_spot::find;
 pub const EDITING_FILE: &str = "astudio-editing-data.vectorcraft";
 /// The editing file's earlier names, still read: VectorCraft's (P3-06), and its name from before
 /// that project was renamed.
-pub const LEGACY_EDITING_FILES: [&str; 2] = ["vectorcraft-editing.vectorcraft", "drawcraft-editing.drawcraft"];
+pub const LEGACY_EDITING_FILES: [&str; 2] = [LEGACY_EDITING_FILE, "drawcraft-editing.drawcraft"];
+/// The name VectorCraft wrote (the first of [`LEGACY_EDITING_FILES`]; VectorCraft's API name).
+pub const LEGACY_EDITING_FILE: &str = "vectorcraft-editing.vectorcraft";
 
 /// The editing file's description: this text, then the hash of the pages (read back by what
 /// follows `hash `, so older descriptions still work).
