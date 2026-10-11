@@ -15,7 +15,7 @@ outsider would.
 Check, in this order, and report only real problems:
 1. Panics in non-test code: `unwrap`, `expect`, `panic!`, `unreachable!`, `todo!`, `unimplemented!`,
    slice indexing on data-derived indices, unchecked arithmetic on input sizes, unbounded recursion.
-2. `unsafe` outside `crates/tablet`.
+2. `unsafe` outside `crates/tablet` and the wasm example plug-ins in `crates/plugins/example*`.
 3. Layering: a crate using a same- or higher-layer crate, or UI crates below L6.
 4. Behaviour not behind a command; logic inside UI panels.
 5. Code or assets that look copied from GPL projects or Adobe; ArtCraft names, links or `ai.storyteller` ids

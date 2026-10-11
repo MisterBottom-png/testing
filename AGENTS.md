@@ -15,7 +15,10 @@ pixel-and-vector editor. Read `docs/00-decisions.md` and `docs/02-architecture.m
   tests. Use `?`, `ok_or`, `let … else`. Use `.get(i)` for indices that come from data. Cap sizes read
   from files. Every crash fix comes with a test that panicked before.
 - **No `unsafe`**, except `astudio-tablet` on Windows (pen input through Wintab / Windows Ink), each block
-  with a `SAFETY:` comment.
+  with a `SAFETY:` comment. Also allowed (owner, 11 October 2026): the WebAssembly example plug-ins in
+  `crates/plugins/example*`, which read the blocks the host hands them through raw pointers. They are
+  built outside the workspace, never part of the app, and run sandboxed; each entry point keeps its
+  `# Safety` contract and each block its `SAFETY:` comment.
 - **Everything is a command.** User-visible behaviour = a command in `astudio-engine` (id, label, menu
   path, shortcut, params doc, `enabled`, `run`) plus tests. The UI, CLI, control channel and MCP call commands by id.
 - **Layers.** A crate depends only on lower layers (`cargo run -p xtask -- layers`). Nothing below L6 uses egui, eframe, winit or rfd.
