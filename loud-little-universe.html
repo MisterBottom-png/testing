@@ -30,13 +30,15 @@ body{
 .asleep .bar{opacity:0; transform:translateY(-10px); pointer-events:none}
 .asleep .deck{opacity:0; transform:translateY(14px); pointer-events:none}
 .asleep .hint{opacity:0}
+.live .bar,.live .deck,.live .hint{transition-delay:0s; transition-duration:.5s}
+.far .deck{opacity:0; transform:translateY(14px); pointer-events:none}
 
 .bar{display:flex; align-items:center; justify-content:space-between; gap:12px}
 .name{min-width:0; display:flex; flex-direction:column; gap:2px}
-.mark{margin:0; font-family:var(--display); font-weight:800; font-size:18px; letter-spacing:-.01em; line-height:1.1}
+.mark{margin:0; font-family:var(--display); font-weight:800; font-size:17px; letter-spacing:-.01em; line-height:1.1}
 .stat{margin:0; font-family:var(--data); font-size:11.5px; color:var(--dim); font-variant-numeric:tabular-nums;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.tools{display:flex; gap:8px; flex:none}
+.tools{display:flex; align-items:center; gap:6px; flex:none}
 
 .stage{flex:1; min-height:0; display:flex; flex-direction:column}
 .slot{flex:1; min-height:0}
@@ -54,16 +56,17 @@ body{
 
 button{font:inherit; color:inherit; cursor:pointer; touch-action:manipulation}
 button:focus-visible{outline:2px solid var(--tick); outline-offset:2px}
-.btn,.chip,.round{
+.btn,.chip,.round,.pill{
   box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:6px;
   border:1px solid var(--line); background:rgba(255,255,255,.06); color:var(--ink);
   font-weight:600; white-space:nowrap; transition:transform .12s ease, background .2s ease, opacity .2s ease;
 }
-.btn:active,.chip:active,.round:active{transform:scale(.95)}
+.btn:active,.chip:active,.round:active,.pill:active{transform:scale(.95)}
 .btn{height:44px; padding:0 12px; border-radius:14px; font-size:14px}
 .btn.sq{width:38px; padding:0; font-size:20px; font-weight:500}
 .btn.main{background:var(--ink); color:#151033; border-color:transparent; font-family:var(--display); font-weight:800; font-size:15px}
-.round{width:40px; height:40px; padding:0; border-radius:50%; font-family:var(--display); font-weight:800; font-size:16px}
+.round{width:38px; height:38px; padding:0; border-radius:50%; font-family:var(--display); font-weight:800; font-size:16px}
+.pill{height:38px; padding:0 13px; border-radius:999px; font-family:var(--display); font-weight:800; font-size:13.5px}
 .chip{height:38px; padding:0 4px; border-radius:999px; font-size:13px}
 .chip i{width:9px; height:9px; border-radius:50%; background:var(--c); box-shadow:0 0 10px var(--c); flex:none}
 .chip[aria-pressed="false"]{opacity:.5}
@@ -112,6 +115,7 @@ svg{display:block}
       <p class="stat" id="stat">&nbsp;</p>
     </div>
     <div class="tools">
+      <button class="pill" id="fly" type="button">Fly out</button>
       <button class="round" id="sound" type="button" aria-pressed="true" aria-label="Sound">
         <svg class="i-on" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7v4h3l4 3.2V3.8L5.5 7z" fill="currentColor"/><path d="M12.4 6.4a3.6 3.6 0 0 1 0 5.2M14.4 4.2a6.6 6.6 0 0 1 0 9.6"/></svg>
         <svg class="i-off" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7v4h3l4 3.2V3.8L5.5 7z" fill="currentColor"/><path d="M12.6 6.8l3.6 4.4M16.2 6.8l-3.6 4.4"/></svg>
@@ -164,6 +168,7 @@ svg{display:block}
       <li>Each ring is one sound. The two outer rings play notes.</li>
       <li>Tap the sun to stop and start.</li>
       <li>Drag in the dark to push the stars around.</li>
+      <li>Tap Fly out to see the whole galaxy. Each star is another universe with its own beat. Tap one to fly in.</li>
       <li>No sound? Check that your phone is not on silent.</li>
     </ul>
     <p>Made from scratch for MisterBottom, who builds drum kits. No pictures, no sound files, no borrowed code. Every star and every sound is drawn by the page as you watch.</p>
@@ -175,7 +180,9 @@ svg{display:block}
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const cv = $('sky'), g = cv.getContext('2d');
+const cv = $('sky'), mg = cv.getContext('2d');
+let g = mg;
+const sysCv = document.createElement('canvas'), sysG = sysCv.getContext('2d');
 const app = $('app'), slotEl = $('slot'), wakeBtn = $('wake'), hintEl = $('hint'), statEl = $('stat');
 const rootCss = getComputedStyle(document.documentElement);
 const tok = (n, d) => rootCss.getPropertyValue(n).trim() || d;
@@ -205,19 +212,52 @@ const HUM  = [0, 0, 3, 0, 5, 0, 3, 5, 0, 7, 5, 3, 7, 10, 7, 5];
 const BELL = [12, 7, 10, 15, 12, 17, 10, 7, 19, 12, 15, 10, 17, 12, 22, 15];
 const FIRST = { boom: [0, 6, 8], snap: [4, 12], tick: [0, 2, 4, 6, 8, 10, 12, 14, 15], hum: [0, 6, 8, 11, 14], ring: [2, 5, 9, 14] };
 
+/* ---------- the galaxy: 300 stars, each one a universe grown from its own number ---------- */
+const rng = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const SUNS = [C.sun, '#cfe4ff', '#ffc9a3', '#ffb3c9', '#d6ffe9'];
+const GAL = [];
+(() => {
+  const rnd = rng(77); let tries = 0;
+  while (GAL.length < 300 && tries++ < 8000) {
+    let r, a;
+    if (rnd() < 0.12) { r = Math.sqrt(rnd()) * 0.16; a = rnd() * TAU; }
+    else { const arm = Math.floor(rnd() * 3); r = 0.14 + 0.86 * Math.pow(rnd(), 0.85); a = arm * TAU / 3 + r * 3.4 + (rnd() - 0.5) * (1.25 - r) * 0.95; r += (rnd() - 0.5) * 0.07; }
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (r > 1 || GAL.some(q => Math.hypot(q.x - x, q.y - y) < 0.05)) continue;
+    GAL.push({ x, y, sun: rnd() < 0.4 ? 0 : 1 + Math.floor(rnd() * 4), sz: 0.6 + Math.pow(rnd(), 2) * 1.3, ph: rnd() * TAU, seed: 1000 + GAL.length * 7919 });
+  }
+})();
+let HOME = 0;
+{ let best = 9; GAL.forEach((q, i) => { const d = Math.hypot(q.x - 0.5, q.y - 0.22); if (d < best) { best = d; HOME = i; } }); GAL[HOME].sun = 0; }
+const gsx = new Float32Array(GAL.length), gsy = new Float32Array(GAL.length);
+const ZOOM = 46, FLY = calm ? 0.7 : 1.9;
+
 /* ---------- state ---------- */
 const blank = () => RINGS.map(() => new Array(STEPS).fill(false));
 const fromLists = o => { const p = blank(); RINGS.forEach((r, i) => (o[r.id] || []).forEach(s => { p[i][s] = true; })); return p; };
-const state = { pat: fromLists(FIRST), bpm: 96, mute: RINGS.map(() => false), sound: true };
+const state = { pat: fromLists(FIRST), bpm: 96, key: 0, mute: RINGS.map(() => false), sound: true };
+let cur = HOME, dirty = false;
+const store = {}, names = {};
+const validPat = p => Array.isArray(p) && p.length === NR && p.every(r => Array.isArray(r) && r.length === STEPS);
+const keep = u => ({ pat: u.pat.map(r => r.map(Boolean)), bpm: clamp(Math.round(+u.bpm || 96), 60, 160) });
+function universe(i) {
+  const rnd = rng(GAL[i].seed);
+  const u = i === HOME ? { pat: fromLists(FIRST), bpm: 96, key: 0 } : { pat: genBeat(rnd), bpm: 76 + Math.floor(rnd() * 15) * 4, key: Math.floor(rnd() * 9) - 4 };
+  if (store[i]) { u.pat = store[i].pat.map(r => r.slice()); u.bpm = store[i].bpm; }
+  return u;
+}
+function enter(i) { const u = universe(i); cur = i; dirty = !!store[i]; state.pat = u.pat; state.bpm = u.bpm; state.key = u.key; }
+function snapshot() { if (dirty) { store[cur] = keep(state); delete names[cur]; } return { store, cur, mute: state.mute, sound: state.sound }; }
 const KEY = 'loud-little-universe-1';
 function adopt(d) {
   if (!d || typeof d !== 'object') return;
-  if (Array.isArray(d.pat) && d.pat.length === NR && d.pat.every(r => Array.isArray(r) && r.length === STEPS)) state.pat = d.pat.map(r => r.map(Boolean));
-  if (Number.isFinite(d.bpm)) state.bpm = clamp(Math.round(d.bpm), 60, 160);
+  if (d.store && typeof d.store === 'object') { for (const k in d.store) { const u = d.store[k]; if (GAL[+k] && u && validPat(u.pat)) store[+k] = keep(u); } }
+  else if (validPat(d.pat)) store[HOME] = keep(d);
+  if (Number.isInteger(d.cur) && GAL[d.cur]) cur = d.cur;
   if (Array.isArray(d.mute) && d.mute.length === NR) state.mute = d.mute.map(Boolean);
   if (typeof d.sound === 'boolean') state.sound = d.sound;
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) {} }
 function load() { try { adopt(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) {} }
 
 let awake = false, playing = true, pausedAt = 0;
@@ -228,13 +268,14 @@ const flash = RINGS.map(() => new Array(STEPS).fill(-9));
 const wob = RINGS.map(() => 0);
 const ghosts = [], waves = [], sparks = [];
 let kickEnv = 0, ringsA = 0.3, titleMix = 1, spin = 0;
-let ptr = null, hover = null, hoverPt = null, edits = { add: 0, del: 0, sky: 0 };
+let ptr = null, hover = null, hoverPt = null, edits = { add: 0, del: 0, sky: 0, fly: 0 };
+let view = 0, flying = 0, far = false, galSpin = 0, galHover = -1, bgOld = null, bgFade = 0;
 
 /* ---------- layout ---------- */
 let W = 1, H = 1, dpr = 1, cx = 0, cy = 0, R = 100, sunR = 15, bg = null;
 const ringR = [0, 0, 0, 0, 0];
 const glow = [];
-let glowSun = null;
+let glowSun = null, sunCol = C.sun, sunEdge = C.sun;
 
 function makeGlow(hex) {
   const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -243,7 +284,8 @@ function makeGlow(hex) {
   k.fillStyle = gr; k.fillRect(0, 0, 128, 128); return c;
 }
 RINGS.forEach(r => { glow.push(makeGlow(r.color)); r.shade = mix(r.color, C.deep, 0.62); });
-glowSun = makeGlow(C.sun);
+const sunGlows = SUNS.map(makeGlow);
+function applyLook() { const k = GAL[cur].sun; sunCol = SUNS[k]; glowSun = sunGlows[k]; sunEdge = cur === HOME ? RINGS[1].color : mix(sunCol, RINGS[1].color, 0.3); }
 
 function paintBg() {
   bg = document.createElement('canvas'); bg.width = Math.ceil(W / 2); bg.height = Math.ceil(H / 2);
@@ -252,7 +294,8 @@ function paintBg() {
   base.addColorStop(0, C.haze); base.addColorStop(0.45, C.sky); base.addColorStop(1, C.deep);
   k.fillStyle = base; k.fillRect(0, 0, W, H);
   k.globalCompositeOperation = 'lighter';
-  const blobs = [[0.12, 0.18, 0.6, RINGS[3].color, 0.17], [0.92, 0.3, 0.5, RINGS[2].color, 0.08], [0.78, 0.9, 0.6, RINGS[0].color, 0.1], [0.08, 0.86, 0.45, RINGS[4].color, 0.05], [0.55, 0.04, 0.4, RINGS[1].color, 0.045]];
+  const look = rng(GAL[cur].seed + 5);
+  const blobs = cur !== HOME ? Array.from({ length: 5 }, () => [look(), look(), 0.4 + look() * 0.3, RINGS[Math.floor(look() * NR)].color, 0.05 + look() * 0.11]) : [[0.12, 0.18, 0.6, RINGS[3].color, 0.17], [0.92, 0.3, 0.5, RINGS[2].color, 0.08], [0.78, 0.9, 0.6, RINGS[0].color, 0.1], [0.08, 0.86, 0.45, RINGS[4].color, 0.05], [0.55, 0.04, 0.4, RINGS[1].color, 0.045]];
   const m = Math.max(W, H);
   for (const [fx, fy, fr, col, a] of blobs) {
     const x = fx * W, y = fy * H, r = fr * m, gr = k.createRadialGradient(x, y, 0, x, y, r);
@@ -266,12 +309,13 @@ function layout() {
   W = Math.max(1, b.width); H = Math.max(1, b.height);
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  sysCv.width = cv.width; sysCv.height = cv.height;
   const s = slotEl.getBoundingClientRect();
   cx = s.left - b.left + s.width / 2; cy = s.top - b.top + s.height / 2;
   R = clamp(Math.min(s.width, s.height) / 2 - 8, 80, 340);
   sunR = R * 0.15;
   for (let i = 0; i < NR; i++) ringR[i] = R * (0.36 + 0.16 * i);
-  paintBg(); makeStars();
+  applyLook(); paintBg(); makeStars();
 }
 
 /* ---------- stars ---------- */
@@ -357,7 +401,7 @@ function stepStars(now, f) {
   }
 }
 
-function drawStars(now) {
+function drawStars(now, dim) {
   g.globalCompositeOperation = 'lighter';
   const sun2 = (sunR * 1.5) * (sunR * 1.5);
   for (let c = 0; c < 5; c++) {
@@ -368,10 +412,10 @@ function drawStars(now) {
       let a = (0.3 + 0.7 * sdp[i]) * (0.62 + 0.38 * Math.sin(now * (0.8 + sdp[i] * 2.2) + sph[i]));
       let sz = ssz[i];
       if (sTitle[i] && titleMix > 0.001) { a = lerp(a, 1, titleMix); sz = lerp(sz, Math.max(sz, dotSize), titleMix); }
-      else if (awake) { const dx = x - cx, dy = y - cy; if (dx * dx + dy * dy < sun2) continue; }
+      else if (awake && view === 0) { const dx = x - cx, dy = y - cy; if (dx * dx + dy * dy < sun2) continue; }
       const sp = Math.abs(svx[i]) + Math.abs(svy[i]);
       if (sp > 0.6) a = Math.min(1, a + sp * 0.06);
-      g.globalAlpha = a;
+      g.globalAlpha = a * dim;
       g.fillRect(x - sz / 2, y - sz / 2, sz, sz);
     }
   }
@@ -379,15 +423,17 @@ function drawStars(now) {
 }
 
 /* ---------- sound (all made here, no files) ---------- */
-let ac = null, master = null, verb = null, noiseBuf = null, snapSend = null, ringSend = null;
+let ac = null, master = null, muff = null, outG = null, verb = null, noiseBuf = null, snapSend = null, ringSend = null;
 function initAudio() {
   if (ac) return;
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   try { ac = new AC({ latencyHint: 'interactive' }); } catch (e) { try { ac = new AC(); } catch (e2) { ac = null; return; } }
-  master = ac.createGain(); master.gain.value = state.sound ? 0.85 : 0;
+  master = ac.createGain(); master.gain.value = 0.85;
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -14; comp.knee.value = 18; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.18;
-  master.connect(comp); comp.connect(ac.destination);
+  muff = ac.createBiquadFilter(); muff.type = 'lowpass'; muff.frequency.value = 18000; muff.Q.value = 0.5;
+  outG = ac.createGain(); outG.gain.value = state.sound ? 1 : 0;
+  master.connect(muff); muff.connect(outG); outG.connect(comp); comp.connect(ac.destination);
   const sr = ac.sampleRate;
   noiseBuf = ac.createBuffer(1, sr, sr);
   const nd = noiseBuf.getChannelData(0); for (let i = 0; i < sr; i++) nd[i] = Math.random() * 2 - 1;
@@ -425,14 +471,14 @@ const VOICE = [
     n.connect(h); h.connect(e); e.connect(master);
   },
   function hum(t, v, s) {
-    const f = 110 * Math.pow(2, HUM[s] / 12);
+    const f = 110 * Math.pow(2, (HUM[s] + state.key) / 12);
     const o = osc('sawtooth', f, t, 0.5), lp = filt('lowpass', 1200, 3), e = shape(t, 0.3 * v, 0.004, 0.34);
     lp.frequency.setValueAtTime(1200, t); lp.frequency.exponentialRampToValueAtTime(260, t + 0.22);
     o.connect(lp); lp.connect(e); e.connect(master);
     const o2 = osc('sine', f, t, 0.5), e2 = shape(t, 0.3 * v, 0.004, 0.32); o2.connect(e2); e2.connect(master);
   },
   function ring(t, v, s) {
-    const f = 220 * Math.pow(2, BELL[s] / 12);
+    const f = 220 * Math.pow(2, (BELL[s] + state.key) / 12);
     [[1, 0.2, 1.3], [2.76, 0.08, 0.5], [5.4, 0.035, 0.18]].forEach(([m, p, d]) => {
       const o = osc('sine', f * m, t, d + 0.1), e = shape(t, p * v, 0.002, d); o.connect(e); e.connect(master); e.connect(ringSend);
     });
@@ -446,6 +492,12 @@ function bang(t) {
   n.connect(lp); lp.connect(e2); e2.connect(master); e2.connect(snapSend);
   [0, 4, 8, 3, 13].forEach((s, i) => VOICE[4](t + 0.05 + i * 0.075, 0.8, s));
 }
+function whoosh(t, up) {
+  const n = hiss(t, 2), b = filt('bandpass', up ? 260 : 2800, 1.4), e = shape(t, 0.13, 0.6, 1.2);
+  b.frequency.setValueAtTime(up ? 260 : 2800, t); b.frequency.exponentialRampToValueAtTime(up ? 2800 : 260, t + 1.6);
+  n.connect(b); b.connect(e); e.connect(outG);
+}
+function muffle(on) { if (muff) muff.frequency.setTargetAtTime(on ? 520 : 18000, ac.currentTime, on ? 0.3 : 0.55); }
 function play(r, s, t, v) { if (!ac || state.mute[r]) return; try { VOICE[r](t, v, s); } catch (e) {} }
 
 /* ---------- the loop ---------- */
@@ -485,6 +537,7 @@ function addSparks(x, y, n, col, speed, now, comet) {
 function onHit(r, s, now) {
   if (!state.pat[r][s]) return;
   flash[r][s] = now;
+  if (view > 0.15) { if (r === 0) kickEnv = 1; return; }
   const a = slotAngle(s), x = cx + Math.cos(a) * ringR[r], y = cy + Math.sin(a) * ringR[r], col = RINGS[r].color;
   if (r === 0) { kickEnv = 1; wob[0] = 3.5; addWave(x, y, 0.3, 520, 70, 1.1, col, now); addSparks(x, y, 10, col, 150, now); }
   else if (r === 1) { wob[1] = 2.6; addWave(x, y, 0.17, 640, 46, 0.7, col, now); addSparks(x, y, 8, col, 190, now); }
@@ -496,7 +549,7 @@ function onHit(r, s, now) {
 /* ---------- editing ---------- */
 function setCell(r, s, on, now, quiet) {
   if (state.pat[r][s] === on) return;
-  state.pat[r][s] = on;
+  state.pat[r][s] = on; dirty = true;
   const a = slotAngle(s), x = cx + Math.cos(a) * ringR[r], y = cy + Math.sin(a) * ringR[r];
   if (on) {
     born[r][s] = now - 0.45; flash[r][s] = now; edits.add++;
@@ -513,10 +566,13 @@ function hit(x, y) {
   let a = Math.atan2(dy, dx) + Math.PI / 2; a = ((a % TAU) + TAU) % TAU;
   return { r, s: Math.round(a / TAU * STEPS) % STEPS };
 }
+function starAt(x, y) { const reach = clamp(R * 0.2, 34, 64); let best = -1, bd = reach * reach; for (let i = 0; i < GAL.length; i++) { const dx = gsx[i] - x, dy = gsy[i] - y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } } return best; }
 const pos = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
 cv.addEventListener('pointerdown', e => {
-  if (!awake) return;
-  const [x, y] = pos(e), now = T(), h = hit(x, y);
+  if (!awake || flying) return;
+  const [x, y] = pos(e), now = T();
+  if (far) { const i = starAt(x, y); if (i >= 0) flyIn(i); return; }
+  const h = hit(x, y);
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
   ptr = { x, y, mode: 'none', paint: false, last: '' };
   if (h && h.sun) togglePlay();
@@ -529,7 +585,10 @@ cv.addEventListener('pointermove', e => {
   if (ptr) {
     ptr.x = x; ptr.y = y;
     if (ptr.mode === 'paint') { const h = hit(x, y); if (h && !h.sun) { const key = h.r + ':' + h.s; if (key !== ptr.last) { ptr.last = key; setCell(h.r, h.s, ptr.paint, T()); } } }
-  } else if (awake && e.pointerType === 'mouse') { const h = hit(x, y); hover = h && !h.sun ? h : null; cv.style.cursor = h ? 'pointer' : 'default'; }
+  } else if (awake && e.pointerType === 'mouse') {
+    if (far) { galHover = starAt(x, y); cv.style.cursor = galHover >= 0 ? 'pointer' : 'default'; }
+    else if (!flying) { const h = hit(x, y); hover = h && !h.sun ? h : null; cv.style.cursor = h ? 'pointer' : 'default'; }
+  }
 });
 const lift = () => { if (ptr) { ptr = null; save(); } };
 cv.addEventListener('pointerup', lift); cv.addEventListener('pointercancel', lift);
@@ -537,24 +596,29 @@ cv.addEventListener('pointerleave', () => { hover = null; });
 window.addEventListener('pointermove', e => { hoverPt = e.pointerType === 'mouse' ? { x: e.clientX, y: e.clientY } : null; }, { passive: true });
 
 /* ---------- controls ---------- */
-const chips = [...document.querySelectorAll('.chip')];
-function nameOf() {
+const chips = [...document.querySelectorAll('.chip')], flyBtn = $('fly');
+const starName = i => i === cur ? nameOf(state.pat)[0] : (names[i] || (names[i] = nameOf(universe(i).pat)[0]));
+function nameOf(pat) {
   let h = 2166136261, n = 0;
-  for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) { const b = state.pat[r][s] ? 1 : 0; n += b; h ^= b + 1 + r; h = Math.imul(h, 16777619) >>> 0; }
+  for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) { const b = pat[r][s] ? 1 : 0; n += b; h ^= b + 1 + r; h = Math.imul(h, 16777619) >>> 0; }
   if (!n) return ['Empty sky', 0];
   const sy = ['ka', 'lo', 'mi', 'ru', 've', 'zo', 'na', 'ti', 'su', 'ha', 'be', 'yo', 'ar', 'el', 'um', 'ix'];
   let w = sy[h & 15] + sy[(h >>> 4) & 15] + ((h >>> 8) & 1 ? sy[(h >>> 9) & 15] : '');
   return [w[0].toUpperCase() + w.slice(1) + ' ' + ((h >>> 13) % 90 + 10), n];
 }
 function refresh() {
-  const [nm, n] = nameOf();
-  statEl.textContent = `${nm} · ${n} ${n === 1 ? 'planet' : 'planets'}`;
+  const [nm, n] = nameOf(state.pat), out = far || flying > 0;
+  statEl.textContent = out ? `${GAL.length} universes` : `${nm} · ${n} ${n === 1 ? 'planet' : 'planets'}`;
+  flyBtn.textContent = out ? 'Back' : 'Fly out';
   $('bpm').textContent = state.bpm;
   chips.forEach((c, i) => c.setAttribute('aria-pressed', String(!state.mute[i])));
   $('play').setAttribute('aria-pressed', String(playing));
   $('sound').setAttribute('aria-pressed', String(state.sound));
   let msg = '';
-  if (!edits.add) msg = 'Tap a ring to drop a planet';
+  if (out) msg = 'Each star is a universe. Tap one to fly in';
+  else if (flying < 0) msg = 'Flying to ' + nm;
+  else if (!edits.add) msg = 'Tap a ring to drop a planet';
+  else if (!edits.fly) msg = 'Tap Fly out to see what else is out there';
   else if (!edits.del) msg = 'Tap a planet to take it away';
   else if (!edits.sky) msg = 'Drag in the dark to push the stars';
   if (msg) hintEl.textContent = msg;
@@ -568,16 +632,16 @@ function togglePlay() {
 }
 function setBpm(v) {
   const now = T(), p = (now - origin) / stepDur();
-  state.bpm = clamp(v, 60, 160); origin = now - p * stepDur(); refresh(); save();
+  state.bpm = clamp(v, 60, 160); dirty = true; origin = now - p * stepDur(); refresh(); save();
 }
 function swapPattern(next, now) {
   for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) if (state.pat[r][s]) ghosts.push({ r, s, t0: now });
-  state.pat = next; let n = 0;
+  state.pat = next; dirty = true; let n = 0;
   for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) if (next[r][s]) born[r][s] = now + 0.12 + (n++) * 0.03;
   refresh(); save();
 }
-function newBeat() {
-  const P = blank(), rnd = Math.random, pick = a => a[Math.floor(rnd() * a.length)];
+function genBeat(rnd) {
+  const P = blank(), pick = a => a[Math.floor(rnd() * a.length)];
   pick([[0, 8], [0, 6, 8], [0, 4, 8, 12], [0, 7, 8, 10], [0, 3, 8, 11], [0, 6, 10], [0, 8, 10, 14], [0, 5, 8, 13]]).forEach(s => { P[0][s] = true; });
   P[1][4] = P[1][12] = true;
   if (rnd() < 0.4) P[1][pick([7, 9, 15])] = true;
@@ -593,12 +657,44 @@ function newBeat() {
   P[3][0] = true;
   for (let i = 0, n = 1 + Math.floor(rnd() * 3); i < n; i++) P[3][pick([3, 6, 10, 11, 13, 14])] = true;
   for (let i = 0, n = 3 + Math.floor(rnd() * 3); i < n; i++) P[4][pick([0, 2, 3, 4, 6, 8, 9, 10, 12, 14])] = true;
+  return P;
+}
+function newBeat() {
   const now = T();
-  swapPattern(P, now);
+  swapPattern(genBeat(Math.random), now);
   addWave(cx, cy, 0.5, 700, 110, 1.1, C.sun, now); kickEnv = 1.2;
   if (ac) { VOICE[4](ac.currentTime + 0.01, 0.7, 0); VOICE[4](ac.currentTime + 0.09, 0.7, 8); }
 }
 chips.forEach((c, i) => c.addEventListener('click', () => { state.mute[i] = !state.mute[i]; refresh(); save(); }));
+function flyOut() {
+  if (!awake || flying || far) return;
+  flying = 1; hover = null; ptr = null; edits.fly++; app.classList.add('far'); muffle(true);
+  if (ac) whoosh(ac.currentTime + 0.01, true);
+  if (!calm) for (let i = 0; i < N; i++) { const dx = sx[i] - cx, dy = sy[i] - cy, d = Math.hypot(dx, dy) + 0.01, p = 2 + Math.random() * 5; svx[i] -= dx / d * p; svy[i] -= dy / d * p; }
+  refresh();
+}
+function flyIn(i) {
+  if (flying || !far) return;
+  const now = T();
+  if (i !== cur) {
+    save();
+    const p = (now - origin) / stepDur();
+    enter(i);
+    if (playing) origin = now - p * stepDur();
+    queue.length = 0; ghosts.length = 0; waves.length = 0; sparks.length = 0;
+    for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) { born[r][s] = now - 1; flash[r][s] = -9; }
+    bgOld = bg; bgFade = 1; applyLook(); paintBg();
+  }
+  far = false; flying = -1; galHover = -1; cv.style.cursor = 'default'; app.classList.remove('far'); muffle(false);
+  if (ac) whoosh(ac.currentTime + 0.01, false);
+  refresh();
+}
+function arrive(now) {
+  addWave(cx, cy, 0.6, 800, 120, 1.2, sunCol, now); kickEnv = 1.3;
+  if (ac) { VOICE[4](ac.currentTime + 0.01, 0.6, 0); VOICE[4](ac.currentTime + 0.1, 0.6, 5); }
+  refresh(); save();
+}
+flyBtn.addEventListener('click', () => { if (far) flyIn(cur); else flyOut(); });
 $('play').addEventListener('click', togglePlay);
 $('fresh').addEventListener('click', newBeat);
 $('wipe').addEventListener('click', () => { swapPattern(blank(), T()); });
@@ -606,7 +702,7 @@ $('slower').addEventListener('click', () => setBpm(state.bpm - 4));
 $('faster').addEventListener('click', () => setBpm(state.bpm + 4));
 $('sound').addEventListener('click', () => {
   state.sound = !state.sound;
-  if (master) master.gain.setTargetAtTime(state.sound ? 0.85 : 0, ac.currentTime, 0.03);
+  if (outG) outG.gain.setTargetAtTime(state.sound ? 1 : 0, ac.currentTime, 0.03);
   refresh(); save();
 });
 const help = $('help'), helpBtn = $('helpBtn');
@@ -616,7 +712,7 @@ $('helpClose').addEventListener('click', () => showHelp(false));
 help.addEventListener('click', e => { if (e.target === help) showHelp(false); });
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !help.hidden) showHelp(false);
-  else if (e.key === ' ' && awake && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); togglePlay(); }
+  else if (e.key === ' ' && awake && view === 0 && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); togglePlay(); }
 });
 
 /* ---------- waking up ---------- */
@@ -636,6 +732,7 @@ function wake() {
   for (let r = 0; r < NR; r++) for (let s = 0; s < STEPS; s++) if (state.pat[r][s]) born[r][s] = now + 0.25 + (n++) * 0.035;
   nextStep = Math.ceil((now - origin) / stepDur()) + 6; queue.length = 0; playing = true;
   if (ac) bang(ac.currentTime + 0.03);
+  setTimeout(() => app.classList.add('live'), 1800);
   refresh();
 }
 wakeBtn.addEventListener('click', wake);
@@ -657,11 +754,71 @@ function drawPlanet(r, s, x, y, rad, k, alpha, now) {
 }
 
 function draw(now, dt, phase) {
+  g = mg;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   g.drawImage(bg, 0, 0, W, H);
+  if (bgFade > 0 && bgOld) { g.globalAlpha = bgFade; g.drawImage(bgOld, 0, 0, W, H); g.globalAlpha = 1; bgFade -= dt * 1.1; }
+  const e = view * view * (3 - 2 * view);
   const z = calm ? 1 : 1 + 0.014 * kickEnv;
-  g.translate(cx, cy); g.scale(z, z); g.translate(-cx, -cy);
+  g.save(); g.translate(cx, cy); g.scale(z, z); g.translate(-cx, -cy); drawStars(now, 1 - 0.5 * e); g.restore();
+
+  // where the camera is: 0 = inside one universe, 1 = the whole galaxy
+  const cs = Math.cos(galSpin), sn = Math.sin(galSpin), cq = GAL[cur];
+  const cpx = cq.x * cs - cq.y * sn, cpy = cq.x * sn + cq.y * cs;
+  const scale = R * Math.pow(ZOOM, 1 - e), sx0 = cx + cpx * R * e, sy0 = cy + cpy * R * e;
+  const sysScale = Math.pow(ZOOM, -e), sysA = clamp((sysScale - 0.045) / 0.3, 0, 1);
+  if (e > 0.02) drawGalaxy(now, e, cs, sn, cpx, cpy, scale, sx0, sy0, sysA);
+  if (sysA <= 0) return;
+  if (view === 0) { g.save(); g.translate(cx, cy); g.scale(z, z); g.translate(-cx, -cy); drawSystem(now, dt, phase); g.restore(); return; }
+  g = sysG; g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.clearRect(0, 0, sysCv.width, sysCv.height);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.translate(sx0, sy0); g.scale(sysScale * z, sysScale * z); g.translate(-cx, -cy);
+  drawSystem(now, dt, phase);
+  g = mg; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = sysA; g.drawImage(sysCv, 0, 0, W, H); g.globalAlpha = 1;
+}
+
+function drawGalaxy(now, e, cs, sn, cpx, cpy, scale, sx0, sy0, sysA) {
+  const galA = clamp((e - 0.1) / 0.45, 0, 1), grow = Math.pow(scale / R, 0.55);
+  g.globalCompositeOperation = 'lighter';
+  const hx = sx0 - cpx * scale, hy = sy0 - cpy * scale, hs = scale * 2.4;
+  if (hs < 5000) {
+    g.globalAlpha = 0.2 * galA; g.drawImage(sunGlows[1], hx - hs / 2, hy - hs / 2, hs, hs);
+    g.globalAlpha = 0.34 * galA; g.drawImage(sunGlows[0], hx - hs * 0.16, hy - hs * 0.16, hs * 0.32, hs * 0.32);
+  }
+  g.fillStyle = '#ffffff';
+  for (let i = 0; i < GAL.length; i++) {
+    const q = GAL[i], rx = q.x * cs - q.y * sn, ry = q.x * sn + q.y * cs;
+    const x = sx0 + (rx - cpx) * scale, y = sy0 + (ry - cpy) * scale;
+    gsx[i] = x; gsy[i] = y;
+    if (x < -60 || y < -60 || x > W + 60 || y > H + 60) continue;
+    let ga = galA * (0.72 + 0.28 * Math.sin(now * (1 + q.sz) + q.ph)), sz = q.sz;
+    if (i === cur) { ga = Math.min(1, galA * 1.4) * (1 - sysA); sz = 1.7 + 0.9 * Math.min(1, kickEnv); }
+    if (ga <= 0.01) continue;
+    const gs = (7 + sz * 9) * grow, c = Math.max(1.2, sz * 1.3 * Math.sqrt(grow));
+    g.globalAlpha = ga * 0.9; g.drawImage(sunGlows[q.sun], x - gs / 2, y - gs / 2, gs, gs);
+    g.globalAlpha = ga; g.fillRect(x - c / 2, y - c / 2, c, c);
+  }
+  const la = clamp((e - 0.8) / 0.2, 0, 1);
+  if (la > 0) {
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    g.font = `600 12px ${tok('--body', 'system-ui, sans-serif')}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const mark = (i, text, col, pulse) => {
+      const x = gsx[i], y = gsy[i], below = y < H - 70;
+      g.strokeStyle = rgba(col, 0.85 * la); g.lineWidth = 1.4; circle(x, y, 10 + pulse); g.stroke();
+      g.fillStyle = rgba(C.deep, 0.6 * la); const tw = g.measureText(text).width + 12, ty = y + (below ? 25 : -25);
+      g.fillRect(x - tw / 2, ty - 9, tw, 18);
+      g.fillStyle = rgba(C.ink, 0.95 * la); g.fillText(text, clamp(x, tw / 2 + 4, W - tw / 2 - 4), ty);
+    };
+    if (HOME !== cur) mark(HOME, 'home', C.sun, 0);
+    mark(cur, 'you are here', C.ink, 2 * Math.min(1, kickEnv));
+    if (galHover >= 0 && galHover !== cur && galHover !== HOME) mark(galHover, starName(galHover), SUNS[GAL[galHover].sun], 0);
+  }
+  g.globalAlpha = 1;
+}
+
+function drawSystem(now, dt, phase) {
   g.globalCompositeOperation = 'lighter';
 
   // ripples
@@ -711,12 +868,10 @@ function draw(now, dt, phase) {
   const ss = sunR * 7.5 * sp; g.drawImage(glowSun, cx - ss / 2, cy - ss / 2, ss, ss);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = sa;
   const sg = g.createRadialGradient(cx - sunR * 0.3, cy - sunR * 0.3, sunR * 0.1, cx, cy, sunR * sp);
-  sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.55, C.sun); sg.addColorStop(1, RINGS[1].color);
+  sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.55, sunCol); sg.addColorStop(1, sunEdge);
   g.fillStyle = sg; circle(cx, cy, sunR * sp); g.fill();
   if (awake && !playing) { g.fillStyle = rgba(C.deep, 0.8); g.beginPath(); const q = sunR * 0.42; g.moveTo(cx - q * 0.7, cy - q); g.lineTo(cx + q, cy); g.lineTo(cx - q * 0.7, cy + q); g.closePath(); g.fill(); }
   g.globalAlpha = 1;
-
-  drawStars(now);
 
   // planets
   if (awake) {
@@ -765,6 +920,12 @@ function frame() {
   if (ac) { const m = ac.currentTime - now; if (Math.abs(m - aOff) > 0.05) aOff = m; else aOff += (m - aOff) * 0.02; }
   sequencer(now);
   kickEnv *= Math.exp(-dt * 7);
+  if (flying) {
+    view = clamp(view + flying * dt / FLY, 0, 1);
+    if (flying > 0 && view >= 1) { flying = 0; far = true; refresh(); }
+    else if (flying < 0 && view <= 0) { flying = 0; arrive(now); }
+  }
+  if (view > 0 && !calm) galSpin += dt * 0.012;
   if (awake) { ringsA += (1 - ringsA) * Math.min(1, dt * 2.5); titleMix += (0 - titleMix) * Math.min(1, dt * 1.6); if (!calm) spin += dt * 0.014; }
   stepStars(now, Math.min(dt * 60, 2.5));
   const sd = stepDur(), steps = playing ? (now - origin) / sd : pausedAt;
@@ -774,14 +935,14 @@ function frame() {
 
 /* ---------- start ---------- */
 function start(data) {
-  load(); adopt(data);
+  load(); adopt(data); enter(cur);
   layout(); refresh();
   let rz = 0;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layout, 120); });
   requestAnimationFrame(frame);
 }
 const hot = window.claude && window.claude.hot;
-if (hot && hot.snapshot) hot.snapshot(() => ({ pat: state.pat, bpm: state.bpm, mute: state.mute, sound: state.sound }));
+if (hot && hot.snapshot) hot.snapshot(snapshot);
 if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
 })();
 </script>
