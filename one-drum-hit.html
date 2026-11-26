@@ -1,0 +1,677 @@
+<title>One Drum Hit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one fixed full-screen painting behind the page that changes as you scroll.
+   On top: tall chapters with one huge word each and short lines of text on solid strips, like a gig poster. */
+:root{
+  color-scheme: dark;
+  --lacquer:#140d0a; --skin:#efe4cf; --brass:#e9a93a;
+  --deep:#0f2d52; --ice:#eaf4ff;
+  --coral:#ff6f59; --plum:#2b0b25; --gold:#ffd27a;
+  --night:#0a0a1c; --spark:#ffe14d; --lilac:#efeaff;
+  --blood:#7a1322; --cream:#ffe9d6;
+  --hud-ink:var(--skin); --hud-bg:var(--lacquer);
+  --display:"Avenir Next Condensed","sans-serif-condensed","Roboto Condensed",Impact,"Bahnschrift","Arial Narrow","Liberation Sans Narrow",sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --data:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--lacquer); color:var(--skin); font-family:var(--body); font-size:16px; line-height:1.5; overflow-x:hidden; overflow-x:clip; -webkit-tap-highlight-color:transparent}
+#gl{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0}
+main{position:relative}
+
+.sec{position:relative; color:var(--ink); overflow-x:hidden; overflow-x:clip}
+.nogl .sec{background:var(--bg)}
+.wrap{box-sizing:border-box; max-width:1120px; margin-inline:auto; display:flex; flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hero .wrap{min-height:88vh; padding-block:84px 14vh; gap:16px; align-items:flex-start}
+.ch .wrap{padding-block:52vh 46vh; gap:54vh}
+
+.word{margin:0; font-family:var(--display); font-weight:900; font-stretch:condensed; text-transform:uppercase;
+  font-size:clamp(7rem,40vw,27rem); line-height:.8; letter-spacing:-.02em; color:var(--ink); text-wrap:balance}
+.word i{display:inline-block; font-style:normal; transform-origin:50% 100%; will-change:transform}
+.word .ln{display:block}
+.hero .word{font-size:clamp(5.2rem,27vw,13rem)}
+.hero .word,.now .word{mix-blend-mode:difference}
+.word.small{font-size:clamp(4.6rem,24vw,15rem)}
+
+.plate{margin:0; max-width:21em; font-size:clamp(1.2rem,1rem + 1.1vw,1.7rem); line-height:1.52; font-weight:600}
+.plate span{background:var(--ink); color:var(--bg); padding:.14em .42em; -webkit-box-decoration-break:clone; box-decoration-break:clone}
+.when{margin:0; font-family:var(--data); font-size:.82rem; letter-spacing:.06em; text-transform:uppercase; font-variant-numeric:tabular-nums}
+.when span{background:var(--bg); color:var(--ink); padding:.3em .6em; outline:1.5px solid var(--ink); outline-offset:-1.5px}
+.beat{display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0;
+  opacity:var(--k,1); transform:translateY(calc((1 - var(--k,1)) * 46px))}
+@media (min-width:860px){ .beat.r{align-self:flex-end} }
+
+.hud{position:fixed; top:0; left:0; right:0; z-index:5; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; pointer-events:none;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.hud > *{pointer-events:auto}
+.hud .right{display:flex; gap:6px}
+.tag{box-sizing:border-box; display:inline-flex; align-items:center; min-height:34px; margin:0; padding:0 11px; border:0; background:var(--hud-ink); color:var(--hud-bg);
+  font:800 13px/1 var(--display); letter-spacing:.09em; text-transform:uppercase; text-decoration:none; transition:background .35s, color .35s}
+button.tag{cursor:pointer}
+.clock{font-family:var(--data); font-weight:700; letter-spacing:0; text-transform:none; font-variant-numeric:tabular-nums; gap:.35em}
+.clock b{display:inline-block; min-width:5ch; text-align:right}
+a:focus-visible,button:focus-visible{outline:3px solid var(--brass); outline-offset:2px}
+
+.rail{position:fixed; left:0; right:0; bottom:0; z-index:5; display:flex; justify-content:center; pointer-events:none;
+  padding:0 max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.rail ol{list-style:none; margin:0; padding:0; display:flex; pointer-events:auto; background:var(--hud-ink); transition:background .35s}
+.rail a{display:block; padding:10px 8px; font:800 11px/1 var(--display); letter-spacing:.09em; text-transform:uppercase; text-decoration:none;
+  color:var(--hud-bg); opacity:.55; transition:color .35s, background .35s, opacity .2s}
+.rail a.on{opacity:1; background:var(--hud-bg); color:var(--hud-ink); outline:1.5px solid var(--hud-ink); outline-offset:-1.5px}
+
+.cue{display:inline-flex; align-items:center; gap:10px; margin-top:6px}
+.cue::before{content:""; width:1.5px; height:34px; background:var(--ink); transform-origin:top; animation:drip 1.6s cubic-bezier(.6,0,.3,1) infinite}
+@keyframes drip{0%{transform:scaleY(0)}55%{transform:scaleY(1)}100%{transform:scaleY(1); opacity:0}}
+
+.btns{display:flex; flex-wrap:wrap; gap:10px}
+.go{min-height:52px; padding:0 20px; border:0; cursor:pointer; background:var(--brass); color:var(--lacquer);
+  font:900 1.25rem/1 var(--display); letter-spacing:.06em; text-transform:uppercase; transition:transform .12s}
+.go.alt{background:var(--bg); color:var(--ink); outline:2px solid var(--ink); outline-offset:-2px}
+.go:active{transform:scale(.96)}
+.now .wrap{padding-bottom:16vh; gap:8vh}
+.now .space{height:46vh}
+.replaying .now .wrap > *{opacity:0}
+.stage{position:fixed; inset:0; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; pointer-events:none; text-align:center}
+.stage b{font:900 clamp(5rem,30vw,16rem)/.8 var(--display); text-transform:uppercase; color:var(--hud-ink)}
+.stage span{font-family:var(--data); font-size:1rem; background:var(--hud-ink); color:var(--hud-bg); padding:.3em .7em}
+
+.foot{display:flex; flex-direction:column; gap:14px; max-width:44em; font-size:.92rem; line-height:1.5}
+.foot h3{margin:0; font:800 1rem/1 var(--display); letter-spacing:.09em; text-transform:uppercase}
+.foot ul{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:4px}
+.foot a{color:var(--brass)}
+.foot p{margin:0; opacity:.8}
+.foot > *{background:rgba(20,13,10,.82); padding:10px 12px}
+.foot > ul{padding-left:2em}
+
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .cue::before{animation:none}
+  .beat{opacity:1; transform:none}
+}
+</style>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<div class="hud">
+  <a class="tag" href="#top">One Drum Hit</a>
+  <div class="right">
+    <div class="tag clock" aria-hidden="true"><b id="ms">000.0</b>ms</div>
+    <button class="tag" id="snd" type="button" aria-pressed="true">Sound on</button>
+  </div>
+</div>
+
+<nav class="rail" aria-label="Chapters">
+  <ol>
+    <li><a href="#hit">Hit</a></li><li><a href="#air">Air</a></li><li><a href="#ear">Ear</a></li><li><a href="#hairs">Hairs</a></li>
+    <li><a href="#brain">Brain</a></li><li><a href="#room">Room</a></li><li><a href="#you">You</a></li><li><a href="#now">Now</a></li>
+  </ol>
+</nav>
+
+<div class="stage" id="stage" hidden><b id="stageName">Hit</b><span id="stageTime">0 to 5 ms</span></div>
+
+<main>
+  <header class="sec hero" id="top" data-scene="0" data-base="0" data-t0="0" data-t1="0" style="--bg:var(--lacquer);--ink:var(--skin)">
+    <div class="wrap">
+      <p class="when"><span>A story that lasts 0.17 seconds</span></p>
+      <h1 class="word"><span class="ln">One</span><span class="ln">Drum</span><span class="ln">Hit</span></h1>
+      <p class="plate"><span>A stick comes down. A sixth of a second later, you feel it. A lot happens in between.</span></p>
+      <p class="when cue"><span id="cue">Scroll to slow time down. Tap the drum.</span></p>
+    </div>
+  </header>
+
+  <section class="sec ch" id="hit" data-scene="0" data-base="1" data-t0="0" data-t1="5" style="--bg:var(--skin);--ink:var(--lacquer)">
+    <div class="wrap">
+      <h2 class="word">Hit</h2>
+      <div class="beat"><p class="when"><span>0 ms</span></p><p class="plate"><span>The stick touches the skin. It stays there for about 5 thousandths of a second. That is all the time it gets.</span></p></div>
+      <div class="beat r"><p class="when"><span>2 ms</span></p><p class="plate"><span>The skin does not shake as one piece. It breaks into shapes. Some parts rise while others fall, and the lines between them stay still. Sand would gather on those lines.</span></p></div>
+      <div class="beat"><p class="when"><span>4 ms</span></p><p class="plate"><span>Each shape hums its own note. On a string the notes line up neatly. On a drum they do not: 1, then 1.59, then 2.14, then 2.30. That messy stack is why a drum sounds like a drum.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="air" data-scene="1" data-t0="5" data-t1="10" style="--bg:var(--deep);--ink:var(--ice)">
+    <div class="wrap">
+      <h2 class="word">Air</h2>
+      <div class="beat"><p class="when"><span>5 ms</span></p><p class="plate"><span>The skin shoves the air next to it. That air shoves the air next to it. Nothing travels to you except the shove.</span></p></div>
+      <div class="beat r"><p class="when"><span>7 ms</span></p><p class="plate"><span>The shove moves at 343 metres a second. That is 1,235 km/h, faster than a passenger jet.</span></p></div>
+      <div class="beat"><p class="when"><span>10 ms</span></p><p class="plate"><span>When the stick lifted off, the first shove was already 1.7 metres away. You are standing 3.4 metres from the drum. It reaches you now.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="ear" data-scene="2" data-t0="10" data-t1="15" style="--bg:var(--coral);--ink:var(--plum)">
+    <div class="wrap">
+      <h2 class="word">Ear</h2>
+      <div class="beat"><p class="when"><span>10 ms</span></p><p class="plate"><span>The air taps your eardrum. Behind it, three tiny bones pass the tap along. The last one is the smallest bone in your body, about 3 millimetres long.</span></p></div>
+      <div class="beat r"><p class="when"><span>11 ms</span></p><p class="plate"><span>The bones knock on a tube curled up like a snail shell. Rolled out flat, it would be about 34 millimetres long.</span></p></div>
+      <div class="beat"><p class="when"><span>14 ms</span></p><p class="plate"><span>High sounds stop near the door. Low sounds roll all the way to the middle. The crack of the stick and the boom of the drum land in different places.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="hairs" data-scene="3" data-t0="15" data-t1="17" style="--bg:var(--plum);--ink:var(--gold)">
+    <div class="wrap">
+      <h2 class="word">Hairs</h2>
+      <div class="beat"><p class="when"><span>15 ms</span></p><p class="plate"><span>Along the tube stand about 15,000 hair cells. One row listens. Three rows help.</span></p></div>
+      <div class="beat r"><p class="when"><span>16 ms</span></p><p class="plate"><span>When the wave passes, the hairs bend. Bending opens tiny gates, and the cell fires. Right here, a sound stops being movement and becomes electricity.</span></p></div>
+      <div class="beat"><p class="when"><span>17 ms</span></p><p class="plate"><span>You were born with every hair cell you will ever have. They do not grow back. Loud drums are worth earplugs.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="brain" data-scene="4" data-t0="17" data-t1="30" style="--bg:var(--night);--ink:var(--lilac)">
+    <div class="wrap">
+      <h2 class="word">Brain</h2>
+      <div class="beat"><p class="when"><span>17 ms</span></p><p class="plate"><span>About 30,000 nerve fibres carry the signal out of your ear.</span></p></div>
+      <div class="beat r"><p class="when"><span>20 ms</span></p><p class="plate"><span>It jumps through a chain of stations deep in your head, each one a few thousandths of a second after the last.</span></p></div>
+      <div class="beat"><p class="when"><span>30 ms</span></p><p class="plate"><span>The first cells in the hearing part of your brain fire. You still do not know you heard anything.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="room" data-scene="5" data-t0="30" data-t1="60" style="--bg:var(--blood);--ink:var(--cream)">
+    <div class="wrap">
+      <h2 class="word">Room</h2>
+      <div class="beat"><p class="when"><span>30 ms</span></p><p class="plate"><span>Meanwhile, the same sound has been bouncing off the walls. Those copies took the long way round, so they turn up late.</span></p></div>
+      <div class="beat r"><p class="when"><span>60 ms</span></p><p class="plate"><span>You do not hear them as echoes. Your brain glues them onto the first sound, and uses the delay to feel how big the room is.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch" id="you" data-scene="6" data-t0="60" data-t1="170" style="--bg:var(--lacquer);--ink:var(--cream)">
+    <div class="wrap">
+      <h2 class="word">You</h2>
+      <div class="beat"><p class="when"><span>110 ms</span></p><p class="plate"><span>A big wave of activity sweeps the hearing part of your brain. This is about when you notice the sound.</span></p></div>
+      <div class="beat r"><p class="when"><span>170 ms</span></p><p class="plate"><span>Now you can answer it. Nod. Tap a foot. Hit the next note.</span></p></div>
+      <div class="beat"><p class="plate"><span>Nobody can fully explain the last step, where a shove of air turns into a feeling. But you just had one.</span></p></div>
+    </div>
+  </section>
+
+  <section class="sec ch now" id="now" data-scene="0" data-base="0" data-rate="0" data-t0="170" data-t1="170" style="--bg:var(--lacquer);--ink:var(--skin)">
+    <div class="wrap">
+      <h2 class="word small"><span class="ln">Real</span><span class="ln">speed</span></h2>
+      <div class="beat">
+        <p class="plate"><span>Everything you just read takes about as long as a blink. Here it is with nothing slowed down.</span></p>
+        <div class="btns">
+          <button class="go" id="real" type="button">Hit the drum</button>
+          <button class="go alt" id="slow" type="button">50 times slower</button>
+        </div>
+        <p class="plate" id="after" hidden><span>That was all of it. 0.17 seconds.</span></p>
+      </div>
+      <div class="space" aria-hidden="true"></div>
+      <footer class="foot">
+        <h3>Where the numbers come from</h3>
+        <ul>
+          <li><a href="https://vbn.aau.dk/ws/files/65339564/Dahl_J_AST_review_submi.pdf" target="_blank" rel="noopener">How long a stick touches a drum</a></li>
+          <li><a href="https://en.wikipedia.org/wiki/Vibration_of_a_circular_membrane" target="_blank" rel="noopener">The shapes a drum skin makes, and their notes</a></li>
+          <li><a href="https://en.wikipedia.org/wiki/Stapes" target="_blank" rel="noopener">The smallest bone in the body</a></li>
+          <li><a href="https://www.britannica.com/science/ear/Organ-of-Corti" target="_blank" rel="noopener">Hair cells and nerve fibres</a></li>
+          <li><a href="https://bionumbers.hms.harvard.edu/bionumber.aspx?id=117129" target="_blank" rel="noopener">The length of the snail tube</a></li>
+          <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8776799" target="_blank" rel="noopener">When the first brain cells fire</a></li>
+          <li><a href="https://www.nature.com/articles/s41598-022-05053-w" target="_blank" rel="noopener">The big wave at about 100 ms</a></li>
+          <li><a href="https://en.wikipedia.org/wiki/Precedence_effect" target="_blank" rel="noopener">Why late copies do not sound like echoes</a></li>
+          <li><a href="https://bionumbers.hms.harvard.edu/bionumber.aspx?id=110799" target="_blank" rel="noopener">How fast people react to a sound</a></li>
+        </ul>
+        <p>Times are rounded and assume you stand 3.4 metres from the drum. Made for MisterBottom, who builds drum kits. Every picture and sound on this page is drawn by code as you watch.</p>
+      </footer>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const root = document.documentElement, cv = $('gl');
+
+/* ---------- the painting: one shader, seven scenes ---------- */
+const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes; uniform float uT, uA, uB, uMix, uPA, uPB, uDim; uniform vec2 uPtr; uniform vec3 uHit;
+#define PI 3.14159265
+#define TAU 6.2831853
+vec2 gHit; float gAge; vec2 asp;
+
+float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+vec2 hash2(vec2 p){ float n = hash(p); return vec2(n, hash(p+n+17.1)); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+  return mix(mix(hash(i), hash(i+vec2(1.,0.)), f.x), mix(hash(i+vec2(0.,1.)), hash(i+vec2(1.,1.)), f.x), f.y); }
+float fbm(vec2 p){ float a = .5, s = 0.; for(int i=0;i<4;i++){ s += a*noise(p); p = p*2.03+vec2(7.1,3.3); a *= .5; } return s; }
+float seg(vec2 p, vec2 a, vec2 b){ vec2 pa = p-a, ba = b-a; float h = clamp(dot(pa,ba)/dot(ba,ba), 0., 1.); return length(pa-ba*h); }
+
+/* 0: the drum, seen from above */
+float shape(vec2 d, float k){
+  float r = length(d), th = atan(d.y, d.x);
+  if(k < 0.5) return cos(0.5*PI*r);
+  if(k < 1.5) return sin(PI*r)*cos(th)*1.3;
+  if(k < 2.5) return sin(PI*r)*cos(2.*th)*1.3;
+  if(k < 3.5) return cos(1.5*PI*r);
+  if(k < 4.5) return sin(PI*r)*cos(3.*th)*1.3;
+  return sin(2.*PI*r)*cos(th)*1.3;
+}
+float freq(float k){ return k<0.5 ? 1. : k<1.5 ? 1.59 : k<2.5 ? 2.14 : k<3.5 ? 2.30 : k<4.5 ? 2.65 : 2.92; }
+float drumH(vec2 d, float q, out float nod){
+  float r = length(d);
+  float m = clamp((q-1.08)*5.4, 0., 4.999), k = floor(m), f = smoothstep(0.72, 1., fract(m));
+  float sa = shape(d, k), sb = shape(d, k+1.);
+  float amt = smoothstep(0.9, 1.1, q);
+  float osc = mix(sa*cos(uT*2.2*freq(k)), sb*cos(uT*2.2*freq(k+1.)), f);
+  nod = mix(abs(sa), abs(sb), f);
+  float h = osc*0.55*amt + (1.-amt)*0.06*sin(uT*1.3)*cos(0.5*PI*r);
+  float rd = length(d-gHit), reach = gAge*1.25;
+  h += 0.4*exp(-gAge*2.1)*sin(24.*(rd-reach))*smoothstep(reach+0.02, reach-0.12, rd);
+  h += 0.5*exp(-gAge*3.)*cos(gAge*20.)*cos(0.5*PI*r);
+  return h*(1.-smoothstep(0.9, 1., r));
+}
+vec3 sceneDrum(vec2 p, float q){
+  float z = smoothstep(0.1, 1., q); z *= z;
+  float R = mix(asp.x > asp.y ? 0.40 : 0.36, 1.32, z);
+  vec2 c = (asp.x > asp.y ? vec2(0.3*asp.x, -0.02) : vec2(0., -0.26*asp.y))*(1.-z);
+  vec2 d = (p-c)/R; float r = length(d), th = atan(d.y, d.x);
+  gHit = (uHit.xy-c)/R; gAge = uHit.z;
+  vec3 brass = vec3(0.914, 0.663, 0.227);
+  vec3 col = vec3(0.078, 0.051, 0.039) + 0.022*noise(vec2(p.x*4., p.y*70.));
+  col *= 1.-0.6*exp(-max(r-1.12, 0.)*5.);
+  if(r < 1.){
+    float nod, n2, e = 0.012;
+    float h = drumH(d, q, nod);
+    float hx = drumH(d+vec2(e,0.), q, n2)-h, hy = drumH(d+vec2(0.,e), q, n2)-h;
+    float lit = dot(vec2(hx,hy)/e, vec2(-0.5, 0.6));
+    float grain = noise(d*90.)*0.05 + noise(d*340.)*0.04;
+    col = vec3(0.937, 0.894, 0.812)*(0.9+grain) + lit*0.13 + h*0.06;
+    float sand = smoothstep(0.14, 0.02, nod)*smoothstep(0.95, 1.15, q);
+    float g = step(0.5, hash(floor(gl_FragCoord.xy/1.5)));
+    col = mix(col, vec3(0.11, 0.06, 0.04), sand*g*0.9);
+    col *= 1.-0.4*smoothstep(0.86, 1., r);
+  } else if(r < 1.075){
+    float a = 0.5+0.5*sin(th*2.+0.9);
+    col = brass*(0.45+0.6*a) + pow(a, 12.)*0.5;
+  } else if(r < 1.16){
+    float lug = abs(fract(th/TAU*10.+0.5)-0.5);
+    if(lug < 0.11) col = brass*(0.4+0.25*sin(th*2.+0.9));
+  }
+  return col;
+}
+
+/* 1: air, a field of dots that pass a shove along */
+vec3 sceneAir(vec2 p, float s){
+  vec2 src = vec2(-0.5*asp.x-0.08, -0.5*asp.y-0.08);
+  vec2 you = vec2(0.5*asp.x-0.15, 0.5*asp.y-0.3);
+  float reach = length(you-src), front = s*reach/0.86;
+  vec3 col = mix(vec3(0.035,0.12,0.26), vec3(0.07,0.21,0.38), smoothstep(-0.8, 0.9, p.y/asp.y*2.));
+  float g = 0.036; vec2 id0 = floor(p/g);
+  float dots = 0., hot = 0.;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+    vec2 id = id0+vec2(float(i), float(j));
+    vec2 L = (id+0.5)*g + (hash2(id)-0.5)*g*0.35;
+    vec2 dv = L-src; float dist = length(dv);
+    float x = dist-front;
+    float env = smoothstep(0.03, -0.05, x)*exp(x*2.2);
+    float comp = cos(x*34.)*env;
+    vec2 P = L + dv/dist*sin(x*34.)*env*0.017;
+    vec2 pd = P-uPtr; float pl = length(pd); P += pd/(pl+1e-4)*0.03*smoothstep(0.16, 0., pl);
+    float rad = 0.0045+0.0028*max(comp, 0.);
+    float m = smoothstep(rad, rad-0.003, length(p-P));
+    dots = max(dots, m); hot = max(hot, m*max(comp, 0.));
+  }
+  col += dots*vec3(0.42,0.55,0.7) + hot*vec3(0.5,0.75,0.8);
+  col += exp(-abs(length(p-src)-front)*38.)*vec3(0.25,0.5,0.6)*0.5;
+  float yd = length(p-you), arrive = exp(-abs(front-reach)*7.);
+  col = mix(col, vec3(0.92,0.96,1.), smoothstep(0.004, 0.0, abs(yd-0.034-0.02*arrive)-0.0015));
+  col = mix(col, vec3(0.92,0.96,1.), smoothstep(0.014, 0.011, yd));
+  col += arrive*exp(-yd*14.)*vec3(0.5,0.8,0.9)*0.6;
+  return col;
+}
+
+/* 2: the snail tube inside the ear */
+vec3 sceneEar(vec2 p, float s){
+  vec3 bg = vec3(1.,0.435,0.349), plum = vec3(0.169,0.043,0.145), hot = vec3(1.,0.9,0.72);
+  vec2 q = p/0.92; float ca = cos(-0.6), sa = sin(-0.6); q = vec2(ca*q.x-sa*q.y, sa*q.x+ca*q.y);
+  float r = length(q), th = atan(q.y, q.x); if(th < 0.) th += TAU;
+  float a = 0.034, b = 0.1427, PHI = 16.34;
+  float est = log(max(r, 1e-4)/a)/b;
+  float k = floor((est-th)/TAU+0.5);
+  float phU = th+TAU*k, ph = clamp(phU, 0., PHI);
+  float rk = a*exp(b*ph);
+  float dist = abs(r-rk);
+  if(phU < 0. || phU > PHI) dist = length(q-rk*vec2(cos(ph), sin(ph)));
+  float u = ph/PHI, w = rk*0.33;
+  float inside = smoothstep(w, w-0.005, dist);
+  float uf = 1.08-s*1.3;
+  float passed = smoothstep(uf-0.02, uf+0.05, u);
+  float crack = exp(-pow((u-0.88)/0.07, 2.)), boom = exp(-pow((u-0.24)/0.13, 2.));
+  float amp = passed*(0.22 + crack*(0.6+0.4*sin(uT*9.)) + boom*1.1);
+  float wv = sin(ph*8.+uT*5.);
+  float mem = smoothstep(0.006, 0.002, abs((r-rk)-wv*amp*w*0.5))*inside;
+  vec3 col = bg*(1.-0.22*smoothstep(w+0.05, w, dist));
+  vec3 tube = mix(plum, plum*1.7+vec3(0.1,0.,0.05), u) + hot*amp*(0.35+0.3*wv)*0.8;
+  col = mix(col, tube, inside);
+  col = mix(col, hot, mem*(0.45+0.55*min(1., amp*2.)));
+  vec2 door = a*exp(b*PHI)*vec2(cos(PHI), sin(PHI));
+  float kn = fract(uT*1.2);
+  col = mix(col, plum, smoothstep(0.008, 0., abs(length(q-door)-0.05-kn*0.12))*(1.-kn)*(1.-inside)*smoothstep(0.6, 0.3, s)*0.8);
+  return col;
+}
+
+/* 3: rows of hair cells */
+vec3 sceneHairs(vec2 p, float s){
+  vec3 bg = vec3(0.169,0.043,0.145), gold = vec3(1.,0.824,0.478);
+  float rowH = 0.21, py = p.y+0.03, j = floor(py/rowH), y = py-j*rowH;
+  float lead = step(mod(j+40., 4.), 0.5);
+  float sp = 0.042, i0 = floor(p.x/sp), base = 0.07, hh = 0.095+0.02*lead;
+  float cxw = mix(-0.5*asp.x-0.45, 0.5*asp.x+0.45, s);
+  vec2 P = vec2(p.x, y);
+  float line = 0., glow = 0., body = 0., fire = 0.;
+  for(int n=-2;n<=2;n++){
+    float i = i0+float(n), x = (i+0.5)*sp;
+    float env = exp(-pow((x-cxw)/0.3, 2.));
+    env = max(env, 0.9*smoothstep(0.22, 0., length(vec2(x, j*rowH+base-0.03)-uPtr)));
+    float ph = x*7.-uT*3.+j*0.8;
+    float ang = 0.8*sin(ph)*env + 0.07*sin(uT*1.2+i*1.7+j);
+    vec2 a = vec2(x, base), b = a+hh*vec2(sin(ang), cos(ang));
+    float dd = seg(P, a, b), bend = abs(sin(ph))*env;
+    line = max(line, smoothstep(0.0042, 0.0016, dd)*(0.55+0.45*lead));
+    glow += exp(-dd*70.)*bend;
+    float cd = smoothstep(0.013, 0.010, length(P-vec2(x, base-0.016)));
+    body = max(body, cd); fire = max(fire, cd*bend);
+    float fy = base-0.03-fract(uT*1.4+hash(vec2(i, j)))*0.04;
+    fire = max(fire, smoothstep(0.006, 0.003, length(P-vec2(x, fy)))*step(0.5, bend));
+  }
+  vec3 col = bg + vec3(0.1,0.03,0.09)*smoothstep(0.004, 0., abs(y-0.008));
+  col = mix(col, gold*0.75, line);
+  col = mix(col, vec3(0.45,0.16,0.36), body*(1.-fire));
+  col += gold*glow*0.55 + vec3(1.,0.95,0.8)*fire;
+  return col;
+}
+
+/* 4: the brain, a web of cells passing sparks */
+vec3 sceneBrain(vec2 p, float s){
+  vec2 q = p*5.5+vec2(0., uT*0.03), n = floor(q), f = fract(q);
+  float F1 = 8., F2 = 8.; vec2 idc = vec2(0.);
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+    vec2 g = vec2(float(i), float(j));
+    vec2 o = 0.5+0.38*sin(uT*0.4+TAU*hash2(n+g));
+    vec2 r = g+o-f; float d = dot(r, r);
+    if(d < F1){ F2 = F1; F1 = d; idc = n+g; } else if(d < F2) F2 = d;
+  }
+  F1 = sqrt(F1); F2 = sqrt(F2);
+  float web = smoothstep(0.075, 0., F2-F1), h = hash(idc);
+  float front = mix(-0.5*asp.y-0.25, 0.5*asp.y+0.45, s);
+  float act = smoothstep(front+0.05, front-0.3, p.y);
+  act = max(act, smoothstep(0.26, 0., length(p-uPtr)));
+  float pulse = pow(0.5+0.5*sin(F1*22.-uT*7.+h*TAU), 6.);
+  float fire = pow(0.5+0.5*sin(uT*(2.+3.*h)+h*40.), 10.);
+  vec3 col = vec3(0.04,0.04,0.11) + web*vec3(0.12,0.12,0.3)*(0.5+act);
+  col += web*pulse*act*vec3(1.,0.88,0.3)*0.9;
+  col += smoothstep(0.11, 0.05, F1)*(vec3(0.15,0.15,0.3) + act*fire*vec3(0.6,0.95,1.)*1.2);
+  col += exp(-abs(p.y-front)*9.)*web*vec3(1.,0.9,0.5)*0.8;
+  return col;
+}
+
+/* 5: the room from above, with the sound bouncing off the walls */
+float ring(vec2 p, vec2 c, float rad){
+  float x = length(p-c)-rad;
+  return smoothstep(0.012, 0., abs(x)) + 0.45*smoothstep(0.01, 0., abs(x+0.045))*step(0.045, rad) + 0.2*smoothstep(0.01, 0., abs(x+0.09))*step(0.09, rad);
+}
+vec3 sceneRoom(vec2 p, float s){
+  vec3 bg = vec3(0.478,0.075,0.133), cream = vec3(1.,0.914,0.84), pink = vec3(1.,0.6,0.55);
+  vec2 hs = vec2(0.5*asp.x-0.07, 0.5*asp.y-0.17);
+  vec2 S = vec2(-0.5,-0.55)*hs, L = vec2(0.45,0.5)*hs;
+  float rad = s*2.3*max(hs.x, hs.y), fade = 1./(1.+rad*1.1);
+  vec2 ap = abs(p);
+  float inside = step(ap.x, hs.x)*step(ap.y, hs.y);
+  float wall = smoothstep(0.007, 0.003, abs(max(ap.x-hs.x, ap.y-hs.y)));
+  vec2 m1 = vec2(2.*hs.x-S.x, S.y), m2 = vec2(-2.*hs.x-S.x, S.y), m3 = vec2(S.x, 2.*hs.y-S.y), m4 = vec2(S.x, -2.*hs.y-S.y);
+  float direct = ring(p, S, rad);
+  float refl = ring(p, m1, rad)+ring(p, m2, rad)+ring(p, m3, rad)+ring(p, m4, rad);
+  float refl2 = ring(p, vec2(m1.x, m3.y), rad)+ring(p, vec2(m2.x, m3.y), rad)+ring(p, vec2(m1.x, m4.y), rad)+ring(p, vec2(m2.x, m4.y), rad);
+  vec3 col = bg*(0.7+0.3*inside) + 0.02*noise(p*40.);
+  col = mix(col, pink, inside*min(1., refl*0.6+refl2*0.3)*fade*1.3);
+  col = mix(col, cream, inside*min(1., direct)*min(1., fade*1.8));
+  col = mix(col, cream, wall);
+  float sd = length(p-S);
+  col = mix(col, cream, smoothstep(0.004, 0.001, abs(sd-0.03)) + smoothstep(0.012, 0.009, sd));
+  float got = exp(-abs(length(L-S)-rad)*26.) + 0.6*(exp(-abs(length(L-m1)-rad)*26.)+exp(-abs(length(L-m2)-rad)*26.)+exp(-abs(length(L-m3)-rad)*26.)+exp(-abs(length(L-m4)-rad)*26.));
+  float ld = length(p-L);
+  col = mix(col, cream, smoothstep(0.02+0.012*min(1., got), 0.016+0.012*min(1., got), ld));
+  col += min(1., got)*exp(-ld*16.)*cream*0.5;
+  return col;
+}
+
+/* 6: the feeling */
+vec3 sceneYou(vec2 p, float s){
+  float t = uT*0.11*(1.+s);
+  vec2 q = p*1.5;
+  vec2 w = vec2(fbm(q+vec2(0., t)), fbm(q+vec2(5.2, -t)));
+  vec2 w2 = vec2(fbm(q+3.*w+vec2(1.7, 9.2)+t*0.6), fbm(q+3.*w+vec2(8.3, 2.8)-t*0.4));
+  float f = fbm(q+3.2*w2);
+  vec3 col = mix(vec3(0.1,0.035,0.09), vec3(0.72,0.2,0.2), smoothstep(0.25, 0.62, f));
+  col = mix(col, vec3(0.914,0.563,0.227), smoothstep(0.42, 0.85, w2.x)*0.85);
+  col = mix(col, vec3(1.,0.914,0.84), pow(w.y, 3.)*0.55);
+  float beat = fract(uT*1.15);
+  col += 0.07*exp(-beat*5.) + 0.06*smoothstep(0.02, 0., abs(length(p)-beat*1.4))*(1.-beat);
+  return col*0.92;
+}
+
+vec3 scene(float id, vec2 p, float q){
+  if(id < 0.5) return sceneDrum(p, q);
+  if(id < 1.5) return sceneAir(p, q);
+  if(id < 2.5) return sceneEar(p, q);
+  if(id < 3.5) return sceneHairs(p, q);
+  if(id < 4.5) return sceneBrain(p, q);
+  if(id < 5.5) return sceneRoom(p, q);
+  return sceneYou(p, q);
+}
+void main(){
+  float mn = min(uRes.x, uRes.y);
+  asp = uRes/mn;
+  vec2 p = (gl_FragCoord.xy-0.5*uRes)/mn;
+  vec3 col;
+  if(uMix <= 0.001) col = scene(uA, p, uPA);
+  else if(uMix >= 0.999) col = scene(uB, p, uPB);
+  else {
+    float front = mix(-0.5*asp.y-0.1, 0.5*asp.y+0.1, uMix) + 0.035*sin(p.x*9.+uT*2.) + 0.02*sin(p.x*23.-uT*3.1);
+    float m = smoothstep(0.012, -0.012, p.y-front);
+    if(m <= 0.) col = scene(uA, p, uPA);
+    else if(m >= 1.) col = scene(uB, p, uPB);
+    else col = mix(scene(uA, p, uPA), scene(uB, p, uPB), m);
+    col += vec3(1.,0.93,0.82)*exp(-abs(p.y-front)*80.)*0.55;
+  }
+  col = mix(vec3(0.078,0.051,0.039), col, uDim);
+  col += (hash(gl_FragCoord.xy+fract(uT)*91.)-0.5)*0.028;
+  gl_FragColor = vec4(col, 1.);
+}`;
+
+let gl = null, U = {};
+try { gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' }) || cv.getContext('experimental-webgl'); } catch (e) { gl = null; }
+if (gl) {
+  const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; } return s; };
+  const vs = mk(gl.VERTEX_SHADER, 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }');
+  const fs = mk(gl.FRAGMENT_SHADER, FRAG);
+  const pr = gl.createProgram();
+  if (vs && fs) { gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr); }
+  if (!vs || !fs || !gl.getProgramParameter(pr, gl.LINK_STATUS)) { if (vs && fs) console.error(gl.getProgramInfoLog(pr)); gl = null; }
+  else {
+    gl.useProgram(pr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    ['uRes', 'uT', 'uA', 'uB', 'uMix', 'uPA', 'uPB', 'uDim', 'uPtr', 'uHit'].forEach(n => { U[n] = gl.getUniformLocation(pr, n); });
+  }
+}
+if (!gl) root.classList.add('nogl');
+
+let vw = 1, vh = 1, scale = Math.min(window.devicePixelRatio || 1, 1.5), slowFrames = 0;
+function sizeCanvas() {
+  if (!gl) return;
+  const w = Math.max(1, Math.round(cv.clientWidth * scale)), h = Math.max(1, Math.round(cv.clientHeight * scale));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; gl.viewport(0, 0, w, h); }
+}
+
+/* ---------- chapters ---------- */
+const secs = [...document.querySelectorAll('[data-scene]')].map(el => {
+  const cs = getComputedStyle(el), d = el.dataset;
+  return { el, id: el.id, scene: +d.scene, base: +(d.base || 0), rate: d.rate === undefined ? 1 : +d.rate, t0: +d.t0, t1: +d.t1,
+    ink: cs.getPropertyValue('--ink').trim(), bg: cs.getPropertyValue('--bg').trim(), top: 0, h: 1 };
+});
+const stages = secs.filter(s => s.t1 > s.t0);
+const beats = [...document.querySelectorAll('.beat')].map(el => ({ el, top: 0, k: -1 }));
+const words = [...document.querySelectorAll('.word')].map(el => {
+  const text = el.textContent.replace(/\s+/g, ' ').trim();
+  const lines = el.querySelectorAll('.ln').length ? [...el.querySelectorAll('.ln')] : [el];
+  const letters = [];
+  lines.forEach(ln => { const t = ln.textContent; ln.textContent = ''; [...t].forEach(ch => { const i = document.createElement('i'); i.textContent = ch; i.setAttribute('aria-hidden', 'true'); ln.appendChild(i); letters.push(i); }); });
+  el.setAttribute('aria-label', text);
+  return { el, letters, top: 0, h: 1, still: true };
+});
+const railLinks = [...document.querySelectorAll('.rail a')];
+const msEl = $('ms'), stageEl = $('stage');
+
+function measure() {
+  vw = window.innerWidth; vh = window.innerHeight;
+  const y = window.scrollY;
+  secs.forEach(s => { const r = s.el.getBoundingClientRect(); s.top = r.top + y; s.h = Math.max(1, r.height); });
+  beats.forEach(b => { b.el.style.removeProperty('--k'); b.k = -1; b.top = b.el.getBoundingClientRect().top + y; });
+  words.forEach(w => { const r = w.el.getBoundingClientRect(); w.top = r.top + y; w.h = r.height; });
+  sizeCanvas();
+}
+
+/* ---------- sound: a drum built from the real note ratios of a drum skin ---------- */
+let ac = null, out = null, noiseBuf = null, soundOn = true;
+function audio() {
+  if (ac) { if (ac.state !== 'running') { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); } return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  try { ac = new AC(); } catch (e) { ac = null; return; }
+  out = ac.createDynamicsCompressor(); out.threshold.value = -12; out.ratio.value = 5; out.attack.value = 0.003; out.release.value = 0.2;
+  out.connect(ac.destination);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.2, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function drum(v) {
+  audio(); if (!ac || !soundOn) return;
+  const t = ac.currentTime + 0.005, f0 = 104;
+  [[1, 1, 0.9], [1.59, 0.55, 0.5], [2.14, 0.4, 0.36], [2.30, 0.3, 0.3], [2.65, 0.22, 0.22], [2.92, 0.14, 0.18]].forEach(([r, g, dec]) => {
+    const o = ac.createOscillator(), e = ac.createGain();
+    o.frequency.setValueAtTime(f0 * r * 1.35, t); o.frequency.exponentialRampToValueAtTime(f0 * r, t + 0.045);
+    e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(g * 0.5 * v, t + 0.003); e.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+    o.connect(e); e.connect(out); o.start(t); o.stop(t + dec + 0.05);
+  });
+  const n = ac.createBufferSource(), hp = ac.createBiquadFilter(), e = ac.createGain();
+  n.buffer = noiseBuf; hp.type = 'highpass'; hp.frequency.value = 1500;
+  e.gain.setValueAtTime(0.35 * v, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  n.connect(hp); hp.connect(e); e.connect(out); n.start(t); n.stop(t + 0.05);
+}
+
+/* ---------- touch and pointer ---------- */
+const T = () => performance.now() / 1000;
+let ptr = [9, 9], hit = [0, 0], hitT = -99, wob = 0, active = 0, replay = null;
+const toP = (x, y) => { const m = Math.min(vw, vh); return [(x - vw / 2) / m, -(y - vh / 2) / m]; };
+window.addEventListener('pointermove', e => { ptr = toP(e.clientX, e.clientY); }, { passive: true });
+window.addEventListener('pointerleave', () => { ptr = [9, 9]; });
+window.addEventListener('click', e => {
+  if (e.target.closest('a,button') || replay) return;
+  hit = toP(e.clientX, e.clientY); hitT = T(); wob = 1;
+  if (secs[active].scene === 0) { drum(1); $('cue').textContent = 'Scroll to slow time down.'; } else audio();
+});
+
+/* ---------- controls ---------- */
+const snd = $('snd');
+snd.addEventListener('click', () => { soundOn = !soundOn; snd.setAttribute('aria-pressed', String(soundOn)); snd.textContent = soundOn ? 'Sound on' : 'Sound off'; if (soundOn) audio(); });
+railLinks.forEach(a => a.addEventListener('click', e => {
+  const s = secs.find(q => '#' + q.id === a.getAttribute('href')); if (!s) return;
+  e.preventDefault(); window.scrollTo({ top: s.top + vh * 0.42, behavior: calm ? 'auto' : 'smooth' });
+}));
+function startReplay(k) {
+  if (replay) return;
+  const now = T();
+  replay = { t0: now, k, dim: k === 1 ? 0.55 : 1 };
+  hit = [vw > vh ? 0.3 * vw / vh : 0, vw > vh ? -0.02 : -0.26 * vh / vw]; hitT = now; wob = 1;
+  drum(1);
+  document.body.classList.add('replaying');
+  stageEl.hidden = k === 1;
+}
+$('real').addEventListener('click', () => startReplay(calm ? 50 : 1));
+$('slow').addEventListener('click', () => startReplay(50));
+
+/* ---------- every frame ---------- */
+let lastY = window.scrollY, lastT = T(), vel = 0, shownMs = '', shownActive = -1, shownStage = '';
+function frame() {
+  const now = T(), dt = Math.min(0.1, now - lastT); lastT = now;
+  const y = window.scrollY, mid = y + vh * 0.5;
+  vel = lerp(vel, dt > 0 ? Math.abs(y - lastY) / dt : 0, 0.2); lastY = y;
+
+  let i = 0; while (i < secs.length - 1 && mid >= secs[i + 1].top) i++;
+  const S = secs[i];
+  let s = i === 0 ? clamp(y / Math.max(1, S.h - vh * 0.5), 0, 1) : clamp((mid - S.top) / S.h, 0, 1);
+  let A = S.scene, B = S.scene, pA = S.base + S.rate * s, pB = pA, mix = 0, ms = lerp(S.t0, S.t1, s), dim = 1;
+  const next = secs[i + 1], prev = secs[i - 1];
+  if (next && next.scene !== S.scene && next.top - mid < vh * 0.3) { B = next.scene; pB = next.base; mix = (1 - (next.top - mid) / (vh * 0.3)) * 0.7; }
+  else if (prev && prev.scene !== S.scene && mid - S.top < vh * 0.12) { A = prev.scene; pA = prev.base + prev.rate; B = S.scene; pB = S.base + S.rate * s; mix = 0.7 + (mid - S.top) / (vh * 0.12) * 0.3; }
+  active = i;
+  let hud = S, stageName = '';
+
+  if (replay) {
+    const t = (now - replay.t0) * 1000 / replay.k;
+    if (t >= 170) { replay = null; document.body.classList.remove('replaying'); stageEl.hidden = true; $('after').hidden = false; hitT = now - 0.17; ms = 170; }
+    else {
+      const st = stages.find(q => t < q.t1) || stages[stages.length - 1];
+      const u = clamp((t - st.t0) / (st.t1 - st.t0), 0, 1);
+      A = B = st.scene; pA = pB = st.base + st.rate * u; mix = 0; ms = t; dim = replay.dim; hud = st; stageName = st.id;
+    }
+  }
+
+  if (gl && !document.hidden) {
+    if (dt > 0.036) slowFrames++; else slowFrames = Math.max(0, slowFrames - 1);
+    if (slowFrames > 45 && scale > 0.55) { scale *= 0.8; slowFrames = 0; sizeCanvas(); }
+    gl.uniform2f(U.uRes, cv.width, cv.height);
+    gl.uniform1f(U.uT, calm ? now * 0.35 : now);
+    gl.uniform1f(U.uA, A); gl.uniform1f(U.uB, B); gl.uniform1f(U.uMix, mix);
+    gl.uniform1f(U.uPA, pA); gl.uniform1f(U.uPB, pB); gl.uniform1f(U.uDim, dim);
+    gl.uniform2f(U.uPtr, ptr[0], ptr[1]);
+    gl.uniform3f(U.uHit, hit[0], hit[1], Math.min(60, now - hitT));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  const txt = ms.toFixed(1).padStart(5, '0');
+  if (txt !== shownMs) { shownMs = txt; msEl.textContent = txt; }
+  const hi = secs.indexOf(hud);
+  if (hi !== shownActive) {
+    shownActive = hi;
+    root.style.setProperty('--hud-ink', hud.ink); root.style.setProperty('--hud-bg', hud.bg);
+    railLinks.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + hud.id));
+  }
+  if (stageName !== shownStage) {
+    shownStage = stageName;
+    if (stageName) { const st = secs.find(q => q.id === stageName); $('stageName').textContent = stageName; $('stageTime').textContent = st.t0 + ' to ' + st.t1 + ' ms'; }
+  }
+
+  if (!calm) {
+    for (const b of beats) {
+      const k = clamp((y + vh * 0.96 - b.top) / (vh * 0.22), 0, 1), e = k * k * (3 - 2 * k);
+      if (Math.abs(e - b.k) > 0.004) { b.k = e; b.el.style.setProperty('--k', e.toFixed(3)); }
+    }
+    wob = lerp(wob, Math.min(1, vel / 2200), 0.08);
+    for (const w of words) {
+      const seen = w.top < y + vh && w.top + w.h > y;
+      if (!seen || wob < 0.004) { if (!w.still) { w.still = true; w.letters.forEach(l => { l.style.transform = ''; }); } continue; }
+      w.still = false;
+      w.letters.forEach((l, n) => {
+        const ph = now * 9 + n * 0.85;
+        l.style.transform = `translateY(${(Math.sin(ph) * wob * -0.09).toFixed(3)}em) scaleY(${(1 + Math.sin(ph + 1) * wob * 0.16).toFixed(3)}) skewX(${(Math.cos(ph) * wob * 7).toFixed(2)}deg)`;
+      });
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+let rz = 0;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(measure, 120); });
+window.addEventListener('load', measure);
+measure();
+requestAnimationFrame(frame);
+})();
+</script>
